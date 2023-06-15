@@ -105,15 +105,12 @@ conda activate EHRSHOT_ENV
 
 If you do not have cud/cudnn installed, you will need to install CUDA manually. To do so, follow these steps:
 
-1. Download version 11.8 of CUDA onto your local machine [from here](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=18.04&target_type=runfile_local)
-2. Copy your CUDA download from your local machine onto Nero, into whatever folder you'd like. We'll refer to the path to this folder as `<PATH_TO_CUDA_INSTALLER>` from now on.
-3. Run the CUDA installer as a bash command as follows: `bash <PATH_TO_CUDA_INSTALLER> --installpath=<INSTALL_PATH>`, where `<PATH_TO_CUDA_INSTALLER>` is the path to the file you downloaded/transferred in Step #2, and `<INSTALL_PATH>` is where you'd like to save your CUDA installation files. We recommend using `~` or something similar.
-4. The CUDA installer will pop-up a window during installation. Uncheck all of the boxes it presents except for the box labeled "cuda toolkit".
-5. After the installation completes, the installer will print out two paths to your console. Take note of these paths, and copy them into your `.bashrc` file by running the following commands.
-7. Install cuDNN v8.7.0 (November 28th, 2022) for CUDA. Go to this [link](https://developer.nvidia.com/rdp/cudnn-archive) and download the file
-`Download cuDNN v8.7.0 (November 28th, 2022), for CUDA 11.x` -> `Local Installer for Linux x86_64 (Tar)` on your local computer and transfer it
-over to your local folder in nero. Then follow the instruction [here](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html)
-section 1.3. Note that you need to copy over cudnn files to your local cuda. For example,
+1. Download version 11.8 of CUDA onto your machine [from here](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=18.04&target_type=runfile_local). We'll refer to the path to this download as `<PATH_TO_CUDA_INSTALLER>` from now on.
+2. Run the CUDA installer as a bash command as follows: `bash <PATH_TO_CUDA_INSTALLER> --installpath=<INSTALL_PATH>`, where `<PATH_TO_CUDA_INSTALLER>` is the path to the file you downloaded in Step #1, and `<INSTALL_PATH>` is where you'd like to save your CUDA installation files. We recommend using `~` or something similar.
+3. The CUDA installer will pop-up a window during installation. Uncheck all of the boxes it presents except for the box labeled "cuda toolkit".
+4. After the installation completes, the installer will print out two paths to your console. Take note of these paths, and copy them into your `.bashrc` file by running the following commands.
+5. Install cuDNN v8.7.0 (November 28th, 2022) for CUDA. Go to this [link](https://developer.nvidia.com/rdp/cudnn-archive) and download the file
+`Download cuDNN v8.7.0 (November 28th, 2022), for CUDA 11.x` -> `Local Installer for Linux x86_64 (Tar)` onto your machine. Then follow the [instructions here](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html) in section 1.3. Note that you need to copy over cudnn files to your local cuda. For example,
 
 - `cp cudnn-*-archive/include/cudnn*.h <path_to_your_cuda>/include`
 - `cp -P cudnn-*-archive/lib/libcudnn* <path_to_your_cuda>/lib64`
