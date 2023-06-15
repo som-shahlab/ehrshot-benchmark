@@ -120,11 +120,13 @@ cd ehrshot-benchmark
 pip install -r requirements.txt
 ```
 
-## Downloading Assets
+## Download Private Assets
 
-You will need to separately download several assets that we cannot redistribute publicly on Github: the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
+You will need to separately download several assets that we cannot redistribute publicly on Github.
 
-### Dataset + Foundation Model (CLMBR)
+This includes the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
+
+### A) Dataset + Foundation Model (CLMBR)
 
 **Note:** We are currently working with the Stanford AIMI Center to publicly release the EHRSHOT dataset. This is still a work in progress.
 
@@ -132,7 +134,7 @@ You will need to separately download several assets that we cannot redistribute 
 
 Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
 
-### Athena OHDSI Ontology
+### B) Athena OHDSI Ontology
 
 Our pipeline requires the user to provide an ontology in order to map medical codes to their parents/children. We use the default Athena OHDSI Ontology for this. 
 
