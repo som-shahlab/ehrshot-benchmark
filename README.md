@@ -138,7 +138,7 @@ Our pipeline requires the user to provide an ontology in order to map medical co
 
 Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so you must separately download it by following these steps:
 
-1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list)
+1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list). You may need to create an account.
 2. Click the green "Download" button at the top right of the website
 3. Click the purple "Download Vocabularies" button below the green "Download" button
 4. Name the bundle "athena_download" and select 5.x version
@@ -150,18 +150,18 @@ Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so yo
 
 Your final folder structure should look like this:
 
-- ehrshot-benchmark/
-  - EHRSHOT_ASSETS/
-    - data/
+- `ehrshot-benchmark/`
+  - `EHRSHOT_ASSETS/`
+    - `data/`
       - *We provide this asset, which contains deidentified EHR data as CSVs.*
-    - benchmark/ 
+    - `benchmark/`
       - *We provide this asset, which contains labels and few-shot samples for all our tasks.*
-    - models 
+    - `models`
       - *We provide this asset, which contains our pretrained foundation model for EHRs.*
-    - athena_download/ 
+    - `athena_download/`
       - *You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.*
-  - ehrshot/
-    - *Scripts to run the benchmarks*
+  - `ehrshot/`
+    - *We provide the scripts to run the benchmark here*
 
 <a name="usage"/>
 
