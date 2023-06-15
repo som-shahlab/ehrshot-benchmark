@@ -94,38 +94,25 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
 
 Please use the following steps to create an environment for running the EHRSHOT benchmark.
 
-**Step 1**: Create a `conda` environment
+**1)**: Create a `conda` environment
 
 ```bash
 conda create -n EHRSHOT_ENV python=3.10 -c conda-forge -y
 conda activate EHRSHOT_ENV
 ```
 
-**Step 2**: Install CUDA/CUDNN
-
-If you do not have cud/cudnn installed, you will need to install CUDA manually. To do so, follow these steps:
-
-1. Download version 11.8 of CUDA onto your machine [from here](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=18.04&target_type=runfile_local). We'll refer to the path to this download as `<PATH_TO_CUDA_INSTALLER>` from now on.
-2. Run the CUDA installer as a bash command as follows: `bash <PATH_TO_CUDA_INSTALLER> --installpath=<INSTALL_PATH>`, where `<PATH_TO_CUDA_INSTALLER>` is the path to the file you downloaded in Step #1, and `<INSTALL_PATH>` is where you'd like to save your CUDA installation files. We recommend using `~` or something similar.
-3. The CUDA installer will pop-up a window during installation. Uncheck all of the boxes it presents except for the box labeled "cuda toolkit".
-4. After the installation completes, the installer will print out two paths to your console. Take note of these paths, and copy them into your `.bashrc` file by running the following commands.
-5. Install cuDNN v8.7.0 (November 28th, 2022) for CUDA. Go to this [link](https://developer.nvidia.com/rdp/cudnn-archive) and download the file
-`Download cuDNN v8.7.0 (November 28th, 2022), for CUDA 11.x` -> `Local Installer for Linux x86_64 (Tar)` onto your machine. Then follow the [instructions here](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html) in section 1.3. Note that you need to copy over cudnn files to your local cuda. For example,
-
-- `cp cudnn-*-archive/include/cudnn*.h <path_to_your_cuda>/include`
-- `cp -P cudnn-*-archive/lib/libcudnn* <path_to_your_cuda>/lib64`
-- `chmod a+r <path_to_your_cuda>/include/cudnn*.h <path_to_your_cuda>/lib64/libcudnn*`
-
-**Step 3**: Install FEMR
+**2)**: Install **FEMR**
 
 For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
+
+You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
 
 ```bash
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install "femr_cuda[models]==0.0.20"
 ```
 
-**Step 4**: Install **EHRSHOT**
+**3)**: Install **EHRSHOT**
 
 ```bash
 git clone https://github.com/som-shahlab/ehrshot-benchmark.git
