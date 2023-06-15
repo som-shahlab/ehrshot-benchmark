@@ -1,0 +1,9 @@
+pandas
+loguru
+sklearn
+scikit-learn
+scipy
+lightgbm
+matplotlib
+numpy
+tqdm
