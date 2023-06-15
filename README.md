@@ -135,7 +135,7 @@ pip install -r requirements.txt
 
 ## Downloading Assets
 
-You will need to separately download several assets that we cannot redistribute publicly on Github: the dataset itself, the weights of the pre-trained model we benchmark, and the Athena OHDSI Ontology. 
+You will need to separately download several assets that we cannot redistribute publicly on Github: the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
 
 ### Dataset + Foundation Model (CLMBR)
 
