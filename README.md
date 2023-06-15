@@ -143,7 +143,7 @@ You will need to separately download several assets that we cannot redistribute 
 
 [Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/). This will require signing a research data use agreement.
 
-Once this is downloaded, please move the `EHRSHOT_ASSETS/` folder inside this repo.
+Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
 
 ### Athena OHDSI Ontology
 
@@ -166,14 +166,15 @@ Your final folder structure should look like this:
 - ehrshot-benchmark/
   - EHRSHOT_ASSETS/
     - data/
-      - We provide this asset, which contains deidentified EHR data as CSVs.
+      - *We provide this asset, which contains deidentified EHR data as CSVs.*
     - benchmark/ 
-      - We provide this asset, which contains labels and few-shot samples for all our tasks.
+      - *We provide this asset, which contains labels and few-shot samples for all our tasks.*
     - models 
-      - We provide this asset, which contains our pretrained foundation model for EHRs.
+      - *We provide this asset, which contains our pretrained foundation model for EHRs.*
     - athena_download/ 
-      - You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.
+      - *You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.*
   - ehrshot/
+    - *Scripts to run the benchmarks*
 
 <a name="usage"/>
 
