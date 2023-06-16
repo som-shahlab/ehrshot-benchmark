@@ -148,6 +148,14 @@ Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so yo
 6. It will take some time for the download to be ready. Please [refresh the webpage here](https://athena.ohdsi.org/vocabulary/download-history) to check whether your download is ready. Once the download is ready, click "Download"
 7. After the download is complete, unzip the file and move all the files into the `EHRSHOT_ASSETS/athena_download/` folder in your repo.
 
+After downloading the Athena OHDSI Ontology, you will have to separately download the CPT subset of the ontology. You can follow the instructions in the `readme.txt` in your Athena download, or follow the steps below:
+
+1. Create a [UMLS account here](https://uts.nlm.nih.gov/uts/signup-login)
+2. Get your [UMLS API key here](https://uts.nlm.nih.gov/uts/edit-profile)
+3. From the `EHRSHOT_ASSETS/athena_download/` folder, run this command: `bash cpt.sh <YOUR UMLS API KEY>`
+
+Your ontology will then be ready to go!
+
 ## Folder Structure
 
 Your final folder structure should look like this:
