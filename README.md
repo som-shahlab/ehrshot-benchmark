@@ -16,7 +16,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 <a name="dataset"/>
 
-# 🗃️ Dataset + Tasks | [Download here](https://stanfordaimi.azurewebsites.net/)
+# 🗃️ Dataset + Tasks | [Download here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7)
 
 The EHRSHOT dataset contains:
 * **6,712 patients**
@@ -50,7 +50,7 @@ Each task is a predictive classification task, and includes a canonical train/va
 
 <a name="models"/>
 
-# 🔮 Foundation Model for EHRs (CLMBR) | [Download here](https://stanfordaimi.azurewebsites.net/)
+# 🔮 Foundation Model for EHRs (CLMBR) | [Download here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7)
 
 We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
 
@@ -94,41 +94,25 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
 
 Please use the following steps to create an environment for running the EHRSHOT benchmark.
 
-**Step 1**: Create a `conda` environment
+**1)**: Create a `conda` environment
 
 ```bash
 conda create -n EHRSHOT_ENV python=3.10 -c conda-forge -y
 conda activate EHRSHOT_ENV
 ```
 
-**Step 2**: Install CUDA/CUDNN
-
-If you do not have cud/cudnn installed, you will need to install CUDA manually. To do so, follow these steps:
-
-1. Download version 11.8 of CUDA onto your local machine [from here](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=18.04&target_type=runfile_local)
-2. Copy your CUDA download from your local machine onto Nero, into whatever folder you'd like. We'll refer to the path to this folder as `<PATH_TO_CUDA_INSTALLER>` from now on.
-3. Run the CUDA installer as a bash command as follows: `bash <PATH_TO_CUDA_INSTALLER> --installpath=<INSTALL_PATH>`, where `<PATH_TO_CUDA_INSTALLER>` is the path to the file you downloaded/transferred in Step #2, and `<INSTALL_PATH>` is where you'd like to save your CUDA installation files. We recommend using `~` or something similar.
-4. The CUDA installer will pop-up a window during installation. Uncheck all of the boxes it presents except for the box labeled "cuda toolkit".
-5. After the installation completes, the installer will print out two paths to your console. Take note of these paths, and copy them into your `.bashrc` file by running the following commands.
-7. Install cuDNN v8.7.0 (November 28th, 2022) for CUDA. Go to this [link](https://developer.nvidia.com/rdp/cudnn-archive) and download the file
-`Download cuDNN v8.7.0 (November 28th, 2022), for CUDA 11.x` -> `Local Installer for Linux x86_64 (Tar)` on your local computer and transfer it
-over to your local folder in nero. Then follow the instruction [here](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html)
-section 1.3. Note that you need to copy over cudnn files to your local cuda. For example,
-
-- `cp cudnn-*-archive/include/cudnn*.h <path_to_your_cuda>/include`
-- `cp -P cudnn-*-archive/lib/libcudnn* <path_to_your_cuda>/lib64`
-- `chmod a+r <path_to_your_cuda>/include/cudnn*.h <path_to_your_cuda>/lib64/libcudnn*`
-
-**Step 3**: Install FEMR
+**2)**: Install **FEMR**
 
 For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
+
+You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
 
 ```bash
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install "femr_cuda[models]==0.0.20"
 ```
 
-**Step 4**: Install **EHRSHOT**
+**3)**: Install **EHRSHOT**
 
 ```bash
 git clone https://github.com/som-shahlab/ehrshot-benchmark.git
@@ -136,25 +120,27 @@ cd ehrshot-benchmark
 pip install -r requirements.txt
 ```
 
-## Downloading Assets
+## Download Private Assets
 
-You will need to separately download several assets that we cannot redistribute publicly on Github: the dataset itself, the weights of the pre-trained model we benchmark, and the Athena OHDSI Ontology. 
+You will need to separately download several assets that we cannot redistribute publicly on Github.
 
-### Dataset + Foundation Model (CLMBR)
+This includes the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
 
-**Note:** We are currently working with the Stanford AIMI Center to publicly release the EHRSHOT dataset. This is still a work in progress.
+### A) Dataset + Foundation Model (CLMBR)
 
-[Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/). This will require signing a research data use agreement.
+**Note:** We are currently working with the Stanford AIMI Center to publicly release the model weights. This is still a work in progress.
 
-Once this is downloaded, please move the `EHRSHOT_ASSETS/` folder inside this repo.
+[Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7). This will require signing a research data use agreement.
 
-### Athena OHDSI Ontology
+Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
+
+### B) Athena OHDSI Ontology
 
 Our pipeline requires the user to provide an ontology in order to map medical codes to their parents/children. We use the default Athena OHDSI Ontology for this. 
 
 Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so you must separately download it by following these steps:
 
-1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list)
+1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list). You may need to create an account.
 2. Click the green "Download" button at the top right of the website
 3. Click the purple "Download Vocabularies" button below the green "Download" button
 4. Name the bundle "athena_download" and select 5.x version
@@ -162,21 +148,30 @@ Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so yo
 6. It will take some time for the download to be ready. Please [refresh the webpage here](https://athena.ohdsi.org/vocabulary/download-history) to check whether your download is ready. Once the download is ready, click "Download"
 7. After the download is complete, unzip the file and move all the files into the `EHRSHOT_ASSETS/athena_download/` folder in your repo.
 
+After downloading the Athena OHDSI Ontology, you will have to separately download the CPT subset of the ontology. You can follow the instructions in the `readme.txt` in your Athena download, or follow the steps below:
+
+1. Create a [UMLS account here](https://uts.nlm.nih.gov/uts/signup-login)
+2. Get your [UMLS API key here](https://uts.nlm.nih.gov/uts/edit-profile)
+3. From the `EHRSHOT_ASSETS/athena_download/` folder, run this command: `bash cpt.sh <YOUR UMLS API KEY>`
+
+Your ontology will then be ready to go!
+
 ## Folder Structure
 
 Your final folder structure should look like this:
 
-- ehrshot-benchmark/
-  - EHRSHOT_ASSETS/
-    - data/
-      - We provide this asset, which contains deidentified EHR data as CSVs.
-    - benchmark/ 
-      - We provide this asset, which contains labels and few-shot samples for all our tasks.
-    - models 
-      - We provide this asset, which contains our pretrained foundation model for EHRs.
-    - athena_download/ 
-      - You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.
-  - ehrshot/
+- `ehrshot-benchmark/`
+  - `EHRSHOT_ASSETS/`
+    - `data/`
+      - *We provide this asset, which contains deidentified EHR data as CSVs.*
+    - `benchmark/`
+      - *We provide this asset, which contains labels and few-shot samples for all our tasks.*
+    - `models`
+      - *We provide this asset, which contains our pretrained foundation model for EHRs.*
+    - `athena_download/`
+      - *You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.*
+  - `ehrshot/`
+    - *We provide the scripts to run the benchmark here*
 
 <a name="usage"/>
 
