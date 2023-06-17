@@ -106,6 +106,7 @@ def generate_binary_classification_metrics(X_train, y_train, X_val, y_val, X_tes
             X_train
         )  # best for sparse data: see https://scikit-learn.org/stable/modules/preprocessing.html#scaling-sparse-data
         X_train = scaler.fit_transform(X_train)
+        X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
         model = LogisticRegression(n_jobs=1, penalty="l2", solver="lbfgs")
         if is_tune_hyperparams:
