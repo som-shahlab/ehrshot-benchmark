@@ -9,8 +9,7 @@ __pycache__/
 logs
 ehrshot/logs/
 data
-EHRSHOT_ASSETS
-EHRSHOT_ASSETS_BACKUP
+EHRSHOT_ASSETS*
 
 # Distribution / packaging
 .Python

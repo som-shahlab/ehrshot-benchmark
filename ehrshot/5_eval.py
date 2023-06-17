@@ -73,6 +73,7 @@ def tune_hyperparams(X_train, y_train, X_val, y_val, model, params, num_threads:
     test_fold[X_train.shape[0]:] = 1
     clf = GridSearchCV(model, params, n_jobs=6, verbose=1, cv=PredefinedSplit(test_fold=test_fold), refit=False)
     clf.fit(X, y)
+    best_params = clf.best_params_
     best_model = model.__class__(**clf.best_params_)
     best_model.fit(X_train, y_train)
     return best_model
@@ -82,6 +83,10 @@ def generate_binary_classification_metrics(X_train, y_train, X_val, y_val, X_tes
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
     logger.info(f"Test shape: X = {X_test.shape}, Y = {y_test.shape}")
+
+    logger.info(f"Train prevalence:  {sum(y_train)/len(y_train)}")
+    logger.info(f"Val prevalence: {sum(y_val)/len(y_val)}")
+    logger.info(f"Test prevalence: {sum(y_test)/len(y_test)}")
     
     # Shuffle training set
     np.random.seed(X_train.shape[0])
@@ -149,7 +154,6 @@ def generate_binary_classification_metrics(X_train, y_train, X_val, y_val, X_tes
         'calibration' : test_calibration,
     }
 
-
 def plot_results(label_dict: dict, 
                  labeling_function: str, 
                  size: int = 14,
@@ -216,9 +220,6 @@ def main(args):
     # Set up logging
     PATH_TO_SAVE: str = os.path.join(args.path_to_save, labeling_function)
     os.makedirs(PATH_TO_SAVE, exist_ok=True)
-
-    PATH_TO_SAVE_MODELS: str = os.path.join(PATH_TO_SAVE, f"models")
-    os.makedirs(PATH_TO_SAVE_MODELS, exist_ok=True)
 
     PATH_TO_SHOTS: str = os.path.join(PATH_TO_DATA, f"benchmark/{labeling_function}/{shot_strat}_shots_data.json")
     logger.info(f"Args: {PATH_TO_SHOTS}")
@@ -328,8 +329,6 @@ def main(args):
                         y_val_k_one_label = y_val_k[:, idx]
                         y_test_one_label = y_test[:, idx]
                         model, score = generate_binary_classification_metrics(X_train_k, y_train_k_one_label, X_val_k, y_val_k_one_label, X_test, y_test_one_label, model=model_head, is_tune_hyperparams=args.is_tune_hyperparams)
-                        path_to_save = os.path.join(PATH_TO_SAVE_MODELS, f"{label_str}/{model_name}_{model_head}_{label_str}_rep_{replicate}_shot_strata_{shot_strat}_{k}_tune_params_{args.is_tune_hyperparams}.pkl")
-                        # save_data(model, path_to_save)
                         few_shots_results.append(score)
                     if not model_name in label_dict[label_str]:
                         label_dict[label_str][model_name] = {}
@@ -337,6 +336,7 @@ def main(args):
                         # For `scores`, convert list of dicts to dict of lists
                         'scores' : collections.defaultdict(list, {k: [d[k] for d in few_shots_results] for k in set().union(*few_shots_results)}),
                         'k' : SHOTS,
+                        'best_params': model.get_params()
                     }
         else:
             # Binary classification
@@ -351,8 +351,6 @@ def main(args):
                     X_train_k, y_train_k = X_train[train_idxs], y_train[train_idxs]
                     X_val_k, y_val_k = X_val[val_idxs], y_val[val_idxs]
                     model, score = generate_binary_classification_metrics(X_train_k, y_train_k, X_val_k, y_val_k, X_test, y_test, model=model_head, is_tune_hyperparams=args.is_tune_hyperparams)
-                    path_to_save = os.path.join(PATH_TO_SAVE_MODELS, f"{model_name}_{model_head}_{labeling_function}_rep_{replicate}_shot_strata_{shot_strat}_{k}_tune_params_{args.is_tune_hyperparams}.pkl")
-                    # save_data(model, path_to_save)
                     few_shots_results.append(score)
                 if not model_name in label_dict[labeling_function]:
                     label_dict[labeling_function][model_name] = {}
@@ -360,9 +358,10 @@ def main(args):
                     # For `scores`, convert list of dicts to dict of lists
                     'scores' : collections.defaultdict(list, {k: [d[k] for d in few_shots_results] for k in set().union(*few_shots_results)}),
                     'k' : SHOTS,
+                    'best_params': model.get_params()
                 }
     # Save results
-    path_to_save: str = os.path.join(PATH_TO_SAVE, f"{create_file_name(shot_strat, model_head)}_tune_params_{args.is_tune_hyperparams}_preserve_prev_{args.is_preserve_prevalence}.json")
+    path_to_save: str = os.path.join(PATH_TO_SAVE, f"{shot_strat}_tune_params_{args.is_tune_hyperparams}.json")
     save_data(label_dict, path_to_save)
     logger.success("DONE!")
 

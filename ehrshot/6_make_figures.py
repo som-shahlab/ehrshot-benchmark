@@ -71,8 +71,8 @@ def plot_individual_results(path_to_eval: dict,
                  path_to_save: str = "./"):
     """label_dict[labeling_function][model_name][replicate][scores][auroc]"""
 
-    label_dict = load_data(os.path.join(path_to_eval, "few_logistic_tune_params_True_preserve_prev_False.json"))
-    label_dict_long = load_data(os.path.join(path_to_eval, "long_logistic_tune_params_True_preserve_prev_False.json"))
+    label_dict = load_data(os.path.join(path_to_eval, "few_tune_params_True.json"))
+    label_dict_long = load_data(os.path.join(path_to_eval, "long_tune_params_True.json"))
 
     task = label_dict[labeling_function]
     task_long = label_dict_long[labeling_function]
@@ -135,7 +135,7 @@ def make_data_dict(path_to_eval, task_group):
     LABELING_FUNCTIONS = task_group_dict[task_group]
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_logistic_tune_params_True_preserve_prev_False.json"))
+        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
 
         for label_name in data:
             gbm_dict = data[label_name]["Count_based_GBM"]
@@ -161,7 +161,7 @@ def make_data_dict(path_to_eval, task_group):
     clmbr_auprcs_long = []
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_logistic_tune_params_True_preserve_prev_False.json"))
+        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"))
 
         for label_name in data:
             gbm_dict = data[label_name]["Count_based_GBM"]
@@ -398,7 +398,7 @@ def make_box_plot(path_to_eval,
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
         # Load few-shot data
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_logistic_tune_params_True_preserve_prev_False.json"))
+        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
         for model in MODELS:
             for metric in METRICS:
                 for label_str in data:
@@ -408,7 +408,7 @@ def make_box_plot(path_to_eval,
                         for k_idx, k in enumerate(scores_dict['k']):
                             fewshot_results[model][metric][labeling_function][k].append(scores_dict['scores'][metric][k_idx])
         # Load full data
-        long_data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_logistic_tune_params_True_preserve_prev_False.json"))
+        long_data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"))
         for model in MODELS:
             for metric in METRICS:
                 for label_str in long_data:
@@ -483,7 +483,7 @@ def make_box_plot(path_to_eval,
 
 def main(path_to_data, path_to_save, size=16):
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        label_dict = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_logistic_tune_params_True_preserve_prev_False.json"))
+        label_dict = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
         for lf in label_dict:
             path_to_labeling_function_eval = os.path.join(path_to_eval, labeling_function)
             plot_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=path_to_save, size=size)
@@ -510,7 +510,7 @@ if __name__ == "__main__":
 
     # Plotting individual auroc and auprc plots
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        label_dict = load_data(os.path.join(PATH_TO_EVAL, f"{labeling_function}/few_logistic_tune_params_True_preserve_prev_False.json"))
+        label_dict = load_data(os.path.join(PATH_TO_EVAL, f"{labeling_function}/few_tune_params_True.json"))
         for lf in label_dict:
             path_to_labeling_function_eval = os.path.join(PATH_TO_EVAL, labeling_function)
             plot_individual_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=PATH_TO_SAVE)

@@ -10,9 +10,9 @@
 
 
 # labeling_functions=("guo_los" "guo_readmission" "guo_icu" "uden_hypertension" "uden_hyperlipidemia" "uden_pancan" "uden_celiac" "uden_lupus" "uden_acutemi" "thrombocytopenia_lab" "hyperkalemia_lab" "hypoglycemia_lab" "hyponatremia_lab" "anemia_lab" "chexpert")
-labeling_functions=("guo_readmission" "guo_icu")
-shot_strats=("few" "long")
-# shot_strats=("long")
+labeling_functions=("guo_los")
+# shot_strats=("few" "long")
+shot_strats=("few")
 
 # Iterate over labeling_functions
 for labeling_function in "${labeling_functions[@]}"; do
