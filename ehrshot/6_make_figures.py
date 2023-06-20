@@ -8,9 +8,6 @@ import matplotlib.pyplot as plt
 import collections
 from matplotlib.patches import Patch
 
-# Plots to generate
-
-
 LABELING_FUNCTIONS = [
     "guo_los", 
     "guo_readmission",

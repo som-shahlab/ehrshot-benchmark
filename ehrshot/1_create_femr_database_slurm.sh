@@ -7,8 +7,6 @@
 #SBATCH --mem=100G
 #SBATCH --cpus-per-task=10
 
-# Usage:
-
 python3 1_create_femr_database.py \
     --path_to_input ../EHRSHOT_ASSETS/data \
     --path_to_target ../EHRSHOT_ASSETS/femr \

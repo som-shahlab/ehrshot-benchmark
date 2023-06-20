@@ -19,14 +19,6 @@ import lightgbm as lgb
 import femr
 import femr.datasets
 
-"""
-python3 6_eval.py \
-    --machine nero \
-    --dataset stanford \
-    --labeling_function guo_readmission \
-    --shot_strat few
-"""
-
 XGB_PARAMS = {
     'max_depth': [3, 6, -1],
     'learning_rate': [0.02, 0.1, 0.5],

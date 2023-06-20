@@ -7,9 +7,8 @@
 #SBATCH --mem=100G
 #SBATCH --cpus-per-task=10
 
-# Usage:
-
 labeling_functions=("guo_los" "guo_readmission" "guo_icu" "uden_hypertension" "uden_hyperlipidemia" "uden_pancan" "uden_celiac" "uden_lupus" "uden_acutemi" "thrombocytopenia_lab" "hyperkalemia_lab" "hypoglycemia_lab" "hyponatremia_lab" "anemia_lab" "chexpert")
+
 for labeling_function in "${labeling_functions[@]}"
 do
     python3 2_generate_labels_and_features.py \

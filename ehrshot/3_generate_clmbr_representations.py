@@ -1,37 +1,10 @@
-"""
-    This script runs CLMBR inference on all patients to generate patient-level representations.
-"""
-
 import argparse
-import pandas as pd
 import os
-from typing import Optional, List, Dict
+from typing import Optional
 from loguru import logger
 import shutil
 from utils import save_data, load_data, sort_tuples, LABELING_FUNCTIONS
 import femr.datasets
-from femr.labelers.core import LabeledPatients, Label
-import collections
-
-"""
-# Codes only
-python3 5_generate_clmbr_representations.py \
-    --machine nero \
-    --dataset stanford \
-    --path_to_clmbr_data /local-scratch/nigam/projects/clmbr_text_assets/data/clmbr_lr_0.0001_wd_0.0_id_0.0_td_0.0_rt_global_maxiter_10000000_hs_768_is_3072_nh_12_nl_6_aw_512_obs \
-    --labeling_function chexpert \
-    --is_force_refresh \
-    --cuda_visible_devices 6 &
-
-# Codes + Text
-python3 5_generate_clmbr_representations.py \
-    --machine nero \
-    --dataset stanford \
-    --path_to_clmbr_data /local-scratch/nigam/projects/clmbr_text_assets/data/clmbr_text_lr_0.0001_wd_0.0_id_0.0_td_0.0_rt_global_maxiter_350000_hs_768_is_3072_nh_12_nl_12_aw_512_obs \
-    --labeling_function chexpert \
-    --is_force_refresh \
-    --cuda_visible_devices 0 &
-"""
 
 def main(args):
     CLMBR_DATA_PATH: str = args.path_to_clmbr_data

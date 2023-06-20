@@ -1,10 +1,9 @@
 import argparse
 import datetime
 import os
-import pickle
 import json
 from loguru import logger
-from utils import LABELING_FUNCTIONS, load_data, save_data
+from utils import LABELING_FUNCTIONS, save_data
 import pandas as pd
 
 import femr

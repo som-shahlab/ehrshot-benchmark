@@ -9,17 +9,12 @@ import struct
 import hashlib
 from loguru import logger
 import numpy as np
-import femr.datasets
 import femr
 import femr.labelers
 from datetime import datetime
 
 # Labeling functions
 LABELING_FUNCTIONS: List[str] = [
-    # Hartutyunyan et al. 2019 (MIMIC-3 benchmark tasks)
-    # "hartutyunyan_mortality", -- issues with mortality label in STARR
-    # "hartutyunyan_decompensation", -- issues with mortality label in STARR
-    # "hartutyunyan_los", -- hard task
     # Guo et al. (CLMBR tasks)
     "guo_los",
     "guo_readmission",
@@ -29,7 +24,6 @@ LABELING_FUNCTIONS: List[str] = [
     'uden_celiac',
     'uden_lupus',
     'uden_acutemi',
-    # 'uden_cteph', -- Not enough labels, ignore
     'uden_hypertension',
     'uden_hyperlipidemia',
     # Instant lab value

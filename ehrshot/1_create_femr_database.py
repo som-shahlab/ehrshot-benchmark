@@ -3,14 +3,6 @@ import argparse
 from loguru import logger
 import femr.datasets
 
-"""
-python3 1_create_femr_database.py \
-    --path_to_input ../data/cohort \
-    --path_to_target ../data/femr\
-    --athena_download ../data/athena_download \
-    --num_threads 10
-"""
-
 def delete_files_not_starting_with_csv(folder_path):
     # Iterate over all files in the folder
     for filename in os.listdir(folder_path):

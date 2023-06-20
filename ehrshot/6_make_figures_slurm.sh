@@ -7,7 +7,6 @@
 #SBATCH --mem=150G
 #SBATCH --cpus-per-task=20
 
-
 python3 6_make_figures.py \
     --path_to_eval ../EHRSHOT_ASSETS/output \
     --path_to_save ../EHRSHOT_ASSETS/figures

@@ -1,10 +1,9 @@
 import argparse
 import os
-import pickle
 import numpy as np
 from loguru import logger
-from utils import (LABELING_FUNCTIONS, load_data, save_data, 
-                   sort_tuples, get_pid_label_times_and_values, 
+from utils import (LABELING_FUNCTIONS, save_data, 
+                   get_pid_label_times_and_values, 
                    process_chexpert_labels, convert_multiclass_to_binary_labels)
 import femr.datasets
 from datetime import datetime

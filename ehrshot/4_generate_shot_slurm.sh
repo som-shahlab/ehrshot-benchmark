@@ -7,11 +7,10 @@
 #SBATCH --mem=150G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:1
-# SBATCH --exclude=secure-gpu-1,secure-gpu-2,secure-gpu-3
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2,secure-gpu-3
 
 labeling_functions=("guo_los" "guo_readmission" "guo_icu" "uden_hypertension" "uden_hyperlipidemia" "uden_pancan" "uden_celiac" "uden_lupus" "uden_acutemi" "thrombocytopenia_lab" "hyperkalemia_lab" "hypoglycemia_lab" "hyponatremia_lab" "anemia_lab" "chexpert")
-# labeling_functions=("guo_los")
-shot_strats=("long")
+shot_strats=("few" "long")
 
 # Iterate over labeling_functions
 for labeling_function in "${labeling_functions[@]}"; do
