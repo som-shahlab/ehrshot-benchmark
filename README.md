@@ -50,7 +50,7 @@ Each task is a predictive classification task, and includes a canonical train/va
 
 <a name="models"/>
 
-# 🔮 Foundation Model for EHRs (CLMBR) | [Download here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7)
+# 🔮 Foundation Model for EHRs (CLMBR) | *Sharable Link In Progress*
 
 We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
 
