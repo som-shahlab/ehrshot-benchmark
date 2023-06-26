@@ -1,6 +1,6 @@
 # 👂 💉 EHRSHOT
 
-A benchmark for few-shot evaluation of foundation models for electronic health records (EHRs).
+A benchmark for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here.](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)**
 
 ----
 
@@ -16,7 +16,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 <a name="dataset"/>
 
-# 🗃️ Dataset + Tasks | [Download here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7)
+# 🗃️ Dataset + Tasks | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
 
 The EHRSHOT dataset contains:
 * **6,712 patients**
@@ -50,7 +50,7 @@ Each task is a predictive classification task, and includes a canonical train/va
 
 <a name="models"/>
 
-# 🔮 Foundation Model for EHRs (CLMBR) | *Sharable Link In Progress*
+# 🔮 Foundation Model for EHRs (CLMBR) | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
 
 We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
 
@@ -128,9 +128,7 @@ This includes the dataset itself, the weights of the pre-trained foundation mode
 
 ### A) Dataset + Foundation Model (CLMBR)
 
-**Note:** We are currently working with the Stanford AIMI Center to publicly release the model weights. This is still a work in progress.
-
-[Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/datasets/44981316-0b07-49bf-a736-989ded5ad3c7). This will require signing a research data use agreement.
+[Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51). This will require signing a research data use agreement.
 
 Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
 
@@ -301,4 +299,4 @@ sbatch 6_make_figures_slurm.sh
 
 # License
 
-The source code of this repo is released under the Apache License 2.0. The dataset and model are released under the Stanford University Dataset Research Use Agreement.
+The source code of this repo is released under the Apache License 2.0. The dataset and model license are listed on their corresponding Stanford AIMI Center webpage.
