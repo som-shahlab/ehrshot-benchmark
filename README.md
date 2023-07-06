@@ -1,6 +1,6 @@
 # 👂 💉 EHRSHOT
 
-A benchmark for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here.](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)**
+A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here.](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)**
 
 ----
 
@@ -24,7 +24,7 @@ The EHRSHOT dataset contains:
 * **893,773 visits**
 * **15 prediction tasks**
 
-Each patient timeline consists of an ordered sequence of clinical events taken from the structured data of their EHR (e.g. diagnoses, procedures, prescriptions, etc.). 
+Each patient consists of an ordered timeline of clinical events taken from the structured data of their EHR (e.g. diagnoses, procedures, prescriptions, etc.). 
 
 Each task is a predictive classification task, and includes a canonical train/val/test split. The tasks are defined as follows:
 
@@ -50,14 +50,13 @@ Each task is a predictive classification task, and includes a canonical train/va
 
 <a name="models"/>
 
-# 🔮 Foundation Model for EHRs (CLMBR) | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
+# 🔮 Foundation Model for EHRs | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
 
 We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
 
 We are [one of the first](https://arxiv.org/abs/2303.12961) to fully release such a model for coded EHR data; in contrast, most prior models released for clinical data  (e.g. GatorTron, ClinicalBERT) only work with unstructured text and cannot process the rich, structured data within an EHR.
 
 We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.sciencedirect.com/science/article/pii/S1532046420302653) as our model. CLMBR is an autoregressive model designed to predict the next medical code in a patient's timeline given previous codes. CLMBR employs causally masked local attention, ensuring forward-only flow of information which is vital for prediction tasks and is in contrast to BERT-based models which are bidirectional in nature. We utilize a transformer as our base model with 141 million trainable parameters and a next code prediction objective, providing minute-level EHR resolution rather than the day-level aggregation of the original model formulation. 
-
 
 
 <a name="prior_work"/>
@@ -94,11 +93,15 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
 
 Please use the following steps to create an environment for running the EHRSHOT benchmark.
 
-**1)**: Create a `conda` environment
+**1)**: Install **EHRSHOT**
 
 ```bash
-conda create -n EHRSHOT_ENV python=3.10 -c conda-forge -y
+conda create -n EHRSHOT_ENV python=3.10 -y
 conda activate EHRSHOT_ENV
+
+git clone https://github.com/som-shahlab/ehrshot-benchmark.git
+cd ehrshot-benchmark
+pip install -r requirements.txt
 ```
 
 **2)**: Install **FEMR**
@@ -112,21 +115,13 @@ pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com
 pip install "femr_cuda[models]==0.0.20"
 ```
 
-**3)**: Install **EHRSHOT**
-
-```bash
-git clone https://github.com/som-shahlab/ehrshot-benchmark.git
-cd ehrshot-benchmark
-pip install -r requirements.txt
-```
-
 ## Download Private Assets
 
 You will need to separately download several assets that we cannot redistribute publicly on Github.
 
 This includes the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
 
-### A) Dataset + Foundation Model (CLMBR)
+### A) Dataset & Foundation Model for EHRs
 
 [Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51). This will require signing a research data use agreement.
 
