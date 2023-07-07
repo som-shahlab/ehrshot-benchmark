@@ -1,6 +1,6 @@
 # 👂 💉 EHRSHOT
 
-A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here.](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)**
+A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)** or **[read the paper here](https://arxiv.org/abs/2307.02028)**.
 
 ----
 
@@ -294,7 +294,7 @@ sbatch 6_make_figures_slurm.sh
 
 # Citation
 
-If you find this project helpful, please cite our paper:
+If you find this project helpful, please cite [our paper](https://arxiv.org/abs/2307.02028):
 
 ```
 @article{wornow2023ehrshot,
