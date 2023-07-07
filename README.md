@@ -12,7 +12,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 3. [Comparison to Prior Work](#prior_work)
 4. [Installation](#installation)
 5. [Usage](#usage)
-
+6. [Citation](#citation)
 
 <a name="dataset"/>
 
@@ -290,6 +290,21 @@ or
 
 ```bash
 sbatch 6_make_figures_slurm.sh
+```
+
+# Citation
+
+If you find this project helpful, please cite our paper:
+
+```
+@article{wornow2023ehrshot,
+      title={EHRSHOT: An EHR Benchmark for Few-Shot Evaluation of Foundation Models}, 
+      author={Michael Wornow and Rahul Thapa and Ethan Steinberg and Jason Fries and Nigam Shah},
+      year={2023},
+      eprint={2307.02028},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
 ```
 
 # License
