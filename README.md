@@ -1,6 +1,8 @@
 # 👂 💉 EHRSHOT
 
-A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[download it here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)** or **[read the paper here](https://arxiv.org/abs/2307.02028)**.
+A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[read the paper here](https://arxiv.org/abs/2307.02028)**. 
+
+Please note that the dataset + model are still being reviewed, and a download link will be provided once they are approved for public release.
 
 ----
 
@@ -16,7 +18,9 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 <a name="dataset"/>
 
-# 🗃️ Dataset + Tasks | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
+# 🗃️ Dataset + Tasks
+
+**Please Note:** Dataset release is currently being reviewed and the download link will be updated once it is publicly available.
 
 The EHRSHOT dataset contains:
 * **6,712 patients**
@@ -50,7 +54,9 @@ Each task is a predictive classification task, and includes a canonical train/va
 
 <a name="models"/>
 
-# 🔮 Foundation Model for EHRs | [Download here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51)
+# 🔮 Foundation Model for EHRs
+
+**Please Note:** Model release is currently being reviewed and the download link will be updated once it is publicly available.
 
 We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
 
@@ -123,7 +129,7 @@ This includes the dataset itself, the weights of the pre-trained foundation mode
 
 ### A) Dataset & Foundation Model for EHRs
 
-[Download the EHRSHOT dataset and pre-trained foundation model from the Stanford AIMI Center here](https://stanfordaimi.azurewebsites.net/datasets/72587f3f-45ab-43fc-8b54-7544c1d8bf51). This will require signing a research data use agreement.
+**Please Note:** Dataset + model release is currently being reviewed and the download link will be updated once it is publicly available.
 
 Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
 
