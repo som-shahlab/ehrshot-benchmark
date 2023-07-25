@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from typing import List, Optional
 
@@ -18,6 +19,7 @@ import scipy
 import lightgbm as lgb
 import femr
 import femr.datasets
+import femr.models.conjugate_gradient
 
 XGB_PARAMS = {
     'max_depth': [3, 6, -1],
@@ -99,9 +101,6 @@ def generate_binary_classification_metrics(X_train, y_train, X_val, y_val, X_tes
             model.fit(X_train, y_train)
     elif model == "logistic":
         # Logistic Regresion
-        scaler = MaxAbsScaler().fit(
-            X_train
-        )  # best for sparse data: see https://scikit-learn.org/stable/modules/preprocessing.html#scaling-sparse-data
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
@@ -198,60 +197,13 @@ def plot_results(label_dict: dict,
 def create_file_name(shot_strat: str, model_head: str):
     return f"{shot_strat}_{model_head}"
 
-def main(args):
-    # Force settings
-    labeling_function: str = args.labeling_function
-    shot_strat: str = args.shot_strat
-    model_head: str = args.model_head
-    num_replicates: int = args.num_replicates
-    PATH_TO_DATA: str = args.path_to_data
-    CLMBR_MODELS: List[str] = args.clmbr_models
 
-    PATH_TO_DATABASE: str = os.path.join(PATH_TO_DATA, "femr/extract")
-
-    # Set up logging
-    PATH_TO_SAVE: str = os.path.join(args.path_to_save, labeling_function)
-    os.makedirs(PATH_TO_SAVE, exist_ok=True)
-
-    PATH_TO_SHOTS: str = os.path.join(PATH_TO_DATA, f"benchmark/{labeling_function}/{shot_strat}_shots_data.json")
-    logger.info(f"Args: {PATH_TO_SHOTS}")
-
-    path_to_log_file: str = os.path.join(PATH_TO_SAVE, f"{labeling_function}_{create_file_name(shot_strat, model_head)}.log")
-    if os.path.exists(path_to_log_file):
-        os.remove(path_to_log_file)
-    logger.add(path_to_log_file)
-    logger.info(f"Args: {args}")
-
-    logger.info(f"Args: {args}")
-    
-    # Load PatientDatabase
-    database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
-
-    # Few v. long shot
-    if shot_strat == 'few':
-        SHOTS = FEW_SHOTS
-    elif shot_strat == 'long':
-        SHOTS = LONG_SHOTS
-    elif shot_strat == 'debug':
-        SHOTS = DEBUG_SHOTS
-    elif shot_strat == 'both':
-        SHOTS = FEW_SHOTS + LONG_SHOTS
-    else:
-        raise ValueError(f"Invalid shot_strat: {shot_strat}")
-
-    patient_ids, label_times, label_values, clmbr_feature_matrix, count_feature_matrix = get_pid_label_times_and_values(PATH_TO_DATA, labeling_function)
-
-    if labeling_function == "chexpert":
-        label_values = process_chexpert_labels(label_values)
-    elif labeling_function.endswith('_lab'):
-        # Lab value is multi-class, convert to binary
-        label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
-
+def train_and_compute(patient_ids, label_times, label_values, count_feature_mtarix, clmbr_feature_matrix, motor_feature_matrix, train_mask, val_mask):
     # Train/test splits
     split_seed: int = 97
     hashed_pids = np.array([database.compute_split(split_seed, pid) for pid in patient_ids])
-    train_pids_idx = np.where(hashed_pids < 70)[0]
-    val_pids_idx = np.where((70 <= hashed_pids) & (hashed_pids < 85))[0]
+    train_pids_idx = np.where(np.logical_and(hashed_pids < 70, train_mask))[0]
+    val_pids_idx = np.where(np.logical_and((70 <= hashed_pids) & (hashed_pids < 85), val_mask))[0]
     test_pids_idx = np.where(hashed_pids >= 85)[0]
 
     patient_ids_train, label_times_train = patient_ids[train_pids_idx], label_times[train_pids_idx]
@@ -261,120 +213,151 @@ def main(args):
     y_train, y_val, y_test = label_values[train_pids_idx], label_values[val_pids_idx], label_values[test_pids_idx]
     X_train_count, X_val_count, X_test_count = count_feature_matrix[train_pids_idx], count_feature_matrix[val_pids_idx], count_feature_matrix[test_pids_idx]
     X_train_clmbr, X_val_clmbr, X_test_clmbr = clmbr_feature_matrix[train_pids_idx], clmbr_feature_matrix[val_pids_idx], clmbr_feature_matrix[test_pids_idx]
+    X_train_motor, X_val_motor, X_test_motor = motor_feature_matrix[train_pids_idx], motor_feature_matrix[val_pids_idx], motor_feature_matrix[test_pids_idx]
 
     prevalence = np.sum(y_test != 0) / len(y_test)
-    logger.info(f"CLMBR Train shape: X = {X_train_clmbr.shape}, Y = {y_train.shape}")
-    logger.info(f"Count Train shape: X = {X_train_count.shape}, Y = {y_train.shape}")
-    logger.info(f"CLMBR Val shape: X = {X_val_clmbr.shape}, Y = {y_val.shape}")
-    logger.info(f"Count Val shape: X = {X_val_count.shape}, Y = {y_val.shape}")
-    logger.info(f"CLMBR Test shape: X = {X_test_clmbr.shape}, Y = {y_test.shape}")
-    logger.info(f"COUNT Test shape: X = {X_test_count.shape}, Y = {y_test.shape}")
+
+    assert X_train_clmbr.shape[0] == y_train.shape[0]
+    assert X_train_motor.shape[0] == y_train.shape[0]
+    assert X_train_count.shape[0] == y_train.shape[0]
+
+    logger.info(f"Num Train: {y_train.shape[0]}, Num Valid: {y_val.shape[0]}, Num Test: {y_test.shape[0]}")
     logger.info(f"Test prevalence: {prevalence}")
+
+    clmbr_model = femr.models.conjugate_gradient.train_logistic_regression(X_train_clmbr, y_train.astype(float), X_val_clmbr, y_val.astype(float))
     
-    # Load PatientDatabase
+    y_train_proba = np.dot(X_train_clmbr, clmbr_model)
+    y_val_proba = np.dot(X_val_clmbr, clmbr_model)
+    y_test_proba = np.dot(X_test_clmbr, clmbr_model)
 
-    # Store results
-    label_dict = {}
-    if labeling_function == "chexpert":
-        for label_str in CHEXPERT_LABELS:
-            label_dict[label_str] = {}
-    else:
-        label_dict[labeling_function] = {}
+    train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
+    val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
+    test_auroc = metrics.roc_auc_score(y_test, y_test_proba)
 
-    for model_name in CLMBR_MODELS:
-        logger.critical(f"Running model: {model_name}")
-        if model_name.startswith("Count_based_"):
-            # Load count-based featurizations
-            # Select only the patients that are in the CLMBR reprs
-            # Choose model head
-            if model_name == 'Count_based_GBM':
-                model_head = 'gbm'
-                X_train = X_train_count
-                X_val = X_val_count
-                X_test = X_test_count
-            else:
-                raise ValueError(f"Invalid count-based feats value for: {model_name}")
-        else:
-            X_train = X_train_clmbr
-            X_val = X_val_clmbr
-            X_test = X_test_clmbr
-            # Choose model head = Logistic Regression
-            model_head = args.model_head
-        logger.critical(f"Using head: {model_head}")
+    results = {}
 
-        few_shots_dict = load_data(PATH_TO_SHOTS)
-        if labeling_function == 'chexpert':
-            # Multilabel
-            for replicate in range(num_replicates):
-                for idx, label_str in enumerate(CHEXPERT_LABELS):
-                    few_shots_results = []
-                    for k in SHOTS:
-                        k = str(k)
-                        replicate = str(replicate)
-                        logger.critical(f"Label: {label_str} | k: {k} | Replicate: {replicate}")
-                        train_idxs = few_shots_dict[label_str][k][replicate]["train_idxs"]
-                        val_idxs = few_shots_dict[label_str][k][replicate]["val_idxs"]
-                        X_train_k, y_train_k = X_train[train_idxs], y_train[train_idxs]
-                        X_val_k, y_val_k = X_val[val_idxs], y_val[val_idxs]
+    results['clmbr'] = {
+        'train': train_auroc,
+        'val': val_auroc,
+        'test': test_auroc,
+    }
+    
+    logger.info(f"CLMBR Train AUROC: {train_auroc}")
+    logger.info(f"CLMBR Val AUROC: {val_auroc}")
+    logger.info(f"CLMBR Test AUROC: {test_auroc}")
+    
+    motor_model = femr.models.conjugate_gradient.train_logistic_regression(X_train_motor, y_train.astype(float), X_val_motor, y_val.astype(float))
+    
+    y_train_proba = np.dot(X_train_motor, motor_model)
+    y_val_proba = np.dot(X_val_motor, motor_model)
+    y_test_proba = np.dot(X_test_motor, motor_model)
 
-                        y_train_k_one_label = y_train_k[:, idx]
-                        y_val_k_one_label = y_val_k[:, idx]
-                        y_test_one_label = y_test[:, idx]
-                        model, score = generate_binary_classification_metrics(X_train_k, y_train_k_one_label, X_val_k, y_val_k_one_label, X_test, y_test_one_label, model=model_head, is_tune_hyperparams=args.is_tune_hyperparams)
-                        few_shots_results.append(score)
-                    if not model_name in label_dict[label_str]:
-                        label_dict[label_str][model_name] = {}
-                    label_dict[label_str][model_name][replicate] = {
-                        # For `scores`, convert list of dicts to dict of lists
-                        'scores' : collections.defaultdict(list, {k: [d[k] for d in few_shots_results] for k in set().union(*few_shots_results)}),
-                        'k' : SHOTS,
-                        'best_params': model.get_params()
-                    }
-        else:
-            # Binary classification
-            for replicate in range(num_replicates):
-                few_shots_results = []
-                for k in SHOTS:
-                    k = str(k)
-                    replicate = str(replicate)
-                    logger.critical(f"Label: {labeling_function} | k: {k} | Replicate: {replicate}")
-                    train_idxs = few_shots_dict[labeling_function][str(k)][replicate]["train_idxs"]
-                    val_idxs = few_shots_dict[labeling_function][str(k)][replicate]["val_idxs"]
-                    X_train_k, y_train_k = X_train[train_idxs], y_train[train_idxs]
-                    X_val_k, y_val_k = X_val[val_idxs], y_val[val_idxs]
-                    model, score = generate_binary_classification_metrics(X_train_k, y_train_k, X_val_k, y_val_k, X_test, y_test, model=model_head, is_tune_hyperparams=args.is_tune_hyperparams)
-                    few_shots_results.append(score)
-                if not model_name in label_dict[labeling_function]:
-                    label_dict[labeling_function][model_name] = {}
-                label_dict[labeling_function][model_name][replicate] = {
-                    # For `scores`, convert list of dicts to dict of lists
-                    'scores' : collections.defaultdict(list, {k: [d[k] for d in few_shots_results] for k in set().union(*few_shots_results)}),
-                    'k' : SHOTS,
-                    'best_params': model.get_params()
-                }
-    # Save results
-    path_to_save: str = os.path.join(PATH_TO_SAVE, f"{shot_strat}_tune_params_{args.is_tune_hyperparams}.json")
-    save_data(label_dict, path_to_save)
-    logger.success("DONE!")
+    train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
+    val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
+    test_auroc = metrics.roc_auc_score(y_test, y_test_proba)
+
+    results['motor'] = {
+        'train': train_auroc,
+        'val': val_auroc,
+        'test': test_auroc,
+    }
+
+    logger.info(f"MOTOR Train AUROC: {train_auroc}")
+    logger.info(f"MOTOR Val AUROC: {val_auroc}")
+    logger.info(f"MOTOR Test AUROC: {test_auroc}")
+
+    if False:
+        model = lgb.LGBMClassifier()
+        logger.info(f"Tuning hyperparameters for LightGBM...")
+        # `min_child_samples`: Specifies the minimum number of samples required in a leaf (terminal node).
+        XGB_PARAMS['min_child_samples'] = [ 1 ]
+        model = tune_hyperparams(X_train_count, y_train, X_val_count, y_val, model, XGB_PARAMS, num_threads=args.num_threads)
+        logger.info(f"Best params: {model.get_params()}")
+
+
+        y_train_proba = model.predict_proba(X_train_count)[::, 1]
+        y_val_proba = model.predict_proba(X_val_count)[::, 1]
+        y_test_proba = model.predict_proba(X_test_count)[::, 1]
+        train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
+        val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
+        test_auroc = metrics.roc_auc_score(y_test, y_test_proba)
+        
+        logger.info(f"GBM Train AUROC: {train_auroc}")
+        logger.info(f"GBM Val AUROC: {val_auroc}")
+        logger.info(f"GBM Test AUROC: {test_auroc}")
+        
+        results['gbm'] = {
+            'train': train_auroc,
+            'val': val_auroc,
+            'test': test_auroc,
+        }
+
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate CLMBR patient representations")
     # Paths
-    parser.add_argument("--path_to_data", type=str, help=( "Path where you have all the data, including your clmbr representations, labeled_featururized patients" ), )
-    parser.add_argument("--path_to_save", type=str, help=( "Path to save evaluation data" ), )
-    parser.add_argument("--labeling_function", required=True, type=str, help="Name of labeling function to create.", choices=LABELING_FUNCTIONS, )
-    parser.add_argument("--shot_strat", type=str, choices=['both', 'few', 'long', 'debug'], help="Type of sampling to do", required=True )
+    parser.add_argument("--path_to_database", type=str)
+    parser.add_argument("--path_to_labels", type=str)
+    parser.add_argument("--path_to_features", type=str)
+    parser.add_argument("--path_to_save", type=str)
+    parser.add_argument("--num_threads", type=int)
     
-    # Logistics
-    parser.add_argument("--num_replicates", type=int, help="For std bars in plots", default=3, )
-    parser.add_argument("--model_head", type=str, choices=['gbm', 'logistic', 'protonet'], default='logistic', help="CLMBR Head")
-    
-    # Subsampling labeled patients
-    # Eval pipeline tuning
-    parser.add_argument("--is_tune_hyperparams", action='store_true', default=False, help="Tune parameters or not")
-    parser.add_argument("--is_preserve_prevalence", action='store_true', default=False, help="Preserve Prevalence or not")
-
-    parser.add_argument('--clmbr_models', nargs='+', default=["Count_based_GBM", "Codes_Only"], help="Pass models to run. ")
     args = parser.parse_args()
-    main(args)
+
+    # Set up logging
+    os.makedirs(args.path_to_save, exist_ok=True)
+    
+
+    database = femr.datasets.PatientDatabase(args.path_to_database)
+
+    labeled_patients = femr.labelers.load_labeled_patients(os.path.join(args.path_to_labels, 'labeled_patients.csv'))
+
+    patient_ids, label_times, label_values, count_feature_matrix, clmbr_feature_matrix, motor_feature_matrix = get_pid_label_times_and_values(args.path_to_features, labeled_patients)
+
+    label_name = os.path.basename(args.path_to_labels)
+
+    logger.info(f"Task name: {label_name}")
+
+    if label_name == "chexpert":
+        label_values = process_chexpert_labels(label_values)
+        os.exit()
+    elif label_name.endswith('_lab'):
+       # Lab value is multi-class, convert to binary
+        label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
+    
+    results = {
+       'long': train_and_compute(patient_ids, label_times, label_values, 
+            count_feature_matrix, clmbr_feature_matrix, motor_feature_matrix,
+            np.ones_like(patient_ids), np.ones_like(patient_ids))
+    }
+
+    with open(os.path.join(args.path_to_labels, 'few_shots_data.json')) as f:
+        few_shots = json.load(f)
+
+    if False:
+        results['few'] = {}
+
+        for k, k_vals in few_shots.items():
+            results['few'][k] = {}
+            for r, r_instance in k_vals.items():
+                print(k, r, r_instance)
+                train_mask = np.zeros_like(patient_ids)
+                val_mask = np.zeros_like(patient_ids)
+
+                for name, mask in (('train', train_mask), ('val', val_mask)):
+                    pids = np.array(r_instance[f'patient_ids_{name}_k'], dtype=np.int64)
+                    times = np.array(r_instance[f'label_times_{name}_k'], dtype="datetime64[us]")
+                
+                    order = np.lexsort((times, pids))
+                    pids = pids[order]
+                    times = times[order]
+                
+                    join_indices = femr.extension.dataloader.compute_feature_label_alignment(pids, times.astype(np.int64), patient_ids, label_times.astype("datetime64[us]").astype(np.int64))
+                    mask[join_indices] = 1
+
+                results['few'][k][r] = train_and_compute(patient_ids, label_times, label_values, count_feature_matrix, clmbr_feature_matrix, train_mask, val_mask)
+
+    with open(os.path.join(args.path_to_save, 'results.json'), 'w') as f:
+        json.dump(results, f)

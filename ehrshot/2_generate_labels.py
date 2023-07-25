@@ -82,7 +82,6 @@ if __name__ == "__main__":
 
     # create directories to save files
     PATH_TO_SAVE_LABELED_PATIENTS: str = os.path.join(PATH_TO_OUTPUT_DIR, "labeled_patients.csv")
-    PATH_TO_SAVE_FEATURIZED_PATIENTS: str = os.path.join(PATH_TO_OUTPUT_DIR, "featurized_patients.pkl")
     os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
 
     # Load PatientDatabase + Ontology
@@ -183,32 +182,6 @@ if __name__ == "__main__":
 
         # Save labeled patients to simple CSV pipeline format
         save_labeled_patients_to_csv(labeled_patients, PATH_TO_SAVE_LABELED_PATIENTS)
-
-    # Lets use both age and count featurizer
-    age = AgeFeaturizer()
-    count = CountFeaturizer(is_ontology_expansion=True)
-    featurizer_age_count = FeaturizerList([age, count])
-
-    # Preprocessing the featurizers, which includes processes such as normalizing age.
-    logger.info("Start | Preprocess featurizers")
-    featurizer_age_count.preprocess_featurizers(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
-    logger.info("Finish | Preprocess featurizers")
-
-    logger.info("Start | Featurize patients")
-    results = featurizer_age_count.featurize(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
-    save_data(results, PATH_TO_SAVE_FEATURIZED_PATIENTS)
-    logger.info("Finish | Featurize patients")
-    feature_matrix, patient_ids, label_values, label_times = (
-        results[0],
-        results[1],
-        results[2],
-        results[3],
-    )
-    logger.info("FeaturizedPatient stats:\n"
-                f"feature_matrix={repr(feature_matrix)}\n"
-                f"patient_ids={repr(patient_ids)}\n"
-                f"label_values={repr(label_values)}\n"
-                f"label_times={repr(label_times)}")
     
     with open(os.path.join(PATH_TO_OUTPUT_DIR, "done.txt"), "w") as f:
         f.write("done")

@@ -13,6 +13,8 @@ import femr
 import femr.labelers
 from datetime import datetime
 
+import femr.extension.dataloader
+
 # Labeling functions
 LABELING_FUNCTIONS: List[str] = [
     # Guo et al. (CLMBR tasks)
@@ -92,13 +94,6 @@ def load_data(filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
         # raise ValueError("Unsupported file extension. Only .pkl and .json are supported.")
-
-def sort_tuples(lst, lst2):
-    zipped_lists = list(zip(lst, lst2))
-    zipped_lists.sort(key=lambda x: (x[0][0], x[0][1]))
-    
-    lst, lst2 = zip(*zipped_lists)
-    return list(lst), list(lst2)
 
 
 def compute_split(person_id: int, seed: int = 97) -> int:
@@ -184,103 +179,37 @@ def rand_num_mod_100(person_id: int, seed: int = 97) -> int:
     return int.from_bytes(hashlib.sha256(value).digest(), "big") % 100
 
 
-def get_pid_label_times_and_values(PATH_TO_DATA, labeling_function):
+def get_pid_label_times_and_values(path_to_features, labeled_patients):
+    label_pids, label_values, label_times = labeled_patients.as_numpy_arrays()
 
-    # PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_DATA, f"benchmark/{labeling_function}/labeled_patients.csv")
-    PATH_TO_COUNT_FEATS: str = os.path.join(PATH_TO_DATA, f"benchmark/{labeling_function}/featurized_patients.pkl")
-    PATH_TO_CLMBR_REPS = os.path.join(PATH_TO_DATA, f"clmbr_reps/{labeling_function}/clmbr_reprs")
 
-    # labeled_patients = femr.labelers.core.load_labeled_patients(PATH_TO_LABELED_PATIENTS)
+    order = np.lexsort((label_times, label_pids))
+    label_pids = label_pids[order]
+    label_values = label_values[order]
+    label_times = label_times[order].astype("datetime64[us]")
 
-    # Count featurizations
-    logger.success(f"Found count featurizations. Loading @ {PATH_TO_COUNT_FEATS}")
+    features = []
+    for feature_name in ['count', 'clmbr', 'motor']:
+        with open(os.path.join(path_to_features, f'{feature_name}_features.pkl'), 'rb') as f:
+            feature_values, feature_pids, _, feature_times = pickle.load(f)
+            feature_times = feature_times.astype("datetime64[us]")
+
+            assert feature_pids.dtype == label_pids.dtype, f'{feature_pids.dtype}, {label_pids.dtype}'
+            assert feature_times.dtype == label_times.dtype, f'{feature_times.dtype}, {label_times.dtype}'
+
+            order = np.lexsort((feature_times, feature_pids))
+            feature_pids = feature_pids[order]
+            feature_times = feature_times[order]
+
+            join_indices = femr.extension.dataloader.compute_feature_label_alignment(label_pids, label_times.astype(np.int64), feature_pids, feature_times.astype(np.int64))
+            feature_values = feature_values[order[join_indices], :]
+
+            assert np.all(feature_pids[join_indices] == label_pids)
+            assert np.all(feature_times[join_indices] == label_times)
+
+            features.append(feature_values)
     
-    logger.info(f"Path to CLMBR REPS: {PATH_TO_CLMBR_REPS}")
-    clmbr_reps = load_data(PATH_TO_CLMBR_REPS)
-    clmbr_feature_matrix, clmbr_patient_ids, clmbr_label_times = [
-        clmbr_reps[k] for k in ("data_matrix", "patient_ids", "labeling_time")
-    ]
-    clmbr_patient_ids_label_times = [(pid, time) for pid, time in zip(clmbr_patient_ids, clmbr_label_times)]
-    idxs = [i for i in range(len(clmbr_patient_ids_label_times))]
-    _, sort_idxs = sort_tuples(clmbr_patient_ids_label_times, idxs)
-    clmbr_feature_matrix = clmbr_feature_matrix[sort_idxs]
-    clmbr_patient_ids = clmbr_patient_ids[sort_idxs]
-    clmbr_label_times = clmbr_label_times[sort_idxs]
-
-    count_feats = pickle.load(open(PATH_TO_COUNT_FEATS, 'rb'))
-    count_feature_matrix, count_patient_ids, count_label_values, count_label_times = (
-        count_feats[0],
-        count_feats[1],
-        count_feats[2],
-        count_feats[3],
-    )
-
-    count_patient_ids_label_times = [(pid, time) for pid, time in zip(count_patient_ids, count_label_times)]
-    idxs = [i for i in range(len(count_patient_ids_label_times))]
-    _, sort_idxs = sort_tuples(count_patient_ids_label_times, idxs)
-    count_feature_matrix = count_feature_matrix[sort_idxs]
-    count_patient_ids = count_patient_ids[sort_idxs]
-    count_label_values = count_label_values[sort_idxs]
-    count_label_times = count_label_times[sort_idxs]
-
-    count_patient_label_time_pairs = list(zip(count_patient_ids, [ x.astype('datetime64[m]') for x in count_label_times ]))
-    clmbr_patient_label_time_pairs = list(zip(clmbr_patient_ids, [ np.datetime64(x).astype('datetime64[m]') for x in clmbr_label_times ]))
-    intersection = set(clmbr_patient_label_time_pairs).intersection(set(count_patient_label_time_pairs))
-
-    intersection_idxs = []
-    already_seen = set()
-    for idx, (patient_id, label_time) in enumerate(count_patient_label_time_pairs):
-        # Get all unique pairs of (patient_id, label_time) present in both the CLMBR and count featurizations
-        if (patient_id, label_time) in intersection and (patient_id, label_time) not in already_seen:
-            intersection_idxs.append(idx)
-            already_seen.add((patient_id, label_time))
-
-    count_feature_matrix = count_feature_matrix[intersection_idxs]
-    count_patient_ids = count_patient_ids[intersection_idxs]
-    count_label_values = count_label_values[intersection_idxs]
-    count_label_times = count_label_times[intersection_idxs]
-
-    intersection_idxs = []
-    already_seen = set()
-    for idx, (patient_id, label_time) in enumerate(clmbr_patient_label_time_pairs):
-        # Get all unique pairs of (patient_id, label_time) present in both the CLMBR and count featurizations
-        if (patient_id, label_time) in intersection and (patient_id, label_time) not in already_seen:
-            intersection_idxs.append(idx)
-            already_seen.add((patient_id, label_time))
-    clmbr_feature_matrix = clmbr_feature_matrix[intersection_idxs]
-    clmbr_patient_ids = clmbr_patient_ids[intersection_idxs]
-    clmbr_label_times = clmbr_label_times[intersection_idxs]
-
-    count_label_times_new = []
-    desired_format = "%Y-%m-%dT%H:%M:%S.%f"
-
-    for label_time in count_label_times:
-        dt_obj = datetime.strptime(str(label_time), desired_format)
-        desired_datetime = datetime(dt_obj.year, dt_obj.month, dt_obj.day, dt_obj.hour, dt_obj.minute)
-        count_label_times_new.append(desired_datetime)
-    
-    count_label_times = np.array(count_label_times_new)
-    assert count_patient_ids.shape == clmbr_patient_ids.shape
-    assert count_label_times.shape == clmbr_label_times.shape
-    assert np.sum(count_patient_ids == clmbr_patient_ids) == len(clmbr_patient_ids)
-    assert np.sum(count_label_times == clmbr_label_times) == len(count_label_times)
-
-    # assert np.sum(count_label_times == clmbr_label_times) == len(clmbr_label_times)
-
-    patient_ids = clmbr_patient_ids
-    label_times = clmbr_label_times
-    label_values = count_label_values
-
-    logger.info(f"CLMBR Feature matrix shape: {clmbr_feature_matrix.shape}")
-    logger.info(f"Count Feature matrix shape: {count_feature_matrix.shape}")
-    logger.info(f"Patient IDs shape: {len(patient_ids)}")
-    logger.info(f"Label values shape: {label_values.shape}")
-    logger.info(f"Label times shape: {label_times.shape}")
-    logger.info(f"Unique label values: {np.unique(label_values)} (total = {len(np.unique(label_values))})")
-    logger.info(f"# of unique patients: {len(np.unique(patient_ids))}")
-
-    return patient_ids, label_times, label_values, clmbr_feature_matrix, count_feature_matrix
-
+    return [label_pids, label_times, label_values] + features
 
 def process_chexpert_labels(label_values):
     new_labels = []
