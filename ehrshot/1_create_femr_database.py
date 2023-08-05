@@ -1,13 +1,12 @@
 import os
 import argparse
-from loguru import logger
 import femr.datasets
+from loguru import logger
 
 def delete_files_not_starting_with_csv(folder_path):
     # Iterate over all files in the folder
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
-
         # Check if the file is a regular file (not a folder)
         if os.path.isfile(file_path):
             # Check if the file does not start with ".csv"
@@ -16,52 +15,44 @@ def delete_files_not_starting_with_csv(folder_path):
                 os.remove(file_path)
                 logger.info(f"Deleted file: {filename}")
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Create FEMR patient database from EHRSHOT raw CSVs")
+    parser.add_argument("--path_to_input_dir", required=True, type=str, help="Path to folder containing all EHRSHOT CSVs")
+    parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to save FEMR patient database")
+    parser.add_argument("--path_to_athena_download", type=str, help="Path to where your Athena download folder is located (which contains your ontologies)")
+    parser.add_argument("--num_threads", type=int, help="Number of threads to use")
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run femr text featurizer")
-    parser.add_argument(
-        "--path_to_input",
-        type=str,
-        help="Path to folder with all the csv files",
-    )
-    parser.add_argument(
-        "--path_to_target",
-        type=str,
-        help="Path to your target directory to save femr",
-    )
-    parser.add_argument(
-        "--athena_download",
-        type=str,
-        help="Path to athena download",
-    )
-    parser.add_argument(
-        "--num_threads",
-        type=int,
-        default=1,
-        help="Number of threads",
-    )
+    args = parse_args()
+    PATH_TO_INPUT_DIR: str = args.path_to_input_dir
+    PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
+    PATH_TO_ATHENA_DOWNLOAD: str = args.path_to_athena_download
+    NUM_THREADS: int = args.num_threads
+    PATH_TO_FEMR_LOGS: str = os.path.join(PATH_TO_OUTPUT_DIR, "logs")
+    PATH_TO_FEMR_EXTRACT: str = os.path.join(PATH_TO_OUTPUT_DIR, "extract")
+    
+    # Make sure the output directory does not already exist
+    if os.path.exists(PATH_TO_OUTPUT_DIR):
+        raise ValueError(f"Output directory already exists: {PATH_TO_OUTPUT_DIR}. Please delete it or choose a different directory.")
+    os.makedirs(PATH_TO_OUTPUT_DIR)
 
-    args = parser.parse_args()
-    INPUT_DIR = args.path_to_input
-    TARGET_DIR = args.path_to_target
-    athena_download = args.athena_download
-    num_threads = args.num_threads
+    # `etl_simple_femr` command will crash if it sees any non-csv files in the input directory
+    # Thus, we need to make sure we delete any non-CSV files in our input directory
+    delete_files_not_starting_with_csv(PATH_TO_INPUT_DIR) 
 
-    delete_files_not_starting_with_csv(INPUT_DIR)  # We just want csv files inside this folder
-    os.makedirs(TARGET_DIR)
+    # Run the ETL pipeline to transform: EHRSHOT CSVs -> FEMR patient database
+    logger.info(f"Start | Create FEMR PatientDatabase")
+    os.system(f"etl_simple_femr {PATH_TO_INPUT_DIR} {PATH_TO_FEMR_EXTRACT} {PATH_TO_FEMR_LOGS} --num_threads {NUM_THREADS} --path_to_athena_download {PATH_TO_ATHENA_DOWNLOAD}")
+    logger.info(f"Finish | Create FEMR PatientDatabase")
 
-    LOG_DIR = os.path.join(TARGET_DIR, "logs")
-    EXTRACT_DIR = os.path.join(TARGET_DIR, "extract")
-
-    os.system(f"etl_simple_femr {INPUT_DIR} {EXTRACT_DIR} {LOG_DIR} --num_threads {num_threads} --athena_download {athena_download}")
-
-    logger.info(f"Femr database saved in path: {TARGET_DIR}")
-    logger.info("Testing the database")
-
-    database = femr.datasets.PatientDatabase(EXTRACT_DIR)
-    logger.info("Num patients", len(database))
+    # Logging
+    database = femr.datasets.PatientDatabase(PATH_TO_FEMR_EXTRACT)
     all_patient_ids = list(database)
-    omop_id = all_patient_ids[0]
-    patient = database[omop_id]
+    patient_id: int = all_patient_ids[0]
+    patient = database[patient_id]
     events = patient.events
-    logger.info(f"Number of events in patients with omop_id {omop_id}: {events}")
-    logger.info(f"First event of the patient: {events[0]}")
+    logger.info(f"FEMR database saved to: {PATH_TO_OUTPUT_DIR}")
+    logger.info(f"Num patients: {len(database)}")
+    logger.info(f"Number of events in patient '{patient_id}': {len(events)}")
+    logger.info(f"First event of patient '{patient_id}': {events[0]}")
