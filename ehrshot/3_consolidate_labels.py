@@ -1,19 +1,18 @@
 import argparse
-import datetime
 import os
-import json
 from loguru import logger
 import collections
 
 import femr.labelers
 
-
-if __name__ == "__main__":
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Consolidate all labels to speed up featurization")
     parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to save labeles and featurizers")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to save labeles and featurizers")
+    return parser.parse_args()
 
-    args = parser.parse_args()
+if __name__ == "__main__":
+    args = parse_args()
 
     label_names = os.listdir(args.path_to_output_dir)
 

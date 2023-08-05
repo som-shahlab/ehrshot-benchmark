@@ -1,25 +1,12 @@
 import argparse
 import pickle
-import datetime
 import os
-import json
 from loguru import logger
-from utils import LABELING_FUNCTIONS, save_data
-import pandas as pd
 
 import femr
-from femr.datasets import PatientDatabase
 import femr.labelers
-from femr.labelers.core import LabeledPatients
-from femr.featurizers.core import FeaturizerList
-from femr.featurizers.featurizers import AgeFeaturizer, CountFeaturizer
-from femr.labelers.core import NLabelsPerPatientLabeler, TimeHorizon
-from femr.labelers.omop import (
-    MortalityCodeLabeler,
-    ChexpertLabeler,
-)
 
-def parse_args(args) -> argparse.Namespace:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate count-based featurizations for GBM models (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to save labels and featurizers")

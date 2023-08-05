@@ -22,18 +22,18 @@ LABELING_FUNCTIONS: List[str] = [
     "guo_readmission",
     "guo_icu",
     # van Uden et al. (Few shot tasks)
-    'uden_pancan',
-    'uden_celiac',
-    'uden_lupus',
-    'uden_acutemi',
-    'uden_hypertension',
-    'uden_hyperlipidemia',
+    'new_pancan',
+    'new_celiac',
+    'new_lupus',
+    'new_acutemi',
+    'new_hypertension',
+    'new_hyperlipidemia',
     # Instant lab value
-    "thrombocytopenia_lab",
-    "hyperkalemia_lab",
-    "hypoglycemia_lab",
-    "hyponatremia_lab",
-    "anemia_lab",
+    "lab_thrombocytopenia",
+    "lab_hyperkalemia",
+    "lab_hypoglycemia",
+    "lab_hyponatremia",
+    "lab_anemia",
     # Custom tasks
     "chexpert"
 ]

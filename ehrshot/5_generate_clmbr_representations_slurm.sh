@@ -13,7 +13,7 @@ labeling_functions=("guo_los" "guo_readmission" "guo_icu" "uden_hypertension" "u
 
 for labeling_function in "${labeling_functions[@]}"
 do
-    python3 3_generate_clmbr_representations.py \
+    python3 3c_generate_clmbr_representations.py \
         --path_to_clmbr_data ../EHRSHOT_ASSETS/models/clmbr_model \
         --path_to_database ../EHRSHOT_ASSETS/femr/extract \
         --path_to_labeled_featurized_data ../EHRSHOT_ASSETS/benchmark \
