@@ -11,9 +11,6 @@ from femr.labelers.omop import (
     ChexpertLabeler,
 )
 from femr.labelers.benchmarks import (
-    Harutyunyan_LengthOfStayLabeler,
-    Harutyunyan_MortalityLabeler, 
-    Harutyunyan_DecompensationLabeler,
     Guo_LongLOSLabeler,
     Guo_30DayReadmissionLabeler,
     Guo_ICUAdmissionLabeler,
@@ -82,15 +79,8 @@ if __name__ == "__main__":
     logger.info(f"Finish | Load PatientDatabase")
 
     # Select the appropriate labeling function
-    #    Hartutyunyan et al. 2019 (MIMIC-3 benchmark tasks)
-    if LABELING_FUNCTION == "hartutyunyan_mortality":
-        labeler = Harutyunyan_MortalityLabeler(ontology)
-    elif LABELING_FUNCTION == "hartutyunyan_decompensation":
-        labeler = Harutyunyan_DecompensationLabeler(ontology)
-    elif LABELING_FUNCTION == "hartutyunyan_los":
-        labeler = Harutyunyan_LengthOfStayLabeler(ontology)
     #   Guo et al. 2023 tasks (CLMBR tasks)
-    elif LABELING_FUNCTION == "guo_los":
+    if LABELING_FUNCTION == "guo_los":
         labeler = Guo_LongLOSLabeler(ontology)
     elif LABELING_FUNCTION == "guo_readmission":
         labeler = Guo_30DayReadmissionLabeler(ontology)
