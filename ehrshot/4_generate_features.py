@@ -9,7 +9,7 @@ import femr.labelers
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate count-based featurizations for GBM models (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to save labels and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory where labels were saved")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     return parser.parse_args()
 

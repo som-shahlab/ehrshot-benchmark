@@ -32,7 +32,6 @@ do
         --path_to_output_dir ../EHRSHOT_ASSETS/benchmark \
         --path_to_chexpert_csv ../EHRSHOT_ASSETS/benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
         --labeling_function ${labeling_function} \
-        --is_skip_label \
         --num_threads 10
 done
 

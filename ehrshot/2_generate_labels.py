@@ -6,7 +6,6 @@ from utils import LABELING_FUNCTIONS
 import pandas as pd
 
 from femr.datasets import PatientDatabase
-import femr.labelers
 from femr.labelers.core import LabeledPatients
 from femr.labelers.omop import (
     ChexpertLabeler,
