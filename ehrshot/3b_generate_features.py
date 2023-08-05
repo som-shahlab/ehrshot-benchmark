@@ -19,32 +19,43 @@ from femr.labelers.omop import (
     ChexpertLabeler,
 )
 
+def parse_args(args) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate count-based featurizations for GBM models (for all tasks at once)")
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to save labels and featurizers")
+    parser.add_argument("--num_threads", type=int, help="Number of threads to use")
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Consolidate all labels to speed up featurization")
-    parser.add_argument("--path_to_database", required=True, type=str, help="Path to femr database")
-    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to save labeles and featurizers")
-    parser.add_argument("--num_threads", type=int, help="The number of threads to use")
+    args = parse_args()
+    NUM_THREADS: int = args.num_threads
+    PATH_TO_PATIENT_DATABASE = args.path_to_database
+    PATH_TO_LABELS_AND_FEATS_DIR = args.path_to_labels_and_feats_dir
 
-    args = parser.parse_args()
+    # Load consolidated labels across all patients for all tasks
+    labeled_patients = femr.labelers.load_labeled_patients(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, 'all_labels.csv'))
 
-    labeled_patients = femr.labelers.load_labeled_patients(os.path.join(args.path_to_features_dir, 'all_labels.csv'))
-
+    # Combine two featurizations of each patient: one for the patient's age, and one for the count of every code
+    # they've had in their record up to the prediction timepoint for each label
     age = femr.featurizers.AgeFeaturizer()
     count = femr.featurizers.CountFeaturizer(is_ontology_expansion=True)
     featurizer_age_count = femr.featurizers.FeaturizerList([age, count])
 
-    # Preprocessing the featurizers, which includes processes such as normalizing age.
+    # Preprocessing the featurizers -- this includes processes such as normalizing age
     logger.info("Start | Preprocess featurizers")
-    featurizer_age_count.preprocess_featurizers(args.path_to_database, labeled_patients, args.num_threads)
+    featurizer_age_count.preprocess_featurizers(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
     logger.info("Finish | Preprocess featurizers")
 
+    # Run actual featurization for each patient
     logger.info("Start | Featurize patients")
-    results = featurizer_age_count.featurize(args.path_to_database, labeled_patients, args.num_threads)
+    results = featurizer_age_count.featurize(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
+    logger.info("Finish | Featurize patients")
 
-    with open(os.path.join(args.path_to_features_dir, 'count_features.pkl'), 'wb') as f:
+    # Save results
+    with open(os.path.join(args.path_to_labels_and_feats_dir, 'count_features.pkl'), 'wb') as f:
         pickle.dump(results, f)
 
-    logger.info("Finish | Featurize patients")
+    # Logging
     feature_matrix, patient_ids, label_values, label_times = (
         results[0],
         results[1],
