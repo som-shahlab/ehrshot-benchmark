@@ -9,8 +9,7 @@ from femr.labelers import load_labeled_patients, LabeledPatients, Label
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Consolidate all labels to speed up featurization")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to save labeles and featurizers")
-    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to save labeles and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory where labels will be saved")
     return parser.parse_args()
 
 if __name__ == "__main__":

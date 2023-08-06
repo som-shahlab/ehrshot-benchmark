@@ -1,3 +1,4 @@
+import json
 import os
 import argparse
 from utils import load_data
@@ -7,24 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import collections
 from matplotlib.patches import Patch
-
-LABELING_FUNCTIONS = [
-    "guo_los", 
-    "guo_readmission",
-    "guo_icu", 
-    "uden_hypertension", 
-    "uden_hyperlipidemia", 
-    "uden_pancan",
-    "uden_celiac",
-    "uden_lupus", 
-    "uden_acutemi", 
-    "thrombocytopenia_lab",
-    "hyperkalemia_lab", 
-    "hypoglycemia_lab", 
-    "hyponatremia_lab", 
-    "anemia_lab", 
-    "chexpert"
-]
+from utils import LABELING_FUNCTIONS
 
 task_group_dict = {
     "operational_outcomes": [
@@ -33,19 +17,19 @@ task_group_dict = {
         "guo_icu"
     ],
     "lab_values": [
-        "thrombocytopenia_lab",
-        "hyperkalemia_lab",
-        "hypoglycemia_lab",
-        "hyponatremia_lab",
-        "anemia_lab"
+        "lab_thrombocytopenia",
+        "lab_hyperkalemia",
+        "lab_hypoglycemia",
+        "lab_hyponatremia",
+        "lab_anemia"
     ],
     "new_diagnoses": [
-        "uden_hypertension",
-        "uden_hyperlipidemia",
-        "uden_pancan",
-        "uden_celiac",
-        "uden_lupus",
-        "uden_acutemi"
+        "new_hypertension",
+        "new_hyperlipidemia",
+        "new_pancan",
+        "new_celiac",
+        "new_lupus",
+        "new_acutemi"
     ],
     "chexpert": [
         "chexpert"
@@ -68,8 +52,8 @@ def plot_individual_results(path_to_eval: dict,
                  path_to_save: str = "./"):
     """label_dict[labeling_function][model_name][replicate][scores][auroc]"""
 
-    label_dict = load_data(os.path.join(path_to_eval, "few_tune_params_True.json"))
-    label_dict_long = load_data(os.path.join(path_to_eval, "long_tune_params_True.json"))
+    label_dict = json.load(os.path.join(path_to_eval, "few_tune_params_True.json"), 'r')
+    label_dict_long = json.load(os.path.join(path_to_eval, "long_tune_params_True.json"), 'r')
 
     task = label_dict[labeling_function]
     task_long = label_dict_long[labeling_function]
@@ -132,7 +116,7 @@ def make_data_dict(path_to_eval, task_group):
     LABELING_FUNCTIONS = task_group_dict[task_group]
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
+        data = json.load(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"), 'r')
 
         for label_name in data:
             gbm_dict = data[label_name]["Count_based_GBM"]
@@ -158,7 +142,7 @@ def make_data_dict(path_to_eval, task_group):
     clmbr_auprcs_long = []
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"))
+        data = json.load(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"), 'r')
 
         for label_name in data:
             gbm_dict = data[label_name]["Count_based_GBM"]
@@ -395,7 +379,7 @@ def make_box_plot(path_to_eval,
 
     for labeling_function in tqdm(LABELING_FUNCTIONS):
         # Load few-shot data
-        data = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
+        data = json.load(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"), 'r')
         for model in MODELS:
             for metric in METRICS:
                 for label_str in data:
@@ -405,7 +389,7 @@ def make_box_plot(path_to_eval,
                         for k_idx, k in enumerate(scores_dict['k']):
                             fewshot_results[model][metric][labeling_function][k].append(scores_dict['scores'][metric][k_idx])
         # Load full data
-        long_data = load_data(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"))
+        long_data = json.load(os.path.join(path_to_eval, f"{labeling_function}/long_tune_params_True.json"), 'r')
         for model in MODELS:
             for metric in METRICS:
                 for label_str in long_data:
@@ -478,47 +462,85 @@ def make_box_plot(path_to_eval,
             plot_fewshot_over_full_boxplot({ 'clmbr' : clmbr_y_values, 'gbm' : gbm_y_values },  metric=metric, task_group=task_group, save_path=PATH_TO_SAVE)
 
 
-def main(path_to_data, path_to_save, size=16):
-    for labeling_function in tqdm(LABELING_FUNCTIONS):
-        label_dict = load_data(os.path.join(path_to_eval, f"{labeling_function}/few_tune_params_True.json"))
-        for lf in label_dict:
-            path_to_labeling_function_eval = os.path.join(path_to_eval, labeling_function)
-            plot_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=path_to_save, size=size)
+def plot_results(label_dict: dict, 
+                 labeling_function: str, 
+                 size: int = 14,
+                 path_to_save: str = "./"):
+    """label_dict[labeling_function][model_name][replicate][scores][auroc]"""
+    task = label_dict[labeling_function]
+    models = list(task.keys())
+    scores = list(task[models[0]][0]["scores"].keys()) # e.g. auroc, ap, mse
+    n_replicates: int = len(task[models[0]])
+    for s in sorted(scores, reverse=True):
+        if s == "auroc":
+            colors = ["green", "red", 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        elif s == "auprc":
+            colors = ["blue", "orange", 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        else:
+            continue
+        fig, ax = plt.subplots()
+        for idx, m in enumerate(models):
+            if m == "Codes_Only":
+                legend_name = "CLMBR"
+            elif m == "Count_based_GBM":
+                legend_name = "GBM"
+            all_values = [] # Collect values across all replicates
+            for replicate in task[m].keys():
+                all_values.append(task[m][replicate]["scores"][s])
+            all_values = np.array(all_values)
+            means = np.mean(all_values, axis=0)
+            stds = np.std(all_values, axis=0)
+            x = task[m][0]['k']
+            x = [x_i*4 for x_i in x]
+            color = colors[idx]
+            plt.plot(x, means, color=color, label=legend_name, linestyle='--', marker='o')
+            plt.plot(x, means - 0.5 * stds, color=color, alpha=0.1)
+            plt.plot(x, means + 0.5 * stds, color=color, alpha=0.1)
+            plt.fill_between(x, means - 0.5 * stds, means + 0.5 * stds, color=color, alpha=0.2)
+        
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        # plt.legend(fontsize=size)
+        # plt.xlabel("# of Train Examples per Class", fontsize=size)
+        # plt.ylabel(s.upper(), fontsize=size)
+        plt.title(labeling_function_to_paper_name[labeling_function], size=8)
+        plt.xticks(fontsize=size)
+        plt.yticks(fontsize=size)
+        plt.tight_layout()
+        new_path_to_save = os.path.join(path_to_save, f"{labeling_function}_{s}.png")
+        plt.savefig(new_path_to_save, dpi=300)
+        plt.close('all')
 
-
+def parse_args():
+    parser = argparse.ArgumentParser(description="Make plots of results")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to saved labels and featurizers")
+    parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory to save figures")
+    return parser.parse_args()
+    
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Script to plot results.")
-    parser.add_argument(
-        "--path_to_eval",
-        type=str,
-        help="Path to folder with all the csv files",
-    )
-    parser.add_argument(
-        "--path_to_save",
-        type=str,
-        help="Path to save figures",
-    )
-    args = parser.parse_args()
-
-    PATH_TO_EVAL: str = args.path_to_eval
-    PATH_TO_SAVE: str = args.path_to_save
-    os.makedirs(PATH_TO_SAVE, exist_ok=True)
-
+    args = parse_args()
+    PATH_TO_LABELS_AND_FEATS_DIR: str = args.path_to_labels_and_feats_dir
+    PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
+    os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
 
     # Plotting individual auroc and auprc plots
     for labeling_function in tqdm(LABELING_FUNCTIONS):
-        label_dict = load_data(os.path.join(PATH_TO_EVAL, f"{labeling_function}/few_tune_params_True.json"))
+        label_dict = json.load(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, f"{labeling_function}/few_tune_params_True.json"), 'r')
         for lf in label_dict:
-            path_to_labeling_function_eval = os.path.join(PATH_TO_EVAL, labeling_function)
-            plot_individual_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=PATH_TO_SAVE)
-    
+            path_to_labeling_function_eval = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, labeling_function)
+            plot_individual_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=PATH_TO_OUTPUT_DIR)
+
     # Plotting aggregated auroc and auprc plots by task groups
     for task_group in tqdm(task_group_dict):
-        data_dict, k = make_data_dict(PATH_TO_EVAL, task_group)
-        plot_agg_results(data_dict, k=k, save_path=PATH_TO_SAVE, task_group=task_group)
+        data_dict, k = make_data_dict(PATH_TO_LABELS_AND_FEATS_DIR, task_group)
+        plot_agg_results(data_dict, k=k, save_path=PATH_TO_OUTPUT_DIR, task_group=task_group)
     
     # plotting aggregated auroc and auprc box plots by task groups
     for task_group in tqdm(task_group_dict):
-        make_box_plot(PATH_TO_EVAL, task_group=task_group, save_path=PATH_TO_SAVE)
+        make_box_plot(PATH_TO_LABELS_AND_FEATS_DIR, task_group=task_group, save_path=PATH_TO_OUTPUT_DIR)
 
-
+    for labeling_function in tqdm(LABELING_FUNCTIONS):
+        label_dict = json.load(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, f"{labeling_function}/few_tune_params_True.json"), 'r')
+        for lf in label_dict:
+            path_to_labeling_function_eval = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, labeling_function)
+            plot_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=PATH_TO_OUTPUT_DIR, size=16)

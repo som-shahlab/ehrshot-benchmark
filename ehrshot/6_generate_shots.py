@@ -1,3 +1,26 @@
+"""Create a file at `PATH_TO_LABELS_AND_FEATS_DIR/LABELING_FUNCTION/{SHOT_STRAT}_shots_data.json` containing:
+
+Output:
+    few_shots_dict = {
+        sub_task_1: : {
+            k_1: {
+                replicate_1: {
+                    "patient_ids_train_k": List[int] = patient_ids['train'][train_idxs_k].tolist(),
+                    "patient_ids_val_k": List[int] = patient_ids['val'][val_idxs_k].tolist(),
+                    "label_times_train_k": List[str] = [ label_time.isoformat() for label_time in label_times['train'][train_idxs_k] ], 
+                    "label_times_val_k": List[str] = [ label_time.isoformat() for label_time in label_times['val'][val_idxs_k] ], 
+                    'label_values_train_k': List[int] = y_train[train_idxs_k].tolist(),
+                    'label_values_val_k': List[int] = y_val[val_idxs_k].tolist(),
+                    "train_idxs": List[int] = train_idxs_k.tolist(),
+                    "val_idxs": List[int] = val_idxs_k.tolist(),
+                },
+                ... 
+            },
+            ...
+        },
+        ...
+    }
+"""
 import argparse
 import collections
 import json
@@ -10,12 +33,12 @@ from utils import (
     LABELING_FUNCTIONS, 
     CHEXPERT_LABELS, 
     SHOT_STRATS,
-    get_pid_label_times_and_values, 
+    get_labels_and_features, 
     process_chexpert_labels, 
     convert_multiclass_to_binary_labels
 )
 import femr.datasets
-
+from femr.labelers import LabeledPatients, load_labeled_patients
 
 def get_k_samples(y: List[int], k: int, max_k: int, is_preserve_prevalence: bool = False, seed=0) -> List[int]:
     """_summary_
@@ -76,6 +99,8 @@ def generate_shots(k: int,
         "patient_ids_val_k": patient_ids['val'][val_idxs_k].tolist(),
         "label_times_train_k": [ label_time.isoformat() for label_time in label_times['train'][train_idxs_k] ], 
         "label_times_val_k": [ label_time.isoformat() for label_time in label_times['val'][val_idxs_k] ], 
+        'label_values_train_k': y_train[train_idxs_k].tolist(),
+        'label_values_val_k': y_val[val_idxs_k].tolist(),
         "train_idxs": train_idxs_k.tolist(),
         "val_idxs": val_idxs_k.tolist(),
     }
@@ -84,11 +109,11 @@ def generate_shots(k: int,
     
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate few-shot data for eval")
-    parser.add_argument("--path_to_data", type=str, help=( "Path where you have all the data, including your clmbr representations, labeled_featururized patients" ), )
-    parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function to create shots for", choices=LABELING_FUNCTIONS, )
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to saved labels and featurizers")
+    parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
-    parser.add_argument("--n_replicates", type=int, help="Number of replicates to create. Useful for creating std bars in plots", default=3, )
-    parser.add_argument("--path_to_save", type=str, help=( "Path to save few shots data" ), )
+    parser.add_argument("--n_replicates", type=int, help="Number of replicates to run for each `k`. Useful for creating std bars in plots", default=3, )
     return parse_args.parse_args()
 
 if __name__ == "__main__":
@@ -96,10 +121,9 @@ if __name__ == "__main__":
     LABELING_FUNCTION: str = args.labeling_function
     SHOT_STRAT: str = args.shot_strat
     N_REPLICATES: int = args.n_replicates
-    PATH_TO_DATA: str = args.path_to_data
-    PATH_TO_SAVE: str = args.path_to_save
-    PATH_TO_DATABASE: str = os.path.join(PATH_TO_DATA, "femr/extract")
-    PATH_TO_SAVE_SHOTS: str = os.path.join(PATH_TO_SAVE, LABELING_FUNCTION)
+    PATH_TO_DATABASE: str = args.path_to_database
+    PATH_TO_LABELS_AND_FEATS_DIR: str = args.path_to_labels_and_feats_dir
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
 
     # Load PatientDatabase
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
@@ -110,7 +134,9 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Invalid `shot_strat`: {SHOT_STRAT}")
 
-    patient_ids, label_times, label_values, _, _ = get_pid_label_times_and_values(PATH_TO_DATA, LABELING_FUNCTION)
+    # Load labels for this task
+    labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, 'labeled_patients.csv'))
+    patient_ids, label_times, label_values, __ = get_labels_and_features(PATH_TO_LABELS_AND_FEATS_DIR, LABELING_FUNCTION)
 
     if LABELING_FUNCTION == "chexpert":
         # CheXpert is multilabel, convert to binary for EHRSHOT
@@ -155,7 +181,6 @@ if __name__ == "__main__":
                 few_shots_dict[sub_task][k][replicate] = shot_dict
     
     # Save patients selected for each shot
-    path_to_save = os.path.join(PATH_TO_SAVE_SHOTS, f"{SHOT_STRAT}_shots_data.json")
-    with open(path_to_save, 'w') as f:
+    with open(PATH_TO_OUTPUT_FILE, 'w') as f:
         json.dump(few_shots_dict, f)
-    logger.info(f"Saved few shot data to: {path_to_save}")
+    logger.info(f"Saved few shot data to: {PATH_TO_OUTPUT_FILE}")

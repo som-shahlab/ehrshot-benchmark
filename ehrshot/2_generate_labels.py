@@ -6,7 +6,7 @@ from utils import LABELING_FUNCTIONS
 import pandas as pd
 
 from femr.datasets import PatientDatabase
-from femr.labelers.core import LabeledPatients
+from femr.labelers.core import LabeledPatients, NLabelsPerPatientLabeler
 from femr.labelers.omop import (
     ChexpertLabeler,
 )
@@ -18,7 +18,6 @@ from femr.labelers.benchmarks import (
     CeliacDiseaseCodeLabeler,
     LupusCodeLabeler,
     AcuteMyocardialInfarctionCodeLabeler,
-    CTEPHCodeLabeler,
     EssentialHypertensionCodeLabeler,
     HyperlipidemiaCodeLabeler,
     HyponatremiaInstantLabValueLabeler,
@@ -31,7 +30,7 @@ from femr.labelers.benchmarks import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate labels for a specific task")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to save labels and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory where labels will be saved")
     parser.add_argument("--labeling_function", required=True, type=str, help="Name of task for which we are creating labels", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use", default=1, )
     parser.add_argument("--max_labels_per_patient", type=int, help="Max number of labels to keep per patient (excess labels are randomly discarded)", default=None, )
@@ -95,8 +94,6 @@ if __name__ == "__main__":
         labeler = LupusCodeLabeler(ontology)
     elif LABELING_FUNCTION == 'new_acutemi':
         labeler = AcuteMyocardialInfarctionCodeLabeler(ontology)
-    elif LABELING_FUNCTION == 'new_cteph':
-        labeler = CTEPHCodeLabeler(ontology)
     elif LABELING_FUNCTION == 'new_hypertension':
         labeler = EssentialHypertensionCodeLabeler(ontology)
     elif LABELING_FUNCTION == 'new_hyperlipidemia':
