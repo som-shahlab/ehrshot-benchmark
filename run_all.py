@@ -102,23 +102,22 @@ Please do not run this script if you want to use the k-shots we used in our pape
 """
 # We provide data for few shots, so only run it for long shot.
 
-if False:
-    shot_strats = ["long"]
-    for task in TASKS:
-        for shot_strat in shot_strats:
-            if shot_strat == "few":
-                num_replicates = 5
-            else:
-                num_replicates = 1
-            command = (
-                'python3 ehrshot/4_generate_shot.py '
-                '--path_to_data EHRSHOT_ASSETS '
-                '--labeling_function {} '
-                '--num_replicates {} '
-                '--path_to_save EHRSHOT_ASSETS/benchmark '
-                '--shot_strat {}'
-            ).format(task, num_replicates, shot_strat)
-            os.system(command)
+shot_strats = ["long"]
+for task in TASKS:
+    for shot_strat in shot_strats:
+        if shot_strat == "few":
+            num_replicates = 5
+        else:
+            num_replicates = 1
+        command = (
+            'python3 ehrshot/4_generate_shot.py '
+            '--path_to_data EHRSHOT_ASSETS '
+            '--labeling_function {} '
+            '--num_replicates {} '
+            '--path_to_save EHRSHOT_ASSETS/benchmark '
+            '--shot_strat {}'
+        ).format(task, num_replicates, shot_strat)
+        os.system(command)
 
 # ---------------------------------------Script 5---------------------------------------
 """

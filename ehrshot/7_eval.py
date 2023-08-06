@@ -141,7 +141,7 @@ def run_evaluation(X_train, X_val, X_test, y_train, y_val, y_test, model_head: s
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to saved labels and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")

@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import collections
 from matplotlib.patches import Patch
-from utils import LABELING_FUNCTIONS
+from utils import LABELING_FUNCTIONS, LABELING_FUNCTION_2_PAPER_NAME
 
 task_group_dict = {
     "operational_outcomes": [
@@ -35,7 +35,6 @@ task_group_dict = {
         "chexpert"
     ]
 }
-
 
 def get_avg_data(data_dict, score="auroc"):
     scores = []
@@ -503,7 +502,7 @@ def plot_results(label_dict: dict,
         # plt.legend(fontsize=size)
         # plt.xlabel("# of Train Examples per Class", fontsize=size)
         # plt.ylabel(s.upper(), fontsize=size)
-        plt.title(labeling_function_to_paper_name[labeling_function], size=8)
+        plt.title(LABELING_FUNCTION_2_PAPER_NAME[labeling_function], size=8)
         plt.xticks(fontsize=size)
         plt.yticks(fontsize=size)
         plt.tight_layout()
@@ -513,7 +512,7 @@ def plot_results(label_dict: dict,
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Make plots of results")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to saved labels and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
     parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory to save figures")
     return parser.parse_args()
     

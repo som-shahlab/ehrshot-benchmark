@@ -110,7 +110,7 @@ def generate_shots(k: int,
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate few-shot data for eval")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to saved labels and featurizers")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--n_replicates", type=int, help="Number of replicates to run for each `k`. Useful for creating std bars in plots", default=3, )

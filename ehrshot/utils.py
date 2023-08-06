@@ -47,6 +47,24 @@ LABELING_FUNCTIONS: List[str] = [
     "chexpert"
 ]
 
+LABELING_FUNCTION_2_PAPER_NAME = {
+    "guo_los": "Long LOS",
+    "guo_readmission": "30-day Readmission",
+    "guo_icu": "ICU Admission",
+    "lab_thrombocytopenia": "Thrombocytopenia",
+    "lab_hyperkalemia": "Hyperkalemia",
+    "lab_hypoglycemia": "Hypoglycemia",
+    "lab_hyponatremia": "Hyponatremia",
+    "lab_anemia": "Anemia",
+    "new_hypertension": "Hypertension",
+    "new_hyperlipidemia": "Hyperlipidemia",
+    "new_pancan": "Pancreatic Cancer",
+    "new_celiac": "Celiac",
+    "new_lupus": "Lupus",
+    "new_acutemi": "Acute MI",
+    "chexpert": "Chest X-ray Findings"
+}
+
 # CheXpert labels
 CHEXPERT_LABELS = [
     "No Finding",

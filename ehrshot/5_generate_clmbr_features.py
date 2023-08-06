@@ -3,9 +3,9 @@ import os
 from loguru import logger
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate CLMBR patient representations (for all tasks at once)")
+    parser = argparse.ArgumentParser(description="Generate CLMBR / MOTOR patient representations (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory where labels were saved")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_output_dir", type=str, help="Path to directory where model will be saved")
     parser.add_argument("--model", type=str, help="Type of foundation model to train. Options: 'motor' or 'clmbr'")
     return parser.parse_args()
