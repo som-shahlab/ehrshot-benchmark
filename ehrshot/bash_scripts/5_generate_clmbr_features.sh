@@ -8,14 +8,19 @@
 #SBATCH --mem=100G
 #SBATCH --cpus-per-task=10
 
-python3 5_generate_clmbr_features.py \
-    --path_to_database ../EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_and_feats_dir ../EHRSHOT_ASSETS/benchmark \
-    --path_to_output_dir # TODO \
-    --model clmbr
+# Time to run: XXX mins
 
-python3 5_generate_clmbr_features.py \
-    --path_to_database ../EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_and_feats_dir ../EHRSHOT_ASSETS/benchmark \
-    --path_to_output_dir # TODO \
-    --model motor
+python3 ../5_generate_clmbr_features.py \
+    --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+    --path_to_features_dir ../../EHRSHOT_ASSETS/custom_features \
+    --path_to_models_dir ../../EHRSHOT_ASSETS/models \
+    --model clmbr 
+
+# python3 ../5_generate_clmbr_features.py \
+#     --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
+    # --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+    # --path_to_features_dir ../../EHRSHOT_ASSETS/custom_features \
+#     --path_to_models_dir ../../EHRSHOT_ASSETS/models \
+#     --model motor \
+#     --is_force_refresh

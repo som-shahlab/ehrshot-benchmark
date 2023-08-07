@@ -543,3 +543,5 @@ if __name__ == "__main__":
         for lf in label_dict:
             path_to_labeling_function_eval = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, labeling_function)
             plot_results(path_to_labeling_function_eval, labeling_function=lf, path_to_save=PATH_TO_OUTPUT_DIR, size=16)
+    logger.success("Done!")
+    

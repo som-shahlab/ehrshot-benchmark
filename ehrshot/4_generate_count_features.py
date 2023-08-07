@@ -2,31 +2,41 @@ import argparse
 import pickle
 import os
 from loguru import logger
-
-import femr
-import femr.labelers
+from femr.featurizers import AgeFeaturizer, CountFeaturizer, FeaturizerList
+from femr.labelers import LabeledPatients, load_labeled_patients
+from utils import check_file_existence_and_handle_force_refresh
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate count-based featurizations for GBM models (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
+    parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     NUM_THREADS: int = args.num_threads
+    IS_FORCE_REFRESH = args.is_force_refresh
     PATH_TO_PATIENT_DATABASE = args.path_to_database
-    PATH_TO_LABELS_AND_FEATS_DIR = args.path_to_labels_and_feats_dir
+    PATH_TO_LABELS_DIR = args.path_to_labels_dir
+    PATH_TO_FEATURES_DIR = args.path_to_features_dir
+    PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'count_features.pkl')
+
+    # Force refresh
+    check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
 
     # Load consolidated labels across all patients for all tasks
-    labeled_patients = femr.labelers.load_labeled_patients(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, 'all_labels.csv'))
+    logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
+    labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELS_FILE)
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the count of every code
     # they've had in their record up to the prediction timepoint for each label
-    age = femr.featurizers.AgeFeaturizer()
-    count = femr.featurizers.CountFeaturizer(is_ontology_expansion=True)
-    featurizer_age_count = femr.featurizers.FeaturizerList([age, count])
+    age = AgeFeaturizer()
+    count = CountFeaturizer(is_ontology_expansion=True)
+    featurizer_age_count = FeaturizerList([age, count])
 
     # Preprocessing the featurizers -- this includes processes such as normalizing age
     logger.info("Start | Preprocess featurizers")
@@ -39,7 +49,8 @@ if __name__ == "__main__":
     logger.info("Finish | Featurize patients")
 
     # Save results
-    with open(os.path.join(args.path_to_labels_and_feats_dir, 'count_features.pkl'), 'wb') as f:
+    logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
+    with open(PATH_TO_OUTPUT_FILE, 'wb') as f:
         pickle.dump(results, f)
 
     # Logging
@@ -54,3 +65,5 @@ if __name__ == "__main__":
                 f"patient_ids={repr(patient_ids)}\n"
                 f"label_values={repr(label_values)}\n"
                 f"label_times={repr(label_times)}")
+    logger.success("Done!")
+    

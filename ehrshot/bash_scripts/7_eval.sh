@@ -29,8 +29,9 @@ shot_strats=("few" "long")
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
     python3 7_eval.py \
-        --path_to_database ../EHRSHOT_ASSETS/femr/extract \
-        --path_to_labels_and_feats_dir ../EHRSHOT_ASSETS/benchmark \
+        --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
+        --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+        --path_to_features_dir ../../EHRSHOT_ASSETS/custom_features \
         --labeling_function ${labeling_function} \
         --shot_strat ${shot_strat} \
         --num_threads 10

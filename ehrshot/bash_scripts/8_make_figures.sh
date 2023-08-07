@@ -8,5 +8,5 @@
 #SBATCH --cpus-per-task=20
 
 python3 8_make_figures.py \
-    --path_to_labels_and_feats_dir ../EHRSHOT_ASSETS/benchmark \
-    --path_to_output_dir ../EHRSHOT_ASSETS/figures
+    --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+    --path_to_output_dir ../../EHRSHOT_ASSETS/figures

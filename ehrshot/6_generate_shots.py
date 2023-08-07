@@ -110,7 +110,7 @@ def generate_shots(k: int,
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate few-shot data for eval")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--n_replicates", type=int, help="Number of replicates to run for each `k`. Useful for creating std bars in plots", default=3, )
@@ -122,8 +122,9 @@ if __name__ == "__main__":
     SHOT_STRAT: str = args.shot_strat
     N_REPLICATES: int = args.n_replicates
     PATH_TO_DATABASE: str = args.path_to_database
-    PATH_TO_LABELS_AND_FEATS_DIR: str = args.path_to_labels_and_feats_dir
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
+    PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
+    PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
 
     # Load PatientDatabase
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
@@ -135,8 +136,8 @@ if __name__ == "__main__":
         raise ValueError(f"Invalid `shot_strat`: {SHOT_STRAT}")
 
     # Load labels for this task
-    labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, 'labeled_patients.csv'))
-    patient_ids, label_times, label_values, __ = get_labels_and_features(PATH_TO_LABELS_AND_FEATS_DIR, LABELING_FUNCTION)
+    labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
+    patient_ids, label_times, label_values = get_labels_and_features(labeled_patients, None)
 
     if LABELING_FUNCTION == "chexpert":
         # CheXpert is multilabel, convert to binary for EHRSHOT
@@ -181,6 +182,8 @@ if __name__ == "__main__":
                 few_shots_dict[sub_task][k][replicate] = shot_dict
     
     # Save patients selected for each shot
+    logger.info(f"Saving few shot data to: {PATH_TO_OUTPUT_FILE}")
     with open(PATH_TO_OUTPUT_FILE, 'w') as f:
         json.dump(few_shots_dict, f)
-    logger.info(f"Saved few shot data to: {PATH_TO_OUTPUT_FILE}")
+    logger.success("Done!")
+    

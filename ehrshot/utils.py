@@ -1,15 +1,15 @@
 import pickle
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import numpy as np
-from datetime import datetime
+import datetime
 import torch.nn as nn
 from sklearn.metrics import pairwise_distances
 import femr
 from femr.labelers import LabeledPatients
 from femr.datasets import PatientDatabase
 import femr.extension.dataloader
-
+from loguru import logger
 # SPLITS
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: int = 70
@@ -26,7 +26,7 @@ BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
 
 # Labeling functions
 LABELING_FUNCTIONS: List[str] = [
-    # Guo et al.
+    # Guo et al. 2023
     "guo_los",
     "guo_readmission",
     "guo_icu",
@@ -134,7 +134,7 @@ def get_patient_splits_by_idx(database: PatientDatabase, patient_ids: np.ndarray
     test: np.ndarray = np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]
     return (train, val, test)
 
-def get_labels_and_features(path_to_labels_and_feats_dir: str, labeled_patients: LabeledPatients) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
+def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str]) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
         the labels and features for each patient. Note that this function is more complex b/c we need to align
         the labels with their corresponding features based on their prediction times."""
@@ -145,11 +145,15 @@ def get_labels_and_features(path_to_labels_and_feats_dir: str, labeled_patients:
     sort_order: np.ndarray = np.lexsort((label_times, label_patient_ids))
     label_patient_ids, label_values, label_times = label_patient_ids[sort_order], label_values[sort_order], label_times[sort_order]
 
+    # Just return labels, ignore features
+    if path_to_features_dir is None:
+        return label_patient_ids, label_values, label_times
+
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
     feazturizations: Dict[str, np.ndarray] = {}
-    for model in MODELS:
-        path_to_feats_file: str = os.path.join(path_to_labels_and_feats_dir, f'{model}_features.pkl')
+    for model in BASE_MODELS:
+        path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
         
         with open(path_to_feats_file, 'rb') as f:
@@ -192,6 +196,23 @@ def process_chexpert_labels(label_values):
 def convert_multiclass_to_binary_labels(values, threshold: int = 1):
     values[values >= threshold] = 1
     return values
+
+def check_file_existence_and_handle_force_refresh(path_to_file_or_dir: str, is_force_refresh: bool):
+    if is_force_refresh:
+        if os.path.exists(path_to_file_or_dir):
+            if os.path.isdir(path_to_file_or_dir):
+                logger.critical(f"Deleting existing directory at `{path_to_file_or_dir}`")
+                os.system(f"rm -r {path_to_file_or_dir}")
+            else:
+                logger.critical(f"Deleting existing file at `{path_to_file_or_dir}`")
+                os.system(f"rm {path_to_file_or_dir}")
+    else:
+        if os.path.exists(path_to_file_or_dir):
+            if os.path.isdir(path_to_file_or_dir):
+                raise ValueError(f"Error -- Directory already exists at `{path_to_file_or_dir}`. Please delete it and try again.")
+            else:
+                raise ValueError(f"Error -- File already exists at `{path_to_file_or_dir}`. Please delete it and try again.")
+
 
 class ProtoNetCLMBRClassifier(nn.Module):
     def __init__(self):

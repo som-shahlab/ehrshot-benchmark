@@ -5,7 +5,10 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=normal
 #SBATCH --mem=100G
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=5
 
-python3 3_consolidate_labels.py \
-    --path_to_labels_and_feats_dir ../EHRSHOT_ASSETS/benchmark \
+# Time to run: 10 secs
+
+python3 ../3_consolidate_labels.py \
+    --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+    --is_force_refresh

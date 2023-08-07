@@ -6,7 +6,7 @@ from utils import LABELING_FUNCTIONS
 import pandas as pd
 
 from femr.datasets import PatientDatabase
-from femr.labelers.core import LabeledPatients, NLabelsPerPatientLabeler
+from femr.labelers.core import LabeledPatients
 from femr.labelers.omop import (
     ChexpertLabeler,
 )
@@ -30,11 +30,10 @@ from femr.labelers.benchmarks import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate labels for a specific task")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory where labels will be saved")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_chexpert_csv", type=str, help="Path to CheXpert CSV file. Specific to CheXpert labeler", default=None,)
     parser.add_argument("--labeling_function", required=True, type=str, help="Name of task for which we are creating labels", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use", default=1, )
-    parser.add_argument("--max_labels_per_patient", type=int, help="Max number of labels to keep per patient (excess labels are randomly discarded)", default=None, )
-    parser.add_argument("--path_to_chexpert_csv", type=str, help="Path to CheXpert CSV file. Specific to CheXpert labeler", default=None,)
     return parser.parse_args()
 
 def save_labeled_patients_to_csv(labeled_patients: LabeledPatients, path_to_csv: str) -> pd.DataFrame:
@@ -51,24 +50,23 @@ def save_labeled_patients_to_csv(labeled_patients: LabeledPatients, path_to_csv:
 if __name__ == "__main__":
     args = parse_args()
     PATH_TO_PATIENT_DATABASE = args.path_to_database
+    PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     NUM_THREADS: int = args.num_threads
-    MAX_LABELS_PER_PATIENT: int = args.max_labels_per_patient
     LABELING_FUNCTION: str = args.labeling_function
-    PATH_TO_LABELS_AND_FEATS_DIR = os.path.join(args.path_to_labels_and_feats_dir, LABELING_FUNCTION)
-    PATH_TO_SAVE_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, "labeled_patients.csv")
-    os.makedirs(PATH_TO_LABELS_AND_FEATS_DIR, exist_ok=True)
+    PATH_TO_OUTPUT_DIR: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION)
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, "labeled_patients.csv")
+    os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
 
     # Logging
-    path_to_log_file: str = os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, 'info.log')
+    path_to_log_file: str = os.path.join(PATH_TO_OUTPUT_DIR, 'info.log')
     if os.path.exists(path_to_log_file):
         os.remove(path_to_log_file)
     logger.add(path_to_log_file, level="INFO")  # connect logger to file
     logger.info(f"Task: {LABELING_FUNCTION}")
     logger.info(f"Loading patient database from: {PATH_TO_PATIENT_DATABASE}")
-    logger.info(f"Saving output to: {PATH_TO_LABELS_AND_FEATS_DIR}")
-    logger.info(f"Max # of labels per patient: {MAX_LABELS_PER_PATIENT}")
+    logger.info(f"Saving output to: {PATH_TO_OUTPUT_DIR}")
     logger.info(f"# of threads: {NUM_THREADS}")
-    with open(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, "args.json"), "w") as f:
+    with open(os.path.join(PATH_TO_OUTPUT_DIR, "args.json"), "w") as f:
         json.dump(vars(args), f, indent=4)
 
     # Load PatientDatabase + Ontology
@@ -111,41 +109,29 @@ if __name__ == "__main__":
         labeler = AnemiaInstantLabValueLabeler(ontology)
     #   EHRSHOT: Radiology
     elif LABELING_FUNCTION == "chexpert":
-        assert args.path_to_chexpert_csv is not None, f"path_to_chexpert_csv cannot be {args.path_to_chexpert_csv}"
+        assert args.path_to_chexpert_csv is not None, f"The argument --path_to_chexpert_csv must be specified"
         labeler = ChexpertLabeler(args.path_to_chexpert_csv)
     else:
         raise ValueError(
             f"Labeling function `{LABELING_FUNCTION}` not supported. Must be one of: {LABELING_FUNCTIONS}."
         )
 
-    # Determine how many labels to keep per patient
-    if MAX_LABELS_PER_PATIENT is not None and LABELING_FUNCTION != "chexpert":
-        labeler = NLabelsPerPatientLabeler(labeler, seed=0, num_labels=MAX_LABELS_PER_PATIENT)
-
     logger.info("Start | Label patients")
-    if LABELING_FUNCTION != "chexpert":
-        labeled_patients = labeler.apply(
-            path_to_patient_database=PATH_TO_PATIENT_DATABASE,
-            num_threads=NUM_THREADS
-        )
-    else:
-        labeled_patients = labeler.apply(
-            path_to_patient_database=PATH_TO_PATIENT_DATABASE,
-            num_threads=NUM_THREADS,
-            num_labels=MAX_LABELS_PER_PATIENT,
-        )
+    labeled_patients = labeler.apply(
+        path_to_patient_database=PATH_TO_PATIENT_DATABASE,
+        num_threads=NUM_THREADS
+    )
     logger.info("Finish | Label patients")
 
     # Save labeled patients to simple CSV pipeline format
-    save_labeled_patients_to_csv(labeled_patients, PATH_TO_SAVE_LABELED_PATIENTS)
+    logger.info(f"Saving labeled patients to `{PATH_TO_OUTPUT_FILE}`")
+    save_labeled_patients_to_csv(labeled_patients, PATH_TO_OUTPUT_FILE)
     
     # Logging
     logger.info("LabeledPatient stats:\n"
                 f"Total # of patients = {labeled_patients.get_num_patients(is_include_empty_labels=True)}\n"
                 f"Total # of patients with at least one label = {labeled_patients.get_num_patients(is_include_empty_labels=False)}\n"
                 f"Total # of labels = {labeled_patients.get_num_labels()}")
-    with open(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, "done.txt"), "w") as f:
-        f.write("done")
-    logger.info("Done!")
+    logger.success("Done!")
 
 
