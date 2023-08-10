@@ -10,6 +10,7 @@ from femr.labelers import LabeledPatients
 from femr.datasets import PatientDatabase
 import femr.extension.dataloader
 from loguru import logger
+
 # SPLITS
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: int = 70
@@ -95,7 +96,7 @@ LR_PARAMS = {
 }
 
 # Few shot settings
-SHOT_STRATS: {
+SHOT_STRATS = {
     'few' : [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 128],
     'long' : [-1],
     'all' : [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 128, -1],
