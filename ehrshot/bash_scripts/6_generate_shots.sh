@@ -4,8 +4,8 @@
 #SBATCH --error=logs/6_generate_shots_%A.err
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=normal
-#SBATCH --mem=100G
-#SBATCH --cpus-per-task=10
+#SBATCH --mem=200G
+#SBATCH --cpus-per-task=20
 
 labeling_functions=(
     "guo_los" 
@@ -24,7 +24,7 @@ labeling_functions=(
     "lab_anemia"
     "chexpert"
 )
-shot_strats=("few" "long")
+shot_strats=("all")
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do

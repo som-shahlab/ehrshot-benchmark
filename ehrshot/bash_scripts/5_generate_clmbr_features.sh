@@ -8,7 +8,7 @@
 #SBATCH --mem=100G
 #SBATCH --cpus-per-task=10
 
-# Time to run: XXX mins
+# Time to run: 20 mins
 
 python3 ../5_generate_clmbr_features.py \
     --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
@@ -16,6 +16,8 @@ python3 ../5_generate_clmbr_features.py \
     --path_to_features_dir ../../EHRSHOT_ASSETS/custom_features \
     --path_to_models_dir ../../EHRSHOT_ASSETS/models \
     --model clmbr 
+
+# Time to run: XXXX mins
 
 # python3 ../5_generate_clmbr_features.py \
 #     --path_to_database ../../EHRSHOT_ASSETS/femr/extract \

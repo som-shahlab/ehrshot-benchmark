@@ -27,10 +27,6 @@ if __name__ == "__main__":
     PATH_TO_TASK_BATCHES: str = os.path.join(PATH_TO_FEATURES_DIR, f"{MODEL}_batches")
     PATH_TO_REPRESENTATIONS = os.path.join(PATH_TO_FEATURES_DIR, f"{MODEL}_features.pkl")
     
-    # Force refresh
-    check_file_existence_and_handle_force_refresh(PATH_TO_TASK_BATCHES, IS_FORCE_REFRESH)
-    check_file_existence_and_handle_force_refresh(PATH_TO_REPRESENTATIONS, IS_FORCE_REFRESH)
-    
     # Check that requested model exists
     assert os.path.exists(PATH_TO_MODEL), f"No model for `{MODEL}` exists @ `{PATH_TO_MODEL}`"
     assert os.path.exists(PATH_TO_DICTIONARY), f"No model dictionary for `{MODEL}` exists @ `{PATH_TO_DICTIONARY}`"

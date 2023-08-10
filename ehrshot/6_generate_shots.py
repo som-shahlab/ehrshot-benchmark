@@ -28,14 +28,14 @@ import os
 from typing import Dict, List, Union
 import numpy as np
 from loguru import logger
-from ehrshot.utils import get_splits
 from utils import (
     LABELING_FUNCTIONS, 
     CHEXPERT_LABELS, 
     SHOT_STRATS,
     get_labels_and_features, 
     process_chexpert_labels, 
-    convert_multiclass_to_binary_labels
+    convert_multiclass_to_binary_labels,
+    get_splits
 )
 import femr.datasets
 from femr.labelers import LabeledPatients, load_labeled_patients
@@ -185,5 +185,5 @@ if __name__ == "__main__":
     logger.info(f"Saving few shot data to: {PATH_TO_OUTPUT_FILE}")
     with open(PATH_TO_OUTPUT_FILE, 'w') as f:
         json.dump(few_shots_dict, f)
-    logger.success("Done!")
+    logger.success(f"Done with {LABELING_FUNCTION}!")
     
