@@ -124,7 +124,7 @@ def get_splits(database: PatientDatabase,
         'val' : label_values[val_pids_idx],
         'test' : label_values[val_pids_idx],
     }
-    return patient_ids, label_times, label_values
+    return patient_ids, label_values, label_times
 
 def get_patient_splits_by_idx(database: PatientDatabase, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
@@ -152,7 +152,7 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
 
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
-    feazturizations: Dict[str, np.ndarray] = {}
+    featurizations: Dict[str, np.ndarray] = {}
     for model in BASE_MODELS:
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
@@ -179,9 +179,9 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
             assert np.all(feature_patient_ids[join_indices] == label_patient_ids)
             assert np.all(feature_times[join_indices] == label_times)
 
-            feazturizations[model] = feature_matrix
+            featurizations[model] = feature_matrix
     
-    return label_patient_ids, label_times, label_values, feazturizations
+    return label_patient_ids, label_values, label_times, featurizations
 
 def process_chexpert_labels(label_values):
     new_labels = []

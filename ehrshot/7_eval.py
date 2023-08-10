@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
-    patient_ids, label_times, label_values, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
+    patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
     train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(database, patient_ids)
 
     # Load shot assignments for this task

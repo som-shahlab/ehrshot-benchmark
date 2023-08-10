@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
-    patient_ids, label_times, label_values = get_labels_and_features(labeled_patients, None)
+    patient_ids, label_values, label_times, __ = get_labels_and_features(labeled_patients, None)
 
     if LABELING_FUNCTION == "chexpert":
         # CheXpert is multilabel, convert to binary for EHRSHOT
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
 
     # Train/val/test splits
-    patient_ids, label_times, label_values = get_splits(database, patient_ids, label_times, label_values)
+    patient_ids, label_values, label_times = get_splits(database, patient_ids, label_times, label_values)
     logger.info(f"Train prevalence: {np.sum(label_values['train'] != 0) / len(label_values['train'])}")
     logger.info(f"Val prevalence: {np.sum(label_values['val'] != 0) / len(label_values['val'])}")
     logger.info(f"Test prevalence: {np.sum(label_values['test'] != 0) / len(label_values['test'])}")
