@@ -114,7 +114,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--n_replicates", type=int, help="Number of replicates to run for each `k`. Useful for creating std bars in plots", default=3, )
-    return parse_args.parse_args()
+    return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
