@@ -1,7 +1,6 @@
 import argparse
 import os
 from loguru import logger
-from utils import check_file_existence_and_handle_force_refresh
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate CLMBR / MOTOR patient representations (for all tasks at once)")

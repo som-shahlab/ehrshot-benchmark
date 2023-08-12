@@ -7,6 +7,8 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 
+# Time to run: 2 mins
+
 labeling_functions=(
     "guo_los" 
     "guo_readmission"

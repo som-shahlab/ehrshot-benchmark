@@ -23,6 +23,7 @@ Output:
 """
 import argparse
 import collections
+import datetime
 import json
 import os
 from typing import Dict, List, Union
@@ -81,7 +82,7 @@ def get_k_samples(y: List[int], k: int, max_k: int, is_preserve_prevalence: bool
                 idxs = idxs[:prev_k]
             else:
                 idxs = idxs[:k]
-            valid_idxs.extend(idxs)
+            valid_idxs.extend([ int(x) for x in idxs ]) # need to cast to normal `int` for JSON serializability
     return valid_idxs
 
 def generate_shots(k: int, 
@@ -97,12 +98,12 @@ def generate_shots(k: int,
     shot_dict: Dict[str, List[Union[int, str]]] = {
         "patient_ids_train_k": patient_ids['train'][train_idxs_k].tolist(),
         "patient_ids_val_k": patient_ids['val'][val_idxs_k].tolist(),
-        "label_times_train_k": [ label_time.isoformat() for label_time in label_times['train'][train_idxs_k] ], 
-        "label_times_val_k": [ label_time.isoformat() for label_time in label_times['val'][val_idxs_k] ], 
+        "label_times_train_k": [ label_time.astype(datetime.datetime).isoformat() for label_time in label_times['train'][train_idxs_k] ], 
+        "label_times_val_k": [ label_time.astype(datetime.datetime).isoformat() for label_time in label_times['val'][val_idxs_k] ], 
         'label_values_train_k': y_train[train_idxs_k].tolist(),
         'label_values_val_k': y_val[val_idxs_k].tolist(),
-        "train_idxs": train_idxs_k.tolist(),
-        "val_idxs": val_idxs_k.tolist(),
+        "train_idxs": train_idxs_k,
+        "val_idxs": val_idxs_k,
     }
     
     return shot_dict
