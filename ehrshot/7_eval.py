@@ -1,32 +1,14 @@
-"""Create a file at `PATH_TO_LABELS_AND_FEATS_DIR/LABELING_FUNCTION/results.json` containing:
-
-Output:
-    results = {
-        sub_task_1: : {
-            model_1: {
-                head_1: {
-                    replicate_1: {
-                        auroc: [ list of AUROC scores for each k-shot sample in replicate_1],
-                        auprc: [ list of AUPRC scores for each k-shot sample in replicate_1],
-                        brief: [ list of Brief scores for each k-shot sample in replicate_1],
-                        ks: [ list of values of `k` tested in replicate_1],
-                    },
-                    ...
-                },
-                ... 
-            },
-            ...
-        },
-        ...
-    }
+"""Create a file at `PATH_TO_LABELS_AND_FEATS_DIR/LABELING_FUNCTION/{SHOT_STRAT}_results.csv` containing:
+    Output is a CSV with headers:
+        sub_task, model, head, replicate, score_name, score_value, k
 """
 
 import argparse
-import collections
 import json
 import os
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 import numpy as np
+import pandas as pd
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from loguru import logger
@@ -70,7 +52,14 @@ def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray
     best_model.fit(X_train, y_train) # refit on only training data so that we are truly do `k`-shot learning
     return best_model
 
-def run_evaluation(X_train: np.ndarray, X_val: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, y_test: np.ndarray, model_head: str, n_jobs: int = 1):
+def run_evaluation(X_train: np.ndarray, 
+                    X_val: np.ndarray, 
+                    X_test: np.ndarray, 
+                    y_train: np.ndarray, 
+                    y_val: np.ndarray, 
+                    y_test: np.ndarray, 
+                    model_head: str, 
+                    n_jobs: int = 1) -> Tuple[Any, Dict[str, float]]:
     logger.critical(f"Start | Training {model_head}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
@@ -166,7 +155,7 @@ if __name__ == "__main__":
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
     PATH_TO_SHOTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, 'results.json')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
 
     # Load FEMR Patient Database
@@ -194,11 +183,9 @@ if __name__ == "__main__":
         # Binary classification
         sub_tasks: List[str] = [LABELING_FUNCTION]
         
-    # Store results
-    # Will have the form: 
-    #       results[sub_task][model][head][replicate][score_name] = [ list of scores of type score_name for each k-shot sample in replicate]
-    #       results[sub_task][model][head][replicate][ks] = [ list of values of `k` for each k-shot sample in replicate]
-    results: Dict[str, Dict[str, Dict[str, Dict[int, Dict[str, List]]]]] = {}
+    # Results will be stored as a CSV with columns:
+    #   sub_task, model, head, replicate, score_name, score_value, k
+    results: List[Dict[str, Any]] = []
     
     # For each base model we are evaluating...
     for model in BASE_MODELS:
@@ -216,20 +203,20 @@ if __name__ == "__main__":
             # (NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
-                ks: List[int] = sorted(list(few_shots_dict[sub_task].keys()))
+                ks: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task].keys() ])
                 # `results_for_k`: [key] = replicate, [value] = { 'k' : list of k's, 'scores' : dict of scores, where [key] = score name, [value] = list of values }
                 results_for_k: Dict[str, Dict[str, Union[List[int], Dict[str, List[float]]]]] = {} 
                 
                 # For each k-shot sample we are evaluating...
                 for k in ks:
-                    replicates: List[int] = sorted(list(few_shots_dict[sub_task][k].keys()))
+                    replicates: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task][str(k)].keys() ])
 
                     # For each replicate of this k-shot sample...
                     for replicate in replicates:
                         logger.success(f"Model: {model} | Head: {head} | Task: {sub_task} | k: {k} | replicate: {replicate}")
                         
                         # Get X/Y train/val for this k-shot sample     
-                        shot_dict: Dict[str, List[int]] = few_shots_dict[sub_task][k][replicate]               
+                        shot_dict: Dict[str, List[int]] = few_shots_dict[sub_task][str(k)][str(replicate)]               
                         X_train_k: np.ndarray = X_train[shot_dict["train_idxs"]]
                         X_val_k: np.ndarray = X_val[shot_dict["val_idxs"]]
                         y_train_k: np.ndarray = np.array(shot_dict['label_values_train_k'])
@@ -247,17 +234,18 @@ if __name__ == "__main__":
                         
                         # Save results
                         for score_name, score_value in scores.items():
-                            if replicate not in results_for_k: results_for_k[replicate] = {}
-                            if 'k' not in results_for_k[replicate]: results_for_k[replicate]['k'] = []
-                            if 'scores' not in results_for_k[replicate]: results_for_k[replicate]['scores'] = collections.defaultdict(list)
-                            results_for_k[replicate]['scores'][score_name].append(score_value)
-                            results_for_k[replicate]['k'].append(k)
-                # Save results
-                if sub_task not in results: results[sub_task] = {}
-                if model not in results[sub_task]: results[sub_task][model] = {}
-                results[sub_task][model][head] = results_for_k
+                            results.append({
+                                'labeling_function' : LABELING_FUNCTION,
+                                'sub_task' : sub_task,
+                                'model' : model,
+                                'head' : head,
+                                'replicate' : replicate,
+                                'k' : k,
+                                'score' : score_name,
+                                'value' : score_value,
+                            })
 
     logger.info(f"Saving results to: {PATH_TO_OUTPUT_FILE}")
-    with open(PATH_TO_OUTPUT_FILE, 'w') as f:
-        json.dump(results, f)
+    df: pd.DataFrame = pd.DataFrame(results)
+    df.to_csv(PATH_TO_OUTPUT_FILE)
     logger.success("Done!")

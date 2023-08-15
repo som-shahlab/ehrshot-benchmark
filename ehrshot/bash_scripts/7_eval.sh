@@ -7,22 +7,24 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 
+# Time to run: XXXX (12 mins per task)
+
 labeling_functions=(
     "guo_los" 
-    # "guo_readmission"
-    # "guo_icu"
-    # "new_hypertension"
-    # "new_hyperlipidemia"
-    # "new_pancan"
-    # "new_celiac"
-    # "new_lupus"
-    # "new_acutemi"
-    # "lab_thrombocytopenia"
-    # "lab_hyperkalemia"
-    # "lab_hypoglycemia"
-    # "lab_hyponatremia"
-    # "lab_anemia"
-    # "chexpert"
+    "guo_readmission"
+    "guo_icu"
+    "new_hypertension"
+    "new_hyperlipidemia"
+    "new_pancan"
+    "new_celiac"
+    "new_lupus"
+    "new_acutemi"
+    "lab_thrombocytopenia"
+    "lab_hyperkalemia"
+    "lab_hypoglycemia"
+    "lab_hyponatremia"
+    "lab_anemia"
+    "chexpert"
 )
 shot_strats=("all")
 

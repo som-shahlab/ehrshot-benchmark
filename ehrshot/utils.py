@@ -18,10 +18,21 @@ SPLIT_VAL_CUTOFF: int = 85
 
 # Types of base models to test
 BASE_MODELS: List[str] = ['count', 'clmbr', ]
+MODEL_2_NAME: Dict[str, str] = {
+    'clmbr' : 'CLMBR',
+    'count' : 'Count-based',
+}
+
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
     'count' : ['gbm', 'lr',],
     'clmbr' : ['gbm', 'lr', 'protonet'],
+}
+HEAD_2_NAME: Dict[str, str] = {
+    'gbm' : 'GBM',
+    'lr' : 'Logistic Regression',
+    'rf' : 'Random Forest',
+    'protonet' : 'ProtoNet',
 }
 
 # Labeling functions
@@ -82,6 +93,32 @@ CHEXPERT_LABELS = [
     "Fracture",
     "Support Devices",
 ]
+
+TASK_GROUP_2_LABELING_FUNCTION = {
+    "operational_outcomes": [
+        "guo_los",
+        "guo_readmission",
+        "guo_icu"
+    ],
+    "lab_values": [
+        "lab_thrombocytopenia",
+        "lab_hyperkalemia",
+        "lab_hypoglycemia",
+        "lab_hyponatremia",
+        "lab_anemia"
+    ],
+    "new_diagnoses": [
+        "new_hypertension",
+        "new_hyperlipidemia",
+        "new_pancan",
+        "new_celiac",
+        "new_lupus",
+        "new_acutemi"
+    ],
+    "chexpert": [
+        "chexpert"
+    ]
+}
 
 # Hyperparameter search
 XGB_PARAMS = {
