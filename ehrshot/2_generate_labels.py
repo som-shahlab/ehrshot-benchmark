@@ -1,15 +1,13 @@
 import argparse
 import os
 import json
+from typing import List
 from loguru import logger
 from utils import LABELING_FUNCTIONS
 import pandas as pd
 
 from femr.datasets import PatientDatabase
-from femr.labelers.core import LabeledPatients
-from femr.labelers.omop import (
-    ChexpertLabeler,
-)
+from femr.labelers.core import LabeledPatients, Label
 from femr.labelers.benchmarks import (
     Guo_LongLOSLabeler,
     Guo_30DayReadmissionLabeler,
@@ -25,6 +23,7 @@ from femr.labelers.benchmarks import (
     HyperkalemiaInstantLabValueLabeler,
     HypoglycemiaInstantLabValueLabeler,
     AnemiaInstantLabValueLabeler,
+    ChexpertLabeler,
 )
 
 def parse_args() -> argparse.Namespace:
@@ -119,9 +118,14 @@ if __name__ == "__main__":
     logger.info("Start | Label patients")
     labeled_patients = labeler.apply(
         path_to_patient_database=PATH_TO_PATIENT_DATABASE,
-        num_threads=NUM_THREADS
+        num_threads=NUM_THREADS,
     )
     logger.info("Finish | Label patients")
+    
+    # Force labels to be minute-level resolution for FEMR compatibility
+    for patient, labels in labeled_patients.items():
+        new_labels: List[Label] = [ Label(time=l.time.replace(second=0, microsecond=0), value=l.value) for l in labels ]
+        labeled_patients[patient] = new_labels
 
     # Save labeled patients to simple CSV pipeline format
     logger.info(f"Saving labeled patients to `{PATH_TO_OUTPUT_FILE}`")

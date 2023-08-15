@@ -7,7 +7,7 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 
-# Time to run: 10-40 mins
+# Time to run: 10 mins
 
 mkdir -p ../../EHRSHOT_ASSETS/custom_features
 

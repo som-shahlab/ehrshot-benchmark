@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 patient_2_label_times[patient_id].add(label.time)
     logger.info("Finish | Consolidate patients")
 
-    # Resort all labels to be in chronological order
+    # Resort all labels to be in chronological order AND force minute-level time resolution
     logger.info("Start | Resort labels chronologically")
     patient_2_merged_labels: Dict[int, List[Label]] = {}
     for patient_id, timestamps in patient_2_label_times.items():

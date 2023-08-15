@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import os
+from typing import Any, Dict
 from loguru import logger
 from femr.featurizers import AgeFeaturizer, CountFeaturizer, FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients
@@ -46,20 +47,26 @@ if __name__ == "__main__":
     # Run actual featurization for each patient
     logger.info("Start | Featurize patients")
     results = featurizer_age_count.featurize(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
-    logger.info("Finish | Featurize patients")
-
-    # Save results
-    logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
-    with open(PATH_TO_OUTPUT_FILE, 'wb') as f:
-        pickle.dump(results, f)
-
-    # Logging
     feature_matrix, patient_ids, label_values, label_times = (
         results[0],
         results[1],
         results[2],
         results[3],
     )
+    logger.info("Finish | Featurize patients")
+
+    # Save results
+    logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
+    results_dict: Dict[str, Any] = { # standardize format to match CLMBR's output
+        'data_matrix' : feature_matrix,
+        'patient_ids' : patient_ids,
+        'label_values' : label_values,
+        'labeling_time' : label_times,
+    }
+    with open(PATH_TO_OUTPUT_FILE, 'wb') as f:
+        pickle.dump(results_dict, f)
+
+    # Logging
     logger.info("FeaturizedPatient stats:\n"
                 f"feature_matrix={repr(feature_matrix)}\n"
                 f"patient_ids={repr(patient_ids)}\n"

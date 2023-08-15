@@ -37,6 +37,7 @@ if __name__ == "__main__":
     
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_DIR, IS_FORCE_REFRESH)
+    os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
 
     # `etl_simple_femr` command will crash if it sees any non-csv files in the input directory
     # Thus, we need to make sure we delete any non-CSV files in our input directory

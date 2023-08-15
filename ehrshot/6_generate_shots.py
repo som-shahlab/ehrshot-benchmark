@@ -107,7 +107,7 @@ def generate_shots(k: int,
     }
     
     return shot_dict
-    
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate few-shot data for eval")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")

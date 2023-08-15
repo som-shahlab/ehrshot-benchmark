@@ -1,6 +1,6 @@
 import pickle
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import datetime
 import torch.nn as nn
@@ -17,12 +17,11 @@ SPLIT_TRAIN_CUTOFF: int = 70
 SPLIT_VAL_CUTOFF: int = 85
 
 # Types of base models to test
-BASE_MODELS: List[str] = ['count', 'clmbr', 'motor']
+BASE_MODELS: List[str] = ['count', 'clmbr', ]
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
-    'count' : ['xgb', 'lr'],
-    'clmbr' : ['xgb', 'lr', 'protonet'],
-    'motor' : ['xgb', 'lr'],
+    'count' : ['gbm', 'lr',],
+    'clmbr' : ['gbm', 'lr', 'protonet'],
 }
 
 # Labeling functions
@@ -159,8 +158,14 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
         
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
-            feature_matrix, feature_patient_ids, _, feature_times = pickle.load(f)
-            feature_times = feature_times.astype("datetime64[us]")
+            feats: Dict[str, Any] = pickle.load(f)
+            feature_matrix, feature_patient_ids, feature_times = (
+                feats['data_matrix'],
+                feats['patient_ids'],
+                feats['labeling_time'],
+            )
+            feature_patient_ids = feature_patient_ids.astype(label_patient_ids.dtype)
+            feature_times = feature_times.astype(label_times.dtype)
             assert feature_patient_ids.dtype == label_patient_ids.dtype, f'Error -- mismatched types between feature_patient_ids={feature_patient_ids.dtype} and label_patient_ids={label_patient_ids.dtype}'
             assert feature_times.dtype == label_times.dtype, f'Error -- mismatched types between feature_times={feature_times.dtype} and label_times={label_times.dtype}'
 
@@ -213,6 +218,8 @@ def check_file_existence_and_handle_force_refresh(path_to_file_or_dir: str, is_f
                 raise ValueError(f"Error -- Directory already exists at `{path_to_file_or_dir}`. Please delete it and try again.")
             else:
                 raise ValueError(f"Error -- File already exists at `{path_to_file_or_dir}`. Please delete it and try again.")
+    if os.path.isdir(path_to_file_or_dir):
+        os.makedirs(path_to_file_or_dir, exist_ok=True)
 
 
 class ProtoNetCLMBRClassifier(nn.Module):

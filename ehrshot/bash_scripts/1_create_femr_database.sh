@@ -5,9 +5,9 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=normal
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=22
+#SBATCH --cpus-per-task=20
 
-# Time to run: 11 mins
+# Time to run: 65 mins
 
 python3 ../1_create_femr_database.py \
     --path_to_input_dir ../../EHRSHOT_ASSETS/data \

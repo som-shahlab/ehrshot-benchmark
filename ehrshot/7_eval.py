@@ -31,7 +31,6 @@ from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
-from ehrshot.utils import CHEXPERT_LABELS, LR_PARAMS, MODELS, XGB_PARAMS, ProtoNetCLMBRClassifier, get_patient_splits_by_idx
 from utils import (
     LABELING_FUNCTIONS,
     SHOT_STRATS,
@@ -39,7 +38,13 @@ from utils import (
     BASE_MODEL_2_HEADS,
     get_labels_and_features, 
     process_chexpert_labels, 
-    convert_multiclass_to_binary_labels)
+    convert_multiclass_to_binary_labels,
+    CHEXPERT_LABELS, 
+    LR_PARAMS, 
+    XGB_PARAMS, 
+    ProtoNetCLMBRClassifier, 
+    get_patient_splits_by_idx
+)
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from scipy.sparse import issparse
 import scipy
@@ -49,7 +54,7 @@ import femr.datasets
 import femr.models.conjugate_gradient
 from femr.labelers import load_labeled_patients, LabeledPatients
 
-def tune_hyperparams(X_train, X_val, y_train, y_val, model, param_grid: Dict[str, List], n_jobs: int = 1):
+def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
         Thus, we ned to use `PredefinedSplit` to force the proper splits."""
     # First, concatenate train/val sets (NOTE: need to do concatenation slightly diff for sparse arrays)
@@ -65,7 +70,7 @@ def tune_hyperparams(X_train, X_val, y_train, y_val, model, param_grid: Dict[str
     best_model.fit(X_train, y_train) # refit on only training data so that we are truly do `k`-shot learning
     return best_model
 
-def run_evaluation(X_train, X_val, X_test, y_train, y_val, y_test, model_head: str, n_jobs: int = 1):
+def run_evaluation(X_train: np.ndarray, X_val: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, y_test: np.ndarray, model_head: str, n_jobs: int = 1):
     logger.critical(f"Start | Training {model_head}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
@@ -101,7 +106,7 @@ def run_evaluation(X_train, X_val, X_test, y_train, y_val, y_test, model_head: s
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head == "protonet":
         model = ProtoNetCLMBRClassifier()
-        model = model.fit(X_train, y_train)
+        model.fit(X_train, y_train)
     else:
         raise ValueError(f"Model head `{model_head}` not supported.")
     logger.critical(f"Finish | Fitting {model_head}...")
@@ -143,7 +148,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
-    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
+    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory containing saved features")
+    parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory where results will be saved")
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
@@ -161,7 +167,7 @@ if __name__ == "__main__":
     PATH_TO_SHOTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, 'results.json')
-    os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
 
     # Load FEMR Patient Database
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
@@ -226,9 +232,9 @@ if __name__ == "__main__":
                         shot_dict: Dict[str, List[int]] = few_shots_dict[sub_task][k][replicate]               
                         X_train_k: np.ndarray = X_train[shot_dict["train_idxs"]]
                         X_val_k: np.ndarray = X_val[shot_dict["val_idxs"]]
-                        y_train_k: List[int] = shot_dict['label_values_train_k']
-                        y_val_k: List[int] = shot_dict['label_values_val_k']
-                        y_test_k: List[int] = y_test
+                        y_train_k: np.ndarray = np.array(shot_dict['label_values_train_k'])
+                        y_val_k: np.ndarray = np.array(shot_dict['label_values_val_k'])
+                        y_test_k: np.ndarray = np.array(y_test)
 
                         # CheXpert adjustment
                         if LABELING_FUNCTION == 'chexpert':
