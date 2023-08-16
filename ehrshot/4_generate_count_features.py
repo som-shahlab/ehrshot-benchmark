@@ -57,14 +57,8 @@ if __name__ == "__main__":
 
     # Save results
     logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
-    results_dict: Dict[str, Any] = { # standardize format to match CLMBR's output
-        'data_matrix' : feature_matrix,
-        'patient_ids' : patient_ids,
-        'label_values' : label_values,
-        'labeling_time' : label_times,
-    }
     with open(PATH_TO_OUTPUT_FILE, 'wb') as f:
-        pickle.dump(results_dict, f)
+        pickle.dump(results, f)
 
     # Logging
     logger.info("FeaturizedPatient stats:\n"

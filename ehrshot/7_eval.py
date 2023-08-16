@@ -174,7 +174,6 @@ if __name__ == "__main__":
     if LABELING_FUNCTION == "chexpert":
         label_values = process_chexpert_labels(label_values)
         sub_tasks: List[str] = CHEXPERT_LABELS
-        raise NotImplementedError
     elif LABELING_FUNCTION.startswith('lab_'):
        # Lab value is multi-class, convert to binary
         label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
@@ -204,8 +203,6 @@ if __name__ == "__main__":
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
                 ks: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task].keys() ])
-                # `results_for_k`: [key] = replicate, [value] = { 'k' : list of k's, 'scores' : dict of scores, where [key] = score name, [value] = list of values }
-                results_for_k: Dict[str, Dict[str, Union[List[int], Dict[str, List[float]]]]] = {} 
                 
                 # For each k-shot sample we are evaluating...
                 for k in ks:
@@ -225,8 +222,6 @@ if __name__ == "__main__":
 
                         # CheXpert adjustment
                         if LABELING_FUNCTION == 'chexpert':
-                            y_train_k = y_train_k[:, sub_task_idx]
-                            y_val_k = y_val_k[:, sub_task_idx]
                             y_test_k = y_test[:, sub_task_idx]
 
                         # Fit model with hyperparameter tuning

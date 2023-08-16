@@ -21,7 +21,7 @@ if __name__ == "__main__":
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL_DIR = os.path.join(args.path_to_models_dir, MODEL)
-    PATH_TO_MODEL: str = os.path.join(PATH_TO_MODEL_DIR, "model")
+    PATH_TO_MODEL: str = os.path.join(PATH_TO_MODEL_DIR, "clmbr_model")
     PATH_TO_DICTIONARY: str = os.path.join(PATH_TO_MODEL_DIR, "dictionary")
     PATH_TO_TASK_BATCHES: str = os.path.join(PATH_TO_FEATURES_DIR, f"{MODEL}_batches")
     PATH_TO_REPRESENTATIONS = os.path.join(PATH_TO_FEATURES_DIR, f"{MODEL}_features.pkl")

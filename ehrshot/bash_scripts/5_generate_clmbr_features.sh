@@ -5,8 +5,8 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
-#SBATCH --mem=100G
-#SBATCH --cpus-per-task=10
+#SBATCH --mem=200G
+#SBATCH --cpus-per-task=20
 
 # Time to run: 20 mins
 

@@ -1,6 +1,8 @@
+import ast
 import pickle
 import os
 from typing import Any, Dict, List, Optional, Tuple
+import pandas as pd
 import numpy as np
 import datetime
 import torch.nn as nn
@@ -76,6 +78,13 @@ LABELING_FUNCTION_2_PAPER_NAME = {
     "chexpert": "Chest X-ray Findings"
 }
 
+TASK_GROUP_2_PAPER_NAME = {
+    "operational_outcomes": "Operational Outcomes",
+    "lab_values": "Anticipating Lab Test Results",
+    "new_diagnoses": "Assignment of New Diagnoses",
+    "chexpert": "Anticipating Chest X-ray Findings",
+}
+
 # CheXpert labels
 CHEXPERT_LABELS = [
     "No Finding",
@@ -139,6 +148,52 @@ SHOT_STRATS = {
     'debug' : [10],
 }
 
+# Plotting
+SCORE_MODEL_HEAD_2_COLOR = {
+    'auroc' : {
+        'clmbr' : {
+            'gbm' : 'blue',
+            'lr' : 'deepskyblue',
+            'protonet' : 'cornflowerblue',
+            'rf' : 'turquoise',
+        },
+        'count' : {
+            'gbm' : 'red',
+            'lr' : 'firebrick',
+            'protonet' : 'lightcoral',
+            'rf' : 'coral',
+        },
+    },
+    'auprc' : {
+        'clmbr' : {
+            'gbm' : 'blue',
+            'lr' : 'deepskyblue',
+            'protonet' : 'cornflowerblue',
+            'rf' : 'turquoise',
+        },
+        'count' : {
+            'gbm' : 'red',
+            'lr' : 'firebrick',
+            'protonet' : 'lightcoral',
+            'rf' : 'coral',
+        },
+    },
+    # 'auprc' : {
+    #     'clmbr' : {
+    #         'gbm' : 'purple',
+    #         'lr' : 'mediumorchid',
+    #         'protonet' : 'mediumpurple',
+    #         'rf' : 'magenta',
+    #     },
+    #     'count' : {
+    #         'gbm' : 'green',
+    #         'lr' : 'limegreen',
+    #         'protonet' : 'darkgreen',
+    #         'rf' : 'lime',
+    #     },
+    # },
+}
+
 def get_splits(database: PatientDatabase, 
                 patient_ids: np.ndarray, 
                 label_times: np.ndarray, 
@@ -195,11 +250,11 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
         
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
-            feats: Dict[str, Any] = pickle.load(f)
+            feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = pickle.load(f)
             feature_matrix, feature_patient_ids, feature_times = (
-                feats['data_matrix'],
-                feats['patient_ids'],
-                feats['labeling_time'],
+                feats[0],
+                feats[1],
+                feats[3], # NOTE: skip label_values in [2]
             )
             feature_patient_ids = feature_patient_ids.astype(label_patient_ids.dtype)
             feature_times = feature_times.astype(label_times.dtype)
@@ -241,6 +296,7 @@ def convert_multiclass_to_binary_labels(values, threshold: int = 1):
     return values
 
 def check_file_existence_and_handle_force_refresh(path_to_file_or_dir: str, is_force_refresh: bool):
+    """Checks if file/folder exists. If it does, deletes it if `is_force_refresh` is True."""
     if is_force_refresh:
         if os.path.exists(path_to_file_or_dir):
             if os.path.isdir(path_to_file_or_dir):
@@ -258,6 +314,43 @@ def check_file_existence_and_handle_force_refresh(path_to_file_or_dir: str, is_f
     if os.path.isdir(path_to_file_or_dir):
         os.makedirs(path_to_file_or_dir, exist_ok=True)
 
+def type_tuple_list(s):
+    """For parsing List[Tuple] from command line using `argparse`"""
+    try:
+        # Convert the string representation of list of tuples into actual list of tuples
+        val = ast.literal_eval(s)
+        if not isinstance(val, list):
+            raise ValueError("Argument should be a list of tuples")
+        for item in val:
+            if not isinstance(item, tuple) or not all(isinstance(i, str) for i in item):
+                raise ValueError("Argument items should be tuples of strings")
+        return val
+    except ValueError:
+        raise ValueError("Argument should be a list of tuples of strings")
+
+def filter_df(df: pd.DataFrame, 
+            score: Optional[str] = None, 
+            labeling_function: Optional[str] = None, 
+            task_group: Optional[str] = None,
+            sub_tasks: Optional[List[str]] = None,
+            model_heads: Optional[List[Tuple[str, str]]] = None) -> pd.DataFrame:
+    """Filters results df based on various criteria."""
+    df = df.copy()
+    if score:
+        df = df[df['score'] == score]
+    if labeling_function:
+        df = df[df['labeling_function'] == labeling_function]
+    if task_group:
+        labeling_functions: List[str] = TASK_GROUP_2_LABELING_FUNCTION[task_group]
+        df = df[df['labeling_function'].isin(labeling_functions)]
+    if sub_tasks:
+        df = df[df['sub_task'].isin(sub_tasks)]
+    if model_heads:
+        mask = [ False ] * df.shape[0]
+        for model_head in model_heads:
+            mask = mask | ((df['model'] == model_head[0]) & (df['head'] == model_head[1]))
+        df = df[mask]
+    return df
 
 class ProtoNetCLMBRClassifier(nn.Module):
     def __init__(self):
