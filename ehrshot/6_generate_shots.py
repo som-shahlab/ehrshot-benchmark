@@ -57,32 +57,39 @@ def get_k_samples(y: List[int], k: int, max_k: int, is_preserve_prevalence: bool
         List[int]: List of idxs in `y` that are included in this k-shot sample
     """    
     valid_idxs: List[int] = []
+    # if we have less than `max_k` samples, then we need to replicate our oversampling when doing the `all` case for fair comparison
     if k == -1:
-        # Return all samples
-        valid_idxs = list(range(len(y)))
-    else:
-        classes = np.unique(y)
-        for c in classes:
-            # Get idxs corresponding to this class
-            class_idxs = np.where(y == c)[0]
-            # Get k random labels
-            # Note that instead of directly sampling `k` random samples, we instead
-            # sample `max_k` examples all at once, and then take the first `k` subset of them.
-            # This ensures that `k = N` always contains a superset of the examples sampled
-            # for `k = \hat{N}`, where `\hat{N} < N`.
-            np.random.seed(seed)
-            idxs = np.random.choice(class_idxs, size=min(len(class_idxs), max_k), replace=False)
-            if max_k > len(class_idxs):
-                # Fill rest of `k` with oversampling if not enough examples to fill `k` without replacement
-                idxs = np.hstack([idxs, np.random.choice(class_idxs, size=max_k - len(class_idxs), replace=True)])
-                logger.warning(f"Oversampling class {c} with replacement from {k} -> {max_k} examples.")
-            # If we want to preserve the prevalence of each class, then we need to adjust our sample size
-            if is_preserve_prevalence:
-                prev_k = max(1, int(len(classes) * k * len(class_idxs) / len(y)))
-                idxs = idxs[:prev_k]
-            else:
-                idxs = idxs[:k]
-            valid_idxs.extend([ int(x) for x in idxs ]) # need to cast to normal `int` for JSON serializability
+        # Return 50/50 positives and negatives, where we return all positives in training set.
+        if len(y) < max_k:
+            # Make sure # of positives >= max_k
+            k = max_k
+        else:
+            # Return all positives
+            k = len(np.where(y == 1)[0])
+            max_k = k
+    # Do sampling
+    classes = np.unique(y)
+    for c in classes:
+        # Get idxs corresponding to this class
+        class_idxs = np.where(y == c)[0]
+        # Get k random labels
+        # Note that instead of directly sampling `k` random samples, we instead
+        # sample `max_k` examples all at once, and then take the first `k` subset of them.
+        # This ensures that `k = N` always contains a superset of the examples sampled
+        # for `k = \hat{N}`, where `\hat{N} < N`.
+        np.random.seed(seed)
+        idxs = np.random.choice(class_idxs, size=min(len(class_idxs), max_k), replace=False)
+        if max_k > len(class_idxs):
+            # Fill rest of `k` with oversampling if not enough examples to fill `k` without replacement
+            idxs = np.hstack([idxs, np.random.choice(class_idxs, size=max_k - len(class_idxs), replace=True)])
+            logger.warning(f"Oversampling class {c} with replacement from {len(class_idxs)} -> {max_k} examples.")
+        # If we want to preserve the prevalence of each class, then we need to adjust our sample size
+        if is_preserve_prevalence:
+            prev_k = max(1, int(len(classes) * k * len(class_idxs) / len(y)))
+            idxs = idxs[:prev_k]
+        else:
+            idxs = idxs[:k]
+        valid_idxs.extend([ int(x) for x in idxs ]) # need to cast to normal `int` for JSON serializability
     return valid_idxs
 
 def generate_shots(k: int, 
@@ -149,9 +156,9 @@ if __name__ == "__main__":
 
     # Train/val/test splits
     patient_ids, label_values, label_times = get_splits(database, patient_ids, label_times, label_values)
-    logger.info(f"Train prevalence: {np.sum(label_values['train'] != 0) / len(label_values['train'])}")
-    logger.info(f"Val prevalence: {np.sum(label_values['val'] != 0) / len(label_values['val'])}")
-    logger.info(f"Test prevalence: {np.sum(label_values['test'] != 0) / len(label_values['test'])}")
+    logger.info(f"Train prevalence: {np.sum(label_values['train'] != 0) / label_values['train'].size}")
+    logger.info(f"Val prevalence: {np.sum(label_values['val'] != 0) / label_values['val'].size}")
+    logger.info(f"Test prevalence: {np.sum(label_values['test'] != 0) / label_values['test'].size}")
 
     if LABELING_FUNCTION == 'chexpert':
         # Multilabel -- create one task per class

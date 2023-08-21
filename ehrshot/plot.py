@@ -38,8 +38,6 @@ def plot_one_labeling_function(df: pd.DataFrame,
             x-axis = # of train examples per class (e.g. 1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
             lines = model+head's achieved mean score across replicates (e.g. AUROC/AUPRC)
     """
-    models: List[str] = df['model'].unique().tolist()
-
     # Limit to specific labeling_function, subtask, score, (model, head) combos
     df = filter_df(df, score=score, labeling_function=labeling_function, sub_tasks=sub_tasks, model_heads=model_heads)
 
@@ -88,6 +86,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
         'score' : 'first',
     }).reset_index(drop = True)
 
+    models: List[str] = df['model'].unique().tolist()
     for m_idx, model in enumerate(models):
         heads: List[str] = df[df['model'] == model]['head'].unique().tolist()
         for h_idx, head in enumerate(heads):
@@ -102,12 +101,13 @@ def plot_one_labeling_function(df: pd.DataFrame,
 
             # Plot individual subtasks
             for subtask in df_means_['sub_task'].unique():
-                df_ = df_means_[df_means_['sub_task'] == subtask]
-                ax.plot(df_['k'], df_['value'], color=color, linestyle='-', linewidth=2, alpha=0.25)
+                df_m_ = df_means_[df_means_['sub_task'] == subtask]
+                df_s_ = df_stds_[df_stds_['sub_task'] == subtask]
+                ax.plot(df_m_['k'], df_m_['value'], color=color, linestyle='-', linewidth=2, alpha=0.25)
                 if is_std_bars:
-                    ax.plot(df_['k'], df_['value'] - df_stds_['value'], color=color, alpha=0.1)
-                    ax.plot(df_['k'], df_['value'] + df_stds_['value'], color=color, alpha=0.1)
-                    ax.fill_between(df_['k'], df_['value'] - df_stds_['value'], df_['value'] + df_stds_['value'],color=color, alpha=0.2)
+                    ax.plot(df_m_['k'], df_m_['value'] - df_s_['value'], color=color, alpha=0.1)
+                    ax.plot(df_m_['k'], df_m_['value'] + df_s_['value'], color=color, alpha=0.1)
+                    ax.fill_between(df_m_['k'], df_m_['value'] - df_s_['value'], df_m_['value'] + df_s_['value'],color=color, alpha=0.2)
 
             # Plot average line across all subtasks
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)
@@ -158,6 +158,7 @@ def plot_one_task_group(df: pd.DataFrame,
 
     df_means = df.groupby([
         'labeling_function',
+        'sub_task',
         'model',
         'head',
         'score',
@@ -166,6 +167,7 @@ def plot_one_task_group(df: pd.DataFrame,
         'value' : 'mean',
         'k' : 'first',
         'labeling_function' : 'first',
+        'sub_task' : 'first',
         'model' : 'first',
         'head' : 'first',
         'score' : 'first',
@@ -183,10 +185,10 @@ def plot_one_task_group(df: pd.DataFrame,
             # Color
             color: str = SCORE_MODEL_HEAD_2_COLOR[score][model][head]
 
-            # Plot individual lines
-            for labeling_function in df_means_['labeling_function'].unique():
-                df_ = df_means_[df_means_['labeling_function'] == labeling_function]
-                ax.plot(df_['k'], df_['value'], color=color, linestyle='-', linewidth=2, alpha=0.25)
+            # Plot individual subtasks
+            for subtask in df_means_['sub_task'].unique():
+                df_m_ = df_means_[df_means_['sub_task'] == subtask]
+                ax.plot(df_m_['k'], df_m_['value'], color=color, linestyle='-', linewidth=2, alpha=0.25)
     
             # Plot average line per model
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)

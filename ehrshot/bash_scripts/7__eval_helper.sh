@@ -3,19 +3,17 @@
 #SBATCH --output=logs/7__eval_helper_%A.out
 #SBATCH --error=logs/7__eval_helper_%A.err
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=normal
-#SBATCH --mem=180G
-#SBATCH --cpus-per-task=15
-
-labeling_function=$1
-shot_strat=$2
-num_threads=$3
+#SBATCH --partition=gpu
+#SBATCH --mem=125G
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=10
+#SBATCH --exclude=secure-gpu-1, secure-gpu-2
 
 python3 ../7_eval.py \
-    --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
-    --path_to_features_dir ../../EHRSHOT_ASSETS/custom_features \
-    --path_to_output_dir ../../EHRSHOT_ASSETS/results \
-    --labeling_function $labeling_function \
-    --shot_strat $shot_strat \
-    --num_threads $num_threads
+    --path_to_database $1 \
+    --path_to_labels_dir $2 \
+    --path_to_features_dir $3 \
+    --path_to_output_dir $4 \
+    --labeling_function $5 \
+    --shot_strat $6 \
+    --num_threads $7

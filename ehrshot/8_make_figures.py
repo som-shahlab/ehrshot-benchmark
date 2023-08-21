@@ -39,7 +39,7 @@ def plot_all_labeling_functions(df_results: pd.DataFrame,
                                     score,
                                     model_heads=model_heads,
                                     is_x_scale_log=is_x_scale_log,
-                                    is_std_bars=is_std_bars)
+                                    is_std_bars=False if labeling_function == 'chexpert' else is_std_bars)
 
     # Create a unified legend for the entire figure
     _plot_unified_legend(fig, axes)
@@ -74,7 +74,7 @@ def plot_all_task_groups(df_results: pd.DataFrame,
     # Plot aesthetics
     fig.suptitle(f'{score.upper()} by Task Group', fontsize=16)
     plt.tight_layout()
-    plt.subplots_adjust(top=0.92, bottom=0.1)
+    plt.subplots_adjust(top=0.92, bottom=0.1, hspace=0.25)
     plt.savefig(os.path.join(path_to_output_dir, f"taskgroups_{score}.png"), dpi=300)
     plt.close('all')
     return fig
@@ -87,7 +87,6 @@ def plot_all_task_group_box_plots(df_results: pd.DataFrame,
     task_groups: List[str] = list(TASK_GROUP_2_LABELING_FUNCTION.keys())
 
     for idx, task_group in tqdm(enumerate(task_groups)):
-        if task_group == 'chexpert' : continue
         plot_one_task_group_box_plot(df_results, 
                                     axes.flat[idx], 
                                     task_group, 
@@ -110,7 +109,7 @@ def plot_all_task_group_box_plots(df_results: pd.DataFrame,
     # Plot aesthetics
     fig.suptitle(f'Few-shot v. Full data {score.upper()} by Task Group', fontsize=16)
     plt.tight_layout()
-    plt.subplots_adjust(top=0.92, bottom=0.1)
+    plt.subplots_adjust(top=0.92, bottom=0.1, hspace=0.25)
     plt.savefig(os.path.join(path_to_output_dir, f"taskgroups_boxplot_{score}.png"), dpi=300)
     plt.close('all')
     return fig
@@ -137,7 +136,6 @@ if __name__ == "__main__":
     # Load all results from CSVs
     dfs: List[pd.DataFrame] = []
     for idx, labeling_function in tqdm(enumerate(LABELING_FUNCTIONS)):
-        if labeling_function == 'chexpert': continue
         dfs.append(pd.read_csv(os.path.join(PATH_TO_RESULTS_DIR, f"{labeling_function}/{SHOT_STRAT}_results.csv")))
     df_results: pd.DataFrame = pd.concat(dfs, ignore_index=True)
 

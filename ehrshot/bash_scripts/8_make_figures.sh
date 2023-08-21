@@ -13,5 +13,5 @@ python3 ../8_make_figures.py \
     --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/custom_benchmark \
     --path_to_results_dir ../../EHRSHOT_ASSETS/results \
     --path_to_output_dir ../../EHRSHOT_ASSETS/figures \
-    --model_heads "[('clmbr', 'lr'), ('count', 'lr'), ('count', 'gbm')]" \
+    --model_heads "[('clmbr', 'lr_lbfgs'), ('count', 'gbm')]" \
     --shot_strat all

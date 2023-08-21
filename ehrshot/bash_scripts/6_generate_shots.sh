@@ -35,6 +35,6 @@ for labeling_function in "${labeling_functions[@]}"; do
         --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
         --labeling_function ${labeling_function} \
         --shot_strat ${shot_strat} \
-        --n_replicates 3
+        --n_replicates 5
     done
 done

@@ -46,7 +46,7 @@ def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray
     test_fold: np.ndarray = -np.ones(X.shape[0])
     test_fold[X_train.shape[0]:] = 0
     # Fit model
-    clf = GridSearchCV(model, param_grid, n_jobs=n_jobs, verbose=0, cv=PredefinedSplit(test_fold), refit=False)
+    clf = GridSearchCV(model, param_grid, scoring='roc_auc', n_jobs=n_jobs, verbose=0, cv=PredefinedSplit(test_fold), refit=False)
     clf.fit(X, y)
     best_model = model.__class__(**clf.best_params_)
     best_model.fit(X_train, y_train) # refit on only training data so that we are truly do `k`-shot learning
@@ -67,7 +67,7 @@ def run_evaluation(X_train: np.ndarray,
     logger.info(f"Train prevalence:  {np.mean(y_train)}")
     logger.info(f"Val prevalence:  {np.mean(y_val)}")
     logger.info(f"Test prevalence:  {np.mean(y_test)}")
-    
+
     # Shuffle training set
     np.random.seed(X_train.shape[0])
     train_shuffle_idx = np.arange(X_train.shape[0])
@@ -76,7 +76,10 @@ def run_evaluation(X_train: np.ndarray,
     y_train = y_train[train_shuffle_idx]
 
     logger.critical(f"Start | Fitting {model_head}...")
-    if model_head == "gbm":
+    model_head_parts: List[str] = model_head.split("_")
+    model_head_base: str = model_head_parts[0]
+    if model_head_base == "gbm":
+        # XGBoost
         model = lgb.LGBMClassifier()
         # NOTE: Need to set `min_child_samples = 1`, which specifies the minimum number of samples required in a leaf (terminal node).
         # This is necessary for few-shot learning, since we may have very few samples in a leaf node.
@@ -84,26 +87,41 @@ def run_evaluation(X_train: np.ndarray,
         XGB_PARAMS['min_child_samples'] = [ 1 ]
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, XGB_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
-    elif model_head == "lr":
+    elif model_head_base == "lr":
         # Logistic Regresion
-        scaler = MaxAbsScaler().fit(X_train)
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-        X_test = scaler.transform(X_test)
-        model = LogisticRegression(n_jobs=1, penalty="l2", solver="lbfgs")
-        model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
-        logger.info(f"Best hparams: {model.get_params()}")
-    elif model_head == "protonet":
+        solver: str = model_head_parts[1] # "newton-cg" or "lbfgs" etc.
+        if solver == 'femr':
+            # Use FEMR implementation of conjugate gradient method
+            model = femr.models.conjugate_gradient.train_logistic_regression(X_train, y_train.astype(float), X_val, y_val.astype(float))
+        else:
+            # Use built-in SKLearn solver
+            scaler = MaxAbsScaler().fit(X_train)
+            X_train = scaler.fit_transform(X_train)
+            X_val = scaler.transform(X_val)
+            X_test = scaler.transform(X_test)
+            model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
+            model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
+            logger.info(f"Best hparams: {model.get_params()}")
+    elif model_head_base == "protonet":
+        # ProtoNet
         model = ProtoNetCLMBRClassifier()
         model.fit(X_train, y_train)
     else:
         raise ValueError(f"Model head `{model_head}` not supported.")
     logger.critical(f"Finish | Fitting {model_head}...")
     
+    # Calculate probabilistic preds
+    if model_head == 'lr_femr':
+        # FEMR only returns model weights, so need to manually calculate probs
+        y_train_proba = 1/(1 + np.exp(-np.dot(X_train, model)))
+        y_val_proba = 1/(1 + np.exp(-np.dot(X_val, model)))
+        y_test_proba = 1/(1 + np.exp(-np.dot(X_test, model)))
+    else:
+        y_train_proba = model.predict_proba(X_train)[::, 1]
+        y_val_proba = model.predict_proba(X_val)[::, 1]
+        y_test_proba = model.predict_proba(X_test)[::, 1]
+    
     # AUROC
-    y_train_proba = model.predict_proba(X_train)[::, 1]
-    y_val_proba = model.predict_proba(X_val)[::, 1]
-    y_test_proba = model.predict_proba(X_test)[::, 1]
     train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
     val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
     test_auroc = metrics.roc_auc_score(y_test, y_test_proba)

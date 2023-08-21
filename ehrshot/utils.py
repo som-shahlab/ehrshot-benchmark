@@ -27,12 +27,14 @@ MODEL_2_NAME: Dict[str, str] = {
 
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
-    'count' : ['gbm', 'lr',],
-    'clmbr' : ['gbm', 'lr', 'protonet'],
+    'count' : ['gbm', ],
+    'clmbr' : ['gbm',  'lr_lbfgs', 'lr_femr', 'protonet'],
 }
 HEAD_2_NAME: Dict[str, str] = {
     'gbm' : 'GBM',
-    'lr' : 'Logistic Regression',
+    'lr_lbfgs' : 'Logistic Regression',
+    'lr_newton-cg' : 'Logistic Regression (Newton-CG)',
+    'lr_femr' : 'Logistic Regression (FEMR)',
     'rf' : 'Random Forest',
     'protonet' : 'ProtoNet',
 }
@@ -153,29 +155,29 @@ SCORE_MODEL_HEAD_2_COLOR = {
     'auroc' : {
         'clmbr' : {
             'gbm' : 'blue',
-            'lr' : 'deepskyblue',
-            'protonet' : 'cornflowerblue',
-            'rf' : 'turquoise',
+            'lr_lbfgs' : 'mediumblue',
+            'lr_newton-cg' : 'cornflowerblue',
+            'protonet' : 'dodgerblue',
         },
         'count' : {
             'gbm' : 'red',
-            'lr' : 'firebrick',
-            'protonet' : 'lightcoral',
-            'rf' : 'coral',
+            'lr_lbfgs' : 'mediumblue',
+            'lr_newton-cg' : 'cornflowerblue',
+            'protonet' : 'coral',
         },
     },
     'auprc' : {
         'clmbr' : {
-            'gbm' : 'blue',
-            'lr' : 'deepskyblue',
-            'protonet' : 'cornflowerblue',
-            'rf' : 'turquoise',
+            'gbm' : 'darkblue',
+            'lr_lbfgs' : 'steelblue',
+            'lr_newton-cg' : 'darkturquoise',
+            'protonet' : 'deepskyblue',
         },
         'count' : {
-            'gbm' : 'red',
-            'lr' : 'firebrick',
-            'protonet' : 'lightcoral',
-            'rf' : 'coral',
+            'gbm' : 'darkred',
+            'lr_lbfgs' : 'tomato',
+            'lr_newton-cg' : 'lightsalmon',
+            'protonet' : 'salmon',
         },
     },
     # 'auprc' : {
