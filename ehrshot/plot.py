@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Tuple
 import pandas as pd
 import numpy as np
@@ -295,3 +296,33 @@ def plot_one_task_group_box_plot(df: pd.DataFrame,
     ax.set_xticks(positions, labels=x_tick_labels)
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
+
+def plot_column_per_patient(df_demo: pd.DataFrame, 
+                            path_to_output_dir: str,
+                            column: str, 
+                            x_label: str, 
+                            title: str,
+                            max_clamp: int = None):
+    """
+    3 panels, one for each split
+        Histogram
+            x-axis: # of events in a patient timeline
+            y-axis: # of patients with that # of events
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(20, 5))
+    for idx, split in enumerate(['train', 'val', 'test']):
+        df_ = df_demo[df_demo['split'] == split]
+        counts = df_[column].tolist()
+        
+        # Clamp at `max_clamp`
+        if max_clamp:
+            counts = [ min(count, max_clamp) for count in counts ]
+        
+        axes[idx].hist(counts, bins=100)
+        axes[idx].set_xlabel(f"{x_label}")
+        axes[idx].set_ylabel("# of Patients")
+        axes[idx].legend()
+        axes[idx].set_title(f'{split} (n={len(counts)})')
+    fig.suptitle(f"Distribution of {title}/patient")
+    plt.savefig(os.path.join(path_to_output_dir, f'{column}_per_patient.png'))
+    plt.show()

@@ -35,8 +35,12 @@ if __name__ == "__main__":
     else:
         hier_flag = ""
     
+    if IS_FORCE_REFRESH:
+        os.system(f"rm -rf {PATH_TO_TASK_BATCHES}")
+        os.system(f"rm -rf {PATH_TO_REPRESENTATIONS}")
+    
     # Generate batches for all tasks
-    if not os.path.exists(PATH_TO_TASK_BATCHES):
+    if IS_FORCE_REFRESH or not os.path.exists(PATH_TO_TASK_BATCHES):
         command: str = (
             f"clmbr_create_batches {PATH_TO_TASK_BATCHES}"
             f" --data_path {PATH_TO_PATIENT_DATABASE}"
@@ -54,7 +58,7 @@ if __name__ == "__main__":
         logger.critical(f"Skipping `clmbr_create_batches` because batches already exist @ {PATH_TO_TASK_BATCHES}")
         
     # Generate patient representations for tasks
-    if not os.path.exists(PATH_TO_REPRESENTATIONS):
+    if IS_FORCE_REFRESH or not os.path.exists(PATH_TO_REPRESENTATIONS):
         command: str = (
             f"clmbr_compute_representations {PATH_TO_REPRESENTATIONS}"
             f" --data_path {PATH_TO_PATIENT_DATABASE}"

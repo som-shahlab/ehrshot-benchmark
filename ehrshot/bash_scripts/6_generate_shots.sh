@@ -38,3 +38,5 @@ for labeling_function in "${labeling_functions[@]}"; do
         --n_replicates 5
     done
 done
+
+echo "Done!" >&2

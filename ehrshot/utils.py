@@ -1,6 +1,7 @@
 import ast
 import pickle
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
@@ -389,3 +390,16 @@ class ProtoNetCLMBRClassifier(nn.Module):
         if not os.path.exists(model_save_dir):
             os.makedirs(model_save_dir, exist_ok = True)
         np.save(self.prototypes, os.path.join(model_save_dir, f'{model_name}.npy'))
+
+
+def write_table_to_latex(df: pd.DataFrame, path_to_file: str, is_ignore_index: bool = False):
+    with open(path_to_file, 'a') as f:
+        latex = df.to_latex(index=not is_ignore_index, escape=True)
+        f.write("=======================================\n")
+        f.write("=======================================\n")
+        f.write("\n\nFigure:\n\n")
+        f.write("\n")
+        f.write(re.sub(r'\& +', '& ', latex))
+        f.write("\n")
+        f.write("=======================================\n")
+        f.write("=======================================\n")

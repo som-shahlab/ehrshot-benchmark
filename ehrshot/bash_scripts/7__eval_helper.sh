@@ -4,10 +4,10 @@
 #SBATCH --error=logs/7__eval_helper_%A.err
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=gpu
-#SBATCH --mem=125G
+#SBATCH --mem=120G
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
-#SBATCH --exclude=secure-gpu-1, secure-gpu-2
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 python3 ../7_eval.py \
     --path_to_database $1 \
