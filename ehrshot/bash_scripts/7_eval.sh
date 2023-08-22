@@ -11,6 +11,7 @@ path_to_output_dir='../../EHRSHOT_ASSETS/results'
 
 labeling_functions=(
     "chexpert" # CheXpert first b/c slowest
+    "lab_anemia" # Takes second longest
     "guo_los" 
     "guo_readmission"
     "guo_icu"
@@ -24,10 +25,9 @@ labeling_functions=(
     "lab_hyperkalemia"
     "lab_hypoglycemia"
     "lab_hyponatremia"
-    "lab_anemia"
 )
 shot_strats=("all")
-num_threads=10
+num_threads=25
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do

@@ -42,6 +42,10 @@ def plot_one_labeling_function(df: pd.DataFrame,
     # Limit to specific labeling_function, subtask, score, (model, head) combos
     df = filter_df(df, score=score, labeling_function=labeling_function, sub_tasks=sub_tasks, model_heads=model_heads)
 
+    if labeling_function == 'new_celiac':
+        # Only 62 train examples, so cutoff plot at `k = 64`
+        df = df[df['k'] <= 64]
+
     # Get all `k` shots tested
     ks: List[int] = sorted(df['k'].unique().tolist())
     
@@ -53,7 +57,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
         ks.append(full_data_k)
         df.loc[df['k'] == -1, 'k'] = full_data_k
         x_tick_labels = [ str(k) if k != full_data_k else 'All' for k in ks ]
-
+    
     df_means = df.groupby([
         'labeling_function',
         'sub_task',
@@ -248,6 +252,7 @@ def plot_one_task_group_box_plot(df: pd.DataFrame,
     }).reset_index(drop = True)
     
     # Create the boxplots
+    n_replicates: int = df['replicate'].nunique()
     width = 0.3  # width of the boxplot
     models: List[str] = df_grouped['model'].unique().tolist()
     shift_amt: int = 0
@@ -255,7 +260,7 @@ def plot_one_task_group_box_plot(df: pd.DataFrame,
         heads: List[str] = df_grouped[df_grouped['model'] == model]['head'].unique().tolist()
         for head in heads:
             df_ = df_grouped[(df_grouped['model'] == model) & (df_grouped['head'] == head)]
-            full_data_values: np.ndarray = np.array(df_[df_['k'] == full_data_k]['value'].tolist())
+            full_data_values: np.ndarray = np.array([ [x] * n_replicates for x in df_[df_['k'] == full_data_k]['value'].tolist() ]).flatten() # expand to match # of replicates, since only use 1 replicate for `all`
             values: np.ndarray = np.array(df_[df_['k'] != full_data_k]['value'].tolist())
 
             # Get relative difference between full data v. few-shot

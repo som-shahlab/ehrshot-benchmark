@@ -9,9 +9,9 @@
 
 mkdir -p ../../EHRSHOT_ASSETS/figures
 
-python3 ../8_make_figures.py \
+python3 ../8_make_results_plots.py \
     --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/custom_benchmark \
     --path_to_results_dir ../../EHRSHOT_ASSETS/results \
     --path_to_output_dir ../../EHRSHOT_ASSETS/figures \
-    --model_heads "[('clmbr', 'lr_lbfgs'), ('count', 'gbm')]" \
+    --model_heads "[('clmbr', 'lr_femr'), ('count', 'gbm')]" \
     --shot_strat all

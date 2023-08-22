@@ -217,7 +217,7 @@ if __name__ == "__main__":
             y_test: np.ndarray = label_values[test_pids_idx]
             
             # For each subtask in this task... 
-            # (NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
+            # NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
                 ks: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task].keys() ])
