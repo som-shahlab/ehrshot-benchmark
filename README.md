@@ -187,7 +187,7 @@ python3 run_all.py
 
 ----
 
-You can also run each of the 6 steps individually by directly calling their corresponding Python/Bash files in the `ehrshot/` folder. Note that depending on your system, you may need to change the Bash scripts.
+You can also run each of the steps individually by directly calling their corresponding Python/Bash files in the `ehrshot/` folder. Note that depending on your system, you may need to change the Bash scripts.
 
 Here is a breakdown of what each step in the pipeline does:
 
