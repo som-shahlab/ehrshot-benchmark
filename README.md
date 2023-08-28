@@ -116,9 +116,12 @@ For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Me
 
 You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
 
+Note that this currently only works on Linux machines.
+
 ```bash
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-pip install "femr_cuda[models]==0.0.20"
+conda install bazel=6 -y
+pip install git+https://github.com/som-shahlab/femr.git@ehrshot_branch
 ```
 
 ## Download Private Assets
@@ -184,7 +187,7 @@ python3 run_all.py
 
 ----
 
-You can also run each of the 6 steps individually by directly calling their corresponding Python/Bash files in the `ehrshot/` folder. Note that depending on your system, you may need to change the Bash scripts.
+You can also run each of the steps individually by directly calling their corresponding Python/Bash files in the `ehrshot/` folder. Note that depending on your system, you may need to change the Bash scripts.
 
 Here is a breakdown of what each step in the pipeline does:
 

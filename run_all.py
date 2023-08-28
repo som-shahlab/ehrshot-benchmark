@@ -4,140 +4,183 @@ import sys
 sys.path.append("./ehrshot")
 sys.path.append("./EHRSHOT_ASSETS")
 
-TASKS = [
-    "guo_los", "guo_readmission", "guo_icu", "uden_hypertension", "uden_hyperlipidemia", "uden_pancan",
-    "uden_celiac", "uden_lupus", "uden_acutemi", "thrombocytopenia_lab", "hyperkalemia_lab",
-    "hypoglycemia_lab", "hyponatremia_lab", "anemia_lab", "chexpert"
-]
+
+TASKS=(
+    "guo_los" 
+    "guo_readmission"
+    "guo_icu"
+    "new_hypertension"
+    "new_hyperlipidemia"
+    "new_pancan"
+    "new_celiac"
+    "new_lupus"
+    "new_acutemi"
+    "lab_thrombocytopenia"
+    "lab_hyperkalemia"
+    "lab_hypoglycemia"
+    "lab_hyponatremia"
+    "lab_anemia"
+    "chexpert"
+)
+num_threads =  16
 
 # # ---------------------------------------Script 1---------------------------------------
 """
-This script converts the CSV files into a FEMR database. 
+Convert the EHRSHOT cohort's CSV files into a FEMR database. 
 Read more about [FEMR here](https://github.com/som-shahlab/femr).
 
-Time: ~10 minutes using 10 threads
+Time: XXXXXX
 """
-database_path = "EHRSHOT_ASSETS/femr"
-if not os.path.exists(database_path):
-    command = (
-        'python3 '
-        'ehrshot/1_create_femr_database.py '
-        '--path_to_input EHRSHOT_ASSETS/data '
-        '--path_to_target EHRSHOT_ASSETS/femr '
-        '--athena_download EHRSHOT_ASSETS/athena_download '
-        '--num_threads 10'
-    )
-    os.system(command)
+command = (
+    'python3 ehrshot/1_create_femr_database.py'
+    ' --path_to_input_dir EHRSHOT_ASSETS/data'
+    ' --path_to_output_dir EHRSHOT_ASSETS/femr'
+    ' --path_to_athena_download EHRSHOT_ASSETS/athena_download'
+    f' --num_threads {num_threads}'
+    ' --is_force_refresh'
+)
+print(command)
+os.system(command)
 
 
 # ---------------------------------------Script 2---------------------------------------
 """
-Next, we will use our labeling functions [defined here](https://github.com/som-shahlab/femr/blob/few_shot_ehr_benchmark/src/femr/labelers/benchmarks.py) 
+Use our labeling functions [defined here](https://github.com/som-shahlab/femr/blob/few_shot_ehr_benchmark/src/femr/labelers/benchmarks.py) 
 to generate labels for our dataset for our benchmark tasks.
 """
+os.makedirs("EHRSHOT_ASSETS/custom_benchmark", exist_ok=True)
 for task in TASKS:
     command = (
-        'python3 ehrshot/2_generate_labels_and_features.py '
-        '--path_to_database EHRSHOT_ASSETS/femr/extract '
-        '--path_to_output_dir EHRSHOT_ASSETS/benchmark '
-        '--path_to_chexpert_csv EHRSHOT_ASSETS/benchmark/chexpert/chexpert_labeled_radiology_notes.csv '
-        '--labeling_function {} '
-        '--is_skip_label '
-        '--num_threads 10'
-    ).format(task)
+        'python3 ehrshot/2_generate_labels.py'
+        ' --path_to_database EHRSHOT_ASSETS/femr/extract'
+        ' --path_to_labels_dir EHRSHOT_ASSETS/custom_benchmark'
+        ' --path_to_chexpert_csv EHRSHOT_ASSETS/benchmark/chexpert/chexpert_labeled_radiology_notes.csv'
+        f' --labeling_function {task}'
+        f' --num_threads {num_threads}'
+    )
+    print(command)
     os.system(command)
-
+        
 # ---------------------------------------Script 3---------------------------------------
 """
-Next, we generate the CLMBR representation for the patients in our cohort for each label. 
-This step requires a GPU.
+Consolidate all labels together to speed up feature generation process
 """
-clmbr_reps_dirs = "EHRSHOT_ASSETS/clmbr_reps"
-os.makedirs(clmbr_reps_dirs, exist_ok=True)
-
-for task in TASKS:
-    task_dir = os.path.join(clmbr_reps_dirs, task)
-    if not os.path.exists(task_dir):
-        command = (
-            'python3 ehrshot/3_generate_clmbr_representations.py '
-            '--path_to_clmbr_data EHRSHOT_ASSETS/models/clmbr_model '
-            '--path_to_database EHRSHOT_ASSETS/femr/extract '
-            '--path_to_labeled_featurized_data EHRSHOT_ASSETS/benchmark '
-            '--path_to_save {} '
-            '--labeling_function {}'
-        ).format(clmbr_reps_dirs, task)
-        os.system(command)
+command = (
+    'python3 ehrshot/3_consolidate_labels.py'
+    ' --path_to_labels_dir EHRSHOT_ASSETS/custom_benchmark'
+    ' --is_force_refresh'
+)
+print(command)
+os.system(command)
 
 
 # ---------------------------------------Script 4---------------------------------------
 """
-Next, we will generate our k-shots for evaluation. 
-**Note**: We provide the k-shots we used with our data release. 
-Please do not run this script if you want to use the k-shots we used in our paper. 
+Generate count-based feature representations
 """
-# We provide data for few shots, so only run it for long shot.
-shot_strats = ["long"]
-for task in TASKS:
-    for shot_strat in shot_strats:
-        if shot_strat == "few":
-            num_replicates = 5
-        else:
-            num_replicates = 1
-        command = (
-            'python3 ehrshot/4_generate_shot.py '
-            '--path_to_data EHRSHOT_ASSETS '
-            '--labeling_function {} '
-            '--num_replicates {} '
-            '--path_to_save EHRSHOT_ASSETS/benchmark '
-            '--shot_strat {}'
-        ).format(task, num_replicates, shot_strat)
-        os.system(command)
+
+os.makedirs("EHRSHOT_ASSETS/custom_features", exist_ok=True)
+command = (
+    'python3 ehrshot/4_generate_count_features.py'
+    '--path_to_database EHRSHOT_ASSETS/femr/extract'
+    '--path_to_labels_dir EHRSHOT_ASSETS/custom_benchmark'
+    '--path_to_features_dir EHRSHOT_ASSETS/custom_features'
+    f' --num_threads {num_threads}'
+    f' --is_force_refresh'
+)
+print(command)
+os.system(command)
 
 # ---------------------------------------Script 5---------------------------------------
 """
-Next, we train our baseline models and generate the metrics.
+Generate CLMBR-T-base feature representations for the patients in our cohort.
+This step requires a GPU.
 """
-shot_strats = ["few", "long"]
-eval_dirs = "EHRSHOT_ASSETS/output"
-os.makedirs(eval_dirs, exist_ok=True)
-
-for task in TASKS:
-    for shot_strat in shot_strats:
-        if shot_strat == "few":
-            num_replicates = 5
-        else:
-            num_replicates = 1
-        command = (
-            'python3 ehrshot/5_eval.py '
-            '--path_to_data EHRSHOT_ASSETS '
-            '--labeling_function {} '
-            '--num_replicates {} '
-            '--model_head logistic '
-            '--is_tune_hyperparams '
-            '--path_to_save {} '
-            '--shot_strat {}'
-        ).format(task, num_replicates, eval_dirs, shot_strat)
-        os.system(command)
+    
+command = (
+    'python3 ehrshot/5_generate_clmbr_features.py'
+    ' --path_to_database EHRSHOT_ASSETS/femr/extract'
+    ' --path_to_labels_dir EHRSHOT_ASSETS/models/custom_benchmark'
+    ' --path_to_features_dir EHRSHOT_ASSETS/models/custom_features'
+    ' --path_to_models_dir EHRSHOT_ASSETS/models'
+)
+print(command)
+os.system(command)
 
 # ---------------------------------------Script 6---------------------------------------
 """
-Finally, we generate the plots that included in our paper.
+Generate our k-shots for evaluation. 
+**Note**: We provide the k-shots we used with our data release. 
+Please do not run this script if you want to use the k-shots we used in our paper. 
 """
-figure_dirs = "EHRSHOT_ASSETS/figures"
-os.makedirs(figure_dirs, exist_ok=True)
+shot_strats = ["all"]
+num_replicates: int = 5
+for task in TASKS:
+    for shot_strat in shot_strats:
+        command = (
+            'python3 ehrshot/6_generate_shots.py'
+            ' --path_to_database EHRSHOT_ASSETS/femr/extract'
+            ' --path_to_labels_dir EHRSHOT_ASSETS/custom_benchmark'
+            f' --labeling_function {task}'
+            f' --shot_strat {shot_strat}'
+            f' --num_replicates {num_replicates}'
+        )
+        print(command)
+        os.system(command)
 
+# ---------------------------------------Script 7---------------------------------------
+"""
+Next, we train our baseline models and generate the metrics.
+"""
+shot_strats = ["all"]
+num_replicates: int = 5
+
+for task in TASKS:
+    for shot_strat in shot_strats:
+        command = (
+            'python3 ehrshot/7_eval.py '
+            ' --path_to_database EHRSHOT_ASSETS/femr/extract'
+            f' --path_to_labels_dir EHRSHOT_ASSETS/custom_benchmark'
+            f' --path_to_features_dir EHRSHOT_ASSETS/custom_features'
+            f' --path_to_output_dir EHRSHOT_ASSETS/results'
+            f' --labeling_function {task}'
+            f' --shot_strat {shot_strat}'
+            f' --num_threads {num_threads}'
+        )
+        print(command)
+        os.system(command)
+
+# ---------------------------------------Script 8---------------------------------------
+"""
+Generate plots included in the EHRSHOT paper.
+"""
+os.makedirs("EHRSHOT_ASSETS/figures", exist_ok=True)
+shot_strat: str = "all"
 command = (
-    'python3 ehrshot/6_make_figures.py '
-    '--path_to_eval "EHRSHOT_ASSETS/output" '
-    '--path_to_save {}'   
-).format(figure_dirs)
+    'python3 ehrshot/8_make_figures.py'
+    ' --path_to_labels_and_feats_dir EHRSHOT_ASSETS/custom_benchmark'
+    ' --path_to_results_dir EHRSHOT_ASSETS/results'
+    ' --path_to_output_dir EHRSHOT_ASSETS/figures'
+    ' --model_heads "[(\'clmbr\', \'lr_lbfgs\'), (\'count\', \'gbm\')]"'
+    f' --shot_strat {shot_strat}'   
+)
+print(command)
 os.system(command)
 
-
-
-
-
-
-
-
-
+# ---------------------------------------Script 9---------------------------------------
+"""
+Generate cohort statistic tables included in the EHRSHOT paper.
+"""
+os.makedirs("EHRSHOT_ASSETS/cohort_stats", exist_ok=True)
+shot_strat: str = "all"
+command = (
+    'python3 ehrshot/9_make_cohort_plots.py'
+    ' --path_to_database EHRSHOT_ASSETS/femr/extract'
+    ' --path_to_labels_and_feats_dir EHRSHOT_ASSETS/custom_benchmark'
+    ' --path_to_input_dir EHRSHOT_ASSETS/data'
+    ' --path_to_splits_dir EHRSHOT_ASSETS/splits'
+    ' --path_to_output_dir EHRSHOT_ASSETS/cohort_stats'
+    f' --num_threads {num_threads}'   
+)
+print(command)
+os.system(command)
