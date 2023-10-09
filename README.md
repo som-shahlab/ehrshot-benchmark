@@ -6,7 +6,7 @@ Please note that the dataset + model are still being reviewed, and a download li
 
 ----
 
-Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,712 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
+Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 # 📖 Table of Contents
 1. [Dataset + Tasks](#dataset)
@@ -22,10 +22,10 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 **Please Note:** Dataset release is currently being reviewed and the download link will be updated once it is publicly available.
 
-The EHRSHOT dataset contains:
-* **6,712 patients**
-* **39.2 million clinical events**
-* **893,773 visits**
+The EHRSHOT (version 1) dataset contains:
+* **6,739 patients**
+* **41.6 million clinical events**
+* **921,499 visits**
 * **15 prediction tasks**
 
 Each patient consists of an ordered timeline of clinical events taken from the structured data of their EHR (e.g. diagnoses, procedures, prescriptions, etc.). 
