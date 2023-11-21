@@ -6,11 +6,12 @@
 import argparse
 import json
 import os
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
 from utils import (
@@ -24,6 +25,7 @@ from utils import (
     CHEXPERT_LABELS, 
     LR_PARAMS, 
     XGB_PARAMS, 
+    RF_PARAMS,
     ProtoNetCLMBRClassifier, 
     get_patient_splits_by_idx
 )
@@ -35,6 +37,17 @@ import femr
 import femr.datasets
 import femr.models.conjugate_gradient
 from femr.labelers import load_labeled_patients, LabeledPatients
+
+'''
+python3 7_eval.py \
+    --path_to_database '../EHRSHOT_ASSETS/femr/extract' \
+    --path_to_labels_dir '../EHRSHOT_ASSETS/custom_benchmark' \
+    --path_to_features_dir '../EHRSHOT_ASSETS/custom_hf_features' \
+    --path_to_output_dir '../EHRSHOT_ASSETS/results_hf' \
+    --labeling_function 'guo_icu' \
+    --shot_strat 'all' \
+    --num_threads 20
+'''
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
@@ -86,6 +99,12 @@ def run_evaluation(X_train: np.ndarray,
         # Otherwise the GBM model will refuse to learn anything
         XGB_PARAMS['min_child_samples'] = [ 1 ]
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, XGB_PARAMS, n_jobs=n_jobs)
+        logger.info(f"Best hparams: {model.get_params()}")
+    elif model_head_base == "rf":
+        RF_PARAMS['min_samples_leaf'] = [ 1 ]
+        RF_PARAMS['min_samples_split'] = [ 2 ]
+        model = RandomForestClassifier()
+        model = tune_hyperparams(X_train, X_val, y_train, y_val, model, RF_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head_base == "lr":
         # Logistic Regresion
@@ -160,6 +179,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
+    parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -167,6 +187,7 @@ if __name__ == "__main__":
     LABELING_FUNCTION: str = args.labeling_function
     SHOT_STRAT: str = args.shot_strat
     NUM_THREADS: int = args.num_threads
+    IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
@@ -175,6 +196,12 @@ if __name__ == "__main__":
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
+    
+    # If results already exist, then append new results to existing file
+    df_existing: Optional[pd.DataFrame] = None
+    if os.path.exists(PATH_TO_OUTPUT_FILE):
+        logger.warning(f"Results already exist @ `{PATH_TO_OUTPUT_FILE}`.")
+        df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
 
     # Load FEMR Patient Database
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
@@ -220,6 +247,26 @@ if __name__ == "__main__":
             # NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
+                # Check if results already exist for this model/head/shot_strat in `results.csv`
+                if df_existing is not None:
+                    existing_rows: pd.DataFrame = df_existing[
+                        (df_existing['labeling_function'] == LABELING_FUNCTION) 
+                        & (df_existing['sub_task'] == sub_task) 
+                        & (df_existing['model'] == model) 
+                        & (df_existing['head'] == head)
+                    ]
+                    if existing_rows.shape[0] > 0:
+                        # Overwrite
+                        if IS_FORCE_REFRESH:
+                            logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Overwriting these rows because `is_force_refresh` is TRUE.")
+                        else:
+                            logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Skipping this combination because `is_force_refresh` is FALSE.")
+                            results += existing_rows.to_dict(orient='records')
+                            continue
+                    else:
+                        # Append
+                        logger.warning(f"Results DO NOT exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Appending to this CSV.")
+        
                 ks: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task].keys() ])
                 
                 # For each k-shot sample we are evaluating...
@@ -260,5 +307,6 @@ if __name__ == "__main__":
 
     logger.info(f"Saving results to: {PATH_TO_OUTPUT_FILE}")
     df: pd.DataFrame = pd.DataFrame(results)
+    logger.info(f"Added {df.shape[0] - (df_existing.shape[0] if df_existing is not None else 0)} rows")
     df.to_csv(PATH_TO_OUTPUT_FILE)
     logger.success("Done!")

@@ -6,13 +6,12 @@
 
 path_to_database='../../EHRSHOT_ASSETS/femr/extract'
 path_to_labels_dir='../../EHRSHOT_ASSETS/custom_benchmark'
-path_to_features_dir='../../EHRSHOT_ASSETS/custom_features'
-path_to_output_dir='../../EHRSHOT_ASSETS/results'
+path_to_features_dir='../../EHRSHOT_ASSETS/custom_hf_features'
+path_to_output_dir='../../EHRSHOT_ASSETS/results_hf'
 
 labeling_functions=(
     "chexpert" # CheXpert first b/c slowest
-    "lab_anemia" # Takes second longest
-    "guo_los" 
+    "guo_los"
     "guo_readmission"
     "guo_icu"
     "new_hypertension"
@@ -21,13 +20,15 @@ labeling_functions=(
     "new_celiac"
     "new_lupus"
     "new_acutemi"
+    # Labs take long time -- need more GB
     "lab_thrombocytopenia"
     "lab_hyperkalemia"
-    "lab_hypoglycemia"
     "lab_hyponatremia"
+    "lab_anemia"
+    "lab_hypoglycemia" # will OOM at 200G on `gpu` partition
 )
 shot_strats=("all")
-num_threads=25
+num_threads=24
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do

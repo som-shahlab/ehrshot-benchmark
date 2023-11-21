@@ -69,7 +69,7 @@ def plot_all_task_groups(df_results: pd.DataFrame,
                             is_x_scale_log=is_x_scale_log)
     
     # Create a unified legend for the entire figure
-    _plot_unified_legend(fig, axes, ncol=3, fontsize=12)
+    _plot_unified_legend(fig, axes, ncol=2, fontsize=12)
 
     # Plot aesthetics
     fig.suptitle(f'{score.upper()} by Task Group', fontsize=16)
@@ -95,7 +95,7 @@ def plot_all_task_group_box_plots(df_results: pd.DataFrame,
     
     # Create a unified legend for the entire figure
     df_ = filter_df(df_results, score=score, model_heads=model_heads)
-    legend_n_col: int = 3
+    legend_n_col: int = 2
     handles = [ 
         Patch(
             facecolor=SCORE_MODEL_HEAD_2_COLOR[score][model][head], 
