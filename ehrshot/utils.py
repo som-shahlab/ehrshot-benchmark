@@ -20,23 +20,32 @@ SPLIT_TRAIN_CUTOFF: int = 70
 SPLIT_VAL_CUTOFF: int = 85
 
 # Types of base models to test
-BASE_MODELS: List[str] = ['count', 'clmbr', ]
 MODEL_2_NAME: Dict[str, str] = {
-    'clmbr' : 'CLMBR',
-    'count' : 'Count-based',
+    'count' : 'Count-based (v8)',
+    'clmbr' : 'CLMBR (v8)',
+    # 'gpt2-base' : 'GPT2-base (v9)',
+    # 'gpt2-medium' : 'GP2-medium (v9)',
+    # 'gpt2-large' : 'GP2-large (v9)',
+    # 'bert-base' : 'BERT-base (v9)',
+    'gpt2-base-v8_chunk:last_embed:last' : 'GPT2-base (v8)',
+    'bert-base-v8_chunk:last_embed:last' : 'BERT-base (v8)',
 }
+BASE_MODELS: List[str] = list(MODEL_2_NAME.keys())
 
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
-    'count' : ['gbm', ],
-    'clmbr' : ['lr_lbfgs', 'lr_femr',],
+    'count' : ['gbm', 'lr_lbfgs', 'rf', ], 
+    'clmbr' : ['lr_lbfgs', 'lr_femr', 'rf', ],
+    'gpt2-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
+    'bert-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
 }
 HEAD_2_NAME: Dict[str, str] = {
     'gbm' : 'GBM',
-    'lr_lbfgs' : 'Logistic Regression',
-    'lr_femr' : 'Logistic Regression',
-    'lr_newton-cg' : 'Logistic Regression',
+    'lr_lbfgs' : 'LR',
+    'lr_femr' : 'LR',
+    'lr_newton-cg' : 'LR',
     'protonet' : 'ProtoNet',
+    'rf' : 'Random Forest',
 }
 
 # Labeling functions
@@ -141,6 +150,10 @@ LR_PARAMS = {
     "C": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5, 1e6], 
     "penalty": ['l2']
 }
+RF_PARAMS = {
+    'n_estimators': [10, 20, 50, 100, 300],
+    'max_depth' : [3, 5, 10, 20, 50],
+}
 
 # Few shot settings
 SHOT_STRATS = {
@@ -153,41 +166,37 @@ SHOT_STRATS = {
 # Plotting
 SCORE_MODEL_HEAD_2_COLOR = {
     'auroc' : {
-        'clmbr' : {
-            'lr_femr' : 'blue',
-            'gbm' : 'cornflowerblue',
-            'lr_lbfgs' : 'mediumblue',
-            'protonet' : 'dodgerblue',
-        },
         'count' : {
-            'gbm' : 'red',
+            'gbm' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
+            'rf' : 'tab:orange',
+        },
+        'clmbr' : {
+            'lr_femr' : 'tab:blue',
+        },
+        'gpt2-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:purple',
+        },
+        'bert-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:olive',
         },
     },
     'auprc' : {
-        'clmbr' : {
-            'lr_femr' : 'darkblue',
-            'gbm' : 'darkturquoise',
-            'lr_lbfgs' : 'steelblue',
-            'protonet' : 'deepskyblue',
-        },
         'count' : {
-            'gbm' : 'darkred',
+            'gbm' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
+            'rf' : 'tab:orange',
+        },
+        'clmbr' : {
+            'lr_femr' : 'tab:blue',
+        },
+        'gpt2-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:purple',
+        },
+        'bert-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:olive',
         },
     },
-    # 'auprc' : {
-    #     'clmbr' : {
-    #         'gbm' : 'purple',
-    #         'lr' : 'mediumorchid',
-    #         'protonet' : 'mediumpurple',
-    #         'rf' : 'magenta',
-    #     },
-    #     'count' : {
-    #         'gbm' : 'green',
-    #         'lr' : 'limegreen',
-    #         'protonet' : 'darkgreen',
-    #         'rf' : 'lime',
-    #     },
-    # },
 }
 
 def get_splits(database: PatientDatabase, 
