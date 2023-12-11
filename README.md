@@ -9,12 +9,26 @@ Please note that the dataset + model are still being reviewed, and a download li
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 # 📖 Table of Contents
-1. [Dataset + Tasks](#dataset)
-2. [Pre-trained Foundation Model](#models)
+1. [Pre-trained Foundation Model](#models)
+2. [Dataset + Tasks](#dataset)
 3. [Comparison to Prior Work](#prior_work)
 4. [Installation](#installation)
 5. [Usage](#usage)
 6. [Citation](#citation)
+
+
+<a name="models"/>
+
+# 🔮 Foundation Model for EHRs
+
+**Access:** [The model is on HuggingFace here](https://huggingface.co/StanfordShahLab/clmbr-t-base) and requires signing a research usage agreement.
+
+We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
+
+We are [one of the first](https://arxiv.org/abs/2303.12961) to fully release such a model for coded EHR data; in contrast, most prior models released for clinical data  (e.g. GatorTron, ClinicalBERT) only work with unstructured text and cannot process the rich, structured data within an EHR.
+
+We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.sciencedirect.com/science/article/pii/S1532046420302653) as our model. CLMBR is an autoregressive model designed to predict the next medical code in a patient's timeline given previous codes. CLMBR employs causally masked local attention, ensuring forward-only flow of information which is vital for prediction tasks and is in contrast to BERT-based models which are bidirectional in nature. We utilize a transformer as our base model with 141 million trainable parameters and a next code prediction objective, providing minute-level EHR resolution rather than the day-level aggregation of the original model formulation. 
+
 
 <a name="dataset"/>
 
@@ -50,19 +64,6 @@ Each task is a predictive classification task, and includes a canonical train/va
 | Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
 | Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |
 
-
-
-<a name="models"/>
-
-# 🔮 Foundation Model for EHRs
-
-**Please Note:** Model release is currently being reviewed and the download link will be updated once it is publicly available.
-
-We publish the model weights of a **141 million parameter** clinical foundation model pre-trained on the deidentified structured EHR data of **2.57M patients** from Stanford Medicine.
-
-We are [one of the first](https://arxiv.org/abs/2303.12961) to fully release such a model for coded EHR data; in contrast, most prior models released for clinical data  (e.g. GatorTron, ClinicalBERT) only work with unstructured text and cannot process the rich, structured data within an EHR.
-
-We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.sciencedirect.com/science/article/pii/S1532046420302653) as our model. CLMBR is an autoregressive model designed to predict the next medical code in a patient's timeline given previous codes. CLMBR employs causally masked local attention, ensuring forward-only flow of information which is vital for prediction tasks and is in contrast to BERT-based models which are bidirectional in nature. We utilize a transformer as our base model with 141 million trainable parameters and a next code prediction objective, providing minute-level EHR resolution rather than the day-level aggregation of the original model formulation. 
 
 
 <a name="prior_work"/>
@@ -318,4 +319,4 @@ If you find this project helpful, please cite [our paper](https://arxiv.org/abs/
 
 # License
 
-The source code of this repo is released under the Apache License 2.0. The dataset and model license are listed on their corresponding Stanford AIMI Center webpage.
+The source code of this repo is released under the Apache License 2.0. The model license are listed on their corresponding webpages.
