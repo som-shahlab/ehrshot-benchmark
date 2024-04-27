@@ -123,6 +123,9 @@ Note that this currently only works on Linux machines.
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 conda install bazel=6 -y
 pip install git+https://github.com/som-shahlab/femr.git@ehrshot_branch
+
+# pip install femr==0.0.20
+
 ```
 
 ## Download Private Assets
