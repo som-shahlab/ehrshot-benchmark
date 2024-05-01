@@ -24,17 +24,15 @@ labeling_functions=(
     "lab_hypoglycemia"
     "lab_hyponatremia"
     "lab_anemia"
-    "chexpert"
+    # "chexpert"
 )
-
-mkdir -p ../../EHRSHOT_ASSETS/custom_benchmark
 
 for labeling_function in "${labeling_functions[@]}"
 do
-    python3 ../2_generate_labels.py \
-        --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
-        --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
-        --path_to_chexpert_csv ../../EHRSHOT_ASSETS/custom_benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
+    python3 ../1_generate_labels.py \
+        # --path_to_database ../../EHRSHOT_ASSETS/database_no_visit_merge \
+        # --path_to_labels_dir ../../EHRSHOT_ASSETS/labels_no_visit_merge \
+        # --path_to_chexpert_csv ../../EHRSHOT_ASSETS/custom_benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
         --labeling_function ${labeling_function} \
-        --num_threads 20
+        --num_threads 1 &
 done

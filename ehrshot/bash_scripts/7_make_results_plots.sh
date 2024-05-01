@@ -7,14 +7,12 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 
-mkdir -p ../../EHRSHOT_ASSETS/figures_hf
+python3 ../7_make_results_plots.py \
+    --model_heads "[('clmbr', 'lr_lbfgs'), ('count', 'gbm'), ('count', 'lr_lbfgs'), ('count', 'rf')]" \
+    --shot_strat all  \
+    --path_to_results_dir ../../EHRSHOT_ASSETS/outputs_no_visit_merge \
+    --path_to_output_dir ../../EHRSHOT_ASSETS/figures_no_visit_merge
 
-python3 ../8_make_results_plots.py \
-    --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/custom_benchmark \
-    --path_to_results_dir ../../EHRSHOT_ASSETS/results_hf \
-    --path_to_output_dir ../../EHRSHOT_ASSETS/figures_hf \
-    --model_heads "[('clmbr', 'lr_femr'), ('count', 'gbm'), ('gpt2-base-v8_chunk:last_embed:last', 'lr_lbfgs'), ('bert-base-v8_chunk:last_embed:last', 'lr_lbfgs')]" \
-    --shot_strat all
 
 # --model_heads "[('clmbr', 'lr_femr'), ('count', 'lr_lbfgs'), ('count', 'gbm'), ('count', 'rf'), ('gpt2-base', 'lr_lbfgs')]" \
     # --model_heads "[('gpt2-base', 'lr_lbfgs'), ('gpt2-base', 'gbm'), ('gpt2-base', 'rf')]" \

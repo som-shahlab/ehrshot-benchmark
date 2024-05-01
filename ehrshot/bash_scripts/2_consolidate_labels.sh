@@ -9,6 +9,6 @@
 
 # Time to run: 10 secs
 
-python3 ../3_consolidate_labels.py \
-    --path_to_labels_dir ../../EHRSHOT_ASSETS/custom_benchmark \
+python3 ../2_consolidate_labels.py \
+    # --path_to_labels_dir ../../EHRSHOT_ASSETS/labels_no_visit_merge \
     --is_force_refresh
