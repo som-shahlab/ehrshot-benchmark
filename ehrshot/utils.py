@@ -1,3 +1,4 @@
+import json
 import ast
 import pickle
 import os
@@ -21,21 +22,21 @@ SPLIT_VAL_CUTOFF: int = 85
 
 # Types of base models to test
 MODEL_2_NAME: Dict[str, str] = {
-    'count' : 'Count-based (v8)',
-    'clmbr' : 'CLMBR (v8)',
+    'count' : 'Count-based',
+    'clmbr' : 'CLMBR',
     # 'gpt2-base' : 'GPT2-base (v9)',
     # 'gpt2-medium' : 'GP2-medium (v9)',
     # 'gpt2-large' : 'GP2-large (v9)',
     # 'bert-base' : 'BERT-base (v9)',
-    'gpt2-base-v8_chunk:last_embed:last' : 'GPT2-base (v8)',
-    'bert-base-v8_chunk:last_embed:last' : 'BERT-base (v8)',
+    # 'gpt2-base-v8_chunk:last_embed:last' : 'GPT2-base (v8)',
+    # 'bert-base-v8_chunk:last_embed:last' : 'BERT-base (v8)',
 }
 BASE_MODELS: List[str] = list(MODEL_2_NAME.keys())
 
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
     'count' : ['gbm', 'lr_lbfgs', 'rf', ], 
-    'clmbr' : ['lr_lbfgs', 'lr_femr', 'rf', ],
+    'clmbr' : ['lr_lbfgs', 'rf', ],
     'gpt2-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
     'bert-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
 }
@@ -168,43 +169,31 @@ SCORE_MODEL_HEAD_2_COLOR = {
     'auroc' : {
         'count' : {
             'gbm' : 'tab:red',
-            'lr_lbfgs' : 'tab:green',
+            'lr_lbfgs' : 'aqua',
             'rf' : 'tab:orange',
         },
         'clmbr' : {
-            'lr_femr' : 'tab:blue',
-        },
-        'gpt2-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:purple',
-        },
-        'bert-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:olive',
+            'lr_lbfgs' : 'tab:blue',
         },
     },
     'auprc' : {
         'count' : {
             'gbm' : 'tab:red',
-            'lr_lbfgs' : 'tab:green',
+            'lr_lbfgs' : 'aqua',
             'rf' : 'tab:orange',
         },
         'clmbr' : {
-            'lr_femr' : 'tab:blue',
-        },
-        'gpt2-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:purple',
-        },
-        'bert-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:olive',
+            'lr_lbfgs' : 'tab:blue',
         },
     },
 }
 
-def get_splits(database: PatientDatabase, 
+def get_splits(path_to_split_csv: str,
                 patient_ids: np.ndarray, 
                 label_times: np.ndarray, 
                 label_values: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """Return train/val/test splits for a given set of patients."""
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(database, patient_ids)
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(path_to_split_csv, patient_ids)
     patient_ids: Dict[str, np.ndarray] = {
         'train' : patient_ids[train_pids_idx],
         'val' : patient_ids[val_pids_idx],
@@ -222,14 +211,20 @@ def get_splits(database: PatientDatabase,
     }
     return patient_ids, label_values, label_times
 
-def get_patient_splits_by_idx(database: PatientDatabase, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the idxs for each split within `patient_ids`."""
-    hashed_pids: np.ndarray = np.array([ database.compute_split(SPLIT_SEED, pid) for pid in patient_ids ])
-    train: np.ndarray = np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]
-    val: np.ndarray = np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]
-    test: np.ndarray = np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]
-    return (train, val, test)
+    df_split = pd.read_csv(path_to_split_csv)
+    split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
+    for split in ['train', 'val', 'test']:
+        for idx, id in enumerate(patient_ids.tolist()):
+            if id in df_split[df_split['split'] == split]['omop_person_id'].values:
+                split_2_idxs[split].append(idx)
+    return (
+        split_2_idxs['train'],
+        split_2_idxs['val'],
+        split_2_idxs['test'],
+    )
 
 def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str]) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
@@ -251,16 +246,32 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
     featurizations: Dict[str, np.ndarray] = {}
     for model in BASE_MODELS:
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
+        logger.info(f"Loading features from: {path_to_feats_file}")
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
         
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
             feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = pickle.load(f)
-            feature_matrix, feature_patient_ids, feature_times = (
-                feats[0],
-                feats[1],
-                feats[3], # NOTE: skip label_values in [2]
-            )
+            if model == 'count':
+                feature_matrix, feature_patient_ids, feature_times = (
+                    feats[0],
+                    feats[1],
+                    feats[3], # NOTE: skip label_values in [2]
+                )
+            elif model == 'clmbr':
+                feature_matrix, feature_patient_ids, feature_times = (
+                    feats['data_matrix'],
+                    feats['patient_ids'],
+                    feats['labeling_time'],
+                )
+            elif model == 'motor':
+                feature_matrix, feature_patient_ids, feature_times = (
+                    feats['data_matrix'],
+                    feats['patient_ids'],
+                    feats['labeling_time'],
+                )
+            else:
+                assert False, f"Unsupported model: {model}"
             feature_patient_ids = feature_patient_ids.astype(label_patient_ids.dtype)
             feature_times = feature_times.astype(label_times.dtype)
             assert feature_patient_ids.dtype == label_patient_ids.dtype, f'Error -- mismatched types between feature_patient_ids={feature_patient_ids.dtype} and label_patient_ids={label_patient_ids.dtype}'
@@ -405,3 +416,21 @@ def write_table_to_latex(df: pd.DataFrame, path_to_file: str, is_ignore_index: b
         f.write("\n")
         f.write("=======================================\n")
         f.write("=======================================\n")
+
+
+def get_rel_path(file: str, rel_path: str) -> str:
+    """Transforms a relative path from a specific file in the package `eclair/src/eclair/ into an absolute path"""
+    return os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(file)), rel_path)
+    )
+
+def dump_patient_to_json(patient, file):
+	events = []
+	for event in patient.events:
+		events.append({
+			'start' : str(event.start),
+			'end' : str(event.end),
+			'code' : event.code,
+			'table' : event.omop_table,
+		})
+	json.dump(events, open(file, 'w'), indent=2)
