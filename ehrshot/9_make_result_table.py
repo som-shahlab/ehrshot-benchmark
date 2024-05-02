@@ -1,17 +1,12 @@
 import os
 import argparse
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 import pandas as pd
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 from utils import (
     LABELING_FUNCTIONS, 
-    TASK_GROUP_2_LABELING_FUNCTION,
-    HEAD_2_NAME,
-    MODEL_2_NAME, 
+    TASK_GROUP_2_LABELING_FUNCTION, 
     SHOT_STRATS,
-    SCORE_MODEL_HEAD_2_COLOR,
     filter_df,
     get_rel_path,
     type_tuple_list,
@@ -48,7 +43,9 @@ if __name__ == "__main__":
 
     print("Average AUROC For Each Task Group")
 
-    print(' | '.join(header))
+    print('|' + ' | '.join(header) + '|')
+
+    print('|' + ' | '.join('--' for _ in header) + '|')
 
     for model_head in MODEL_HEADS:
         row = [model_head[0] + ' with ' + model_head[1]]
@@ -61,4 +58,4 @@ if __name__ == "__main__":
                 assert len(filtered_df) == 1, f'{len(filtered_df)} {filtered_df} {func}'
                 aurocs.append(list(filtered_df['value'])[0])
             row.append(f'{sum(aurocs) / len(aurocs):0.3f}')
-        print(' | '.join(row))
+        print('|' + ' | '.join(row) + '|')
