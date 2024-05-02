@@ -9,9 +9,9 @@
 
 python3 ../7_make_results_plots.py \
     --model_heads "[('clmbr', 'lr_lbfgs'), ('count', 'gbm'), ('count', 'lr_lbfgs'), ('count', 'rf')]" \
-    --shot_strat all  \
-    --path_to_results_dir ../../EHRSHOT_ASSETS/outputs_no_visit_merge \
-    --path_to_output_dir ../../EHRSHOT_ASSETS/figures_no_visit_merge
+    --shot_strat all 
+    # --path_to_results_dir ../../EHRSHOT_ASSETS/outputs_no_visit_merge \
+    # --path_to_output_dir ../../EHRSHOT_ASSETS/figures_no_visit_merge
 
 
 # --model_heads "[('clmbr', 'lr_femr'), ('count', 'lr_lbfgs'), ('count', 'gbm'), ('count', 'rf'), ('gpt2-base', 'lr_lbfgs')]" \

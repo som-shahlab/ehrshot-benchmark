@@ -30,9 +30,9 @@ labeling_functions=(
 for labeling_function in "${labeling_functions[@]}"
 do
     python3 ../1_generate_labels.py \
+        --labeling_function ${labeling_function} \
+        --num_threads 1 &
         # --path_to_database ../../EHRSHOT_ASSETS/database_no_visit_merge \
         # --path_to_labels_dir ../../EHRSHOT_ASSETS/labels_no_visit_merge \
         # --path_to_chexpert_csv ../../EHRSHOT_ASSETS/custom_benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
-        --labeling_function ${labeling_function} \
-        --num_threads 1 &
 done
