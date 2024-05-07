@@ -156,7 +156,7 @@ Your final folder structure should look like this:
 To execute the entire benchmark end-to-end, please run:
 
 ```bash
-python3 run_all.py
+bash run_all.sh
 ```
 
 # Citation

@@ -27,6 +27,10 @@ num_threads=20
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
-        sbatch 6__eval_helper.sh ${labeling_function} ${shot_strat} $num_threads
+        if [[ $* == *--is_use_slurm* ]]; then
+            sbatch 6__eval_helper.sh ${labeling_function} ${shot_strat} $num_threads
+        else
+            bash 6__eval_helper.sh ${labeling_function} ${shot_strat} $num_threads
+        fi
     done
 done
