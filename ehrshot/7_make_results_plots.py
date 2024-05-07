@@ -40,7 +40,8 @@ def plot_all_labeling_functions(df_results: pd.DataFrame,
                                     score,
                                     model_heads=model_heads,
                                     is_x_scale_log=is_x_scale_log,
-                                    is_std_bars=False if labeling_function == 'chexpert' else is_std_bars)
+                                    is_std_bars=False if labeling_function == 'chexpert' else is_std_bars,
+                                    path_to_output_table=os.path.join(path_to_output_dir, f"individual_tasks_{labeling_function}_{score}.csv"))
 
     # Create a unified legend for the entire figure
     _plot_unified_legend(fig, axes)
@@ -49,7 +50,7 @@ def plot_all_labeling_functions(df_results: pd.DataFrame,
     fig.suptitle(f'{score.upper()} by Task', fontsize=16)
     plt.tight_layout()
     plt.subplots_adjust(top=0.95, bottom=0.05)
-    plt.savefig(os.path.join(path_to_output_dir, f"tasks_{score}.png"), dpi=300)
+    plt.savefig(os.path.join(path_to_output_dir, f"individual_tasks_{score}.png"), dpi=300)
     plt.close('all')
     return fig
 
@@ -67,7 +68,8 @@ def plot_all_task_groups(df_results: pd.DataFrame,
                             task_group, 
                             score,
                             model_heads=model_heads,
-                            is_x_scale_log=is_x_scale_log)
+                            is_x_scale_log=is_x_scale_log,
+                            path_to_output_table=os.path.join(path_to_output_dir, f"grouped_tasks_{task_group}_{score}.csv"))
     
     # Create a unified legend for the entire figure
     _plot_unified_legend(fig, axes, ncol=2, fontsize=12)
@@ -76,7 +78,7 @@ def plot_all_task_groups(df_results: pd.DataFrame,
     fig.suptitle(f'{score.upper()} by Task Group', fontsize=16)
     plt.tight_layout()
     plt.subplots_adjust(top=0.92, bottom=0.1, hspace=0.25)
-    plt.savefig(os.path.join(path_to_output_dir, f"taskgroups_{score}.png"), dpi=300)
+    plt.savefig(os.path.join(path_to_output_dir, f"grouped_tasks_{score}.png"), dpi=300)
     plt.close('all')
     return fig
 
@@ -141,7 +143,112 @@ if __name__ == "__main__":
         else:
             print(f"Skipping: {labeling_function} b/c no file at `{path_to_csv}`")
     df_results: pd.DataFrame = pd.concat(dfs, ignore_index=True)
+    df_results.to_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'all_results.csv'))
+    
+    ####################################
+    ####################################
+    #
+    # Tables
+    #
+    ####################################
+    ####################################
+    
+    df_means = df_results.groupby([
+        'labeling_function',
+        'sub_task',
+        'model',
+        'head',
+        'score',
+        'k',
+    ]).agg({
+        'value' : 'mean',
+        'k' : 'first',
+        'labeling_function' : 'first',
+        'sub_task' : 'first',
+        'model' : 'first',
+        'head' : 'first',
+        'score' : 'first',
+    }).reset_index(drop = True)
+    df_stds = df_results.groupby([
+        'labeling_function',
+        'sub_task',
+        'model',
+        'head',
+        'score',
+        'k',
+    ]).agg({
+        'value' : 'std',
+        'k' : 'first',
+        'labeling_function' : 'first',
+        'sub_task' : 'first',
+        'model' : 'first',
+        'head' : 'first',
+        'score' : 'first',
+    }).reset_index(drop = True).fillna(0)
+    
+    # Table for each (labeling function, score)
+    #   Rows = model + head
+    #   Columns = k
+    #   Cells = mean ± std of score
+    for sub_task in df_means['sub_task'].unique():
+        for score in df_means['score'].unique():
+            path_to_output_dir_: str = os.path.join(PATH_TO_OUTPUT_DIR, 'individual_tasks', score)
+            os.makedirs(path_to_output_dir_, exist_ok=True)
+            df_ = filter_df(df_means, sub_tasks=[sub_task], score=score).sort_values(by=['model', 'head', 'k'])
+            df_ = df_.rename(columns = {'value' : 'mean' })
+            df_std_ = df_stds[(df_stds['sub_task'] == sub_task) & (df_stds['score'] == score)].sort_values(by=['model', 'head', 'k'])
+            df_['std'] = df_std_['value']
+            # Save raw df
+            df_.to_csv(os.path.join(path_to_output_dir_, f'{sub_task}_raw.csv'), index=False)
+            # Save pretty df
+            df_ = df_.drop(columns = ['score', 'sub_task', 'labeling_function'])
+            df_['value'] = df_['mean'].round(3).astype(str) + ' ± ' + df_['std'].round(3).astype(str)
+            df_ = df_.drop(columns=['mean', 'std'])
+            df_ = df_.pivot(index=['model', 'head'], columns='k', values='value').reset_index()
+            df_.to_csv(os.path.join(path_to_output_dir_, f'{sub_task}_pretty.csv'), index=False)
 
+    # Table for each (task group, score)
+    #   Rows = model + head
+    #   Columns = k
+    #   Cells = mean ± std of score
+    task_groups: List[str] = list(TASK_GROUP_2_LABELING_FUNCTION.keys())
+    for task_group in task_groups:
+        for score in df_means['score'].unique():
+            path_to_output_dir_: str = os.path.join(PATH_TO_OUTPUT_DIR, 'task_groups', score)
+            os.makedirs(path_to_output_dir_, exist_ok=True)
+            df_ = filter_df(df_means, task_group=task_group, score=score)
+            # Do another round of averaging over all subtasks:
+            df_ = df_.groupby([
+                'model',
+                'head',
+                'k',
+            ]).agg({
+                'value' : 'mean',
+                'k' : 'first',
+                'labeling_function' : 'first',
+                'sub_task' : 'first',
+                'model' : 'first',
+                'head' : 'first',
+                'score' : 'first'
+            }).reset_index(drop = True)
+            df_ = df_.rename(columns = {'value' : 'mean' })
+            # Save raw df
+            df_.to_csv(os.path.join(path_to_output_dir_, f'{task_group}_raw.csv'), index=False)
+            # Save pretty df
+            df_ = df_.drop(columns = ['score', 'sub_task', 'labeling_function'])
+            df_['value'] = df_['mean'].round(3).astype(str)
+            df_ = df_.drop(columns=['mean', ])
+            df_ = df_.pivot(index=['model', 'head'], columns='k', values='value').reset_index()
+            df_.to_csv(os.path.join(path_to_output_dir_, f'{task_group}_pretty.csv'), index=False)
+
+    ####################################
+    ####################################
+    #
+    # Plots
+    #
+    ####################################
+    ####################################
+    
     # Plotting individual AUROC/AUPRC plot for each labeling function
     for score in tqdm(df_results['score'].unique(), desc='plot_all_labeling_functions()'):
         if score == 'brier': continue
@@ -154,8 +261,9 @@ if __name__ == "__main__":
         plot_all_task_groups(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR, 
                              model_heads=MODEL_HEADS, is_x_scale_log=True)
 
-    # plotting aggregated auroc and auprc box plots by task groups
+    # Plotting aggregated auroc and auprc box plots by task groups as box plots
     for score in tqdm(df_results['score'].unique(), desc='plot_all_task_group_box_plots()'):
         if score == 'brier': continue
         plot_all_task_group_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
                                       model_heads=MODEL_HEADS)
+    

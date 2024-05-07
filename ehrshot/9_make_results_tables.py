@@ -54,7 +54,7 @@ if __name__ == "__main__":
                 continue # disabled for now
             aurocs = []
             for func in funcs:
-                filtered_df = filter_df(df_results, score='auroc', labeling_function=func, model_heads=[model_head], k=-1)
+                filtered_df = filter_df(df_results, score='auroc', labeling_function=func, model_heads=[model_head])
                 assert len(filtered_df) == 1, f'{len(filtered_df)} {filtered_df} {func}'
                 aurocs.append(list(filtered_df['value'])[0])
             row.append(f'{sum(aurocs) / len(aurocs):0.3f}')

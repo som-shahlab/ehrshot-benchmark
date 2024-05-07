@@ -33,7 +33,7 @@ for labeling_function in "${labeling_functions[@]}"; do
     python3 ../5_generate_shots.py \
         --labeling_function ${labeling_function} \
         --shot_strat ${shot_strat} \
-        --n_replicates 5
+        --n_replicates 5 &
         # --path_to_database ../../EHRSHOT_ASSETS/database_no_visit_merge \
         # --path_to_labels_dir ../../EHRSHOT_ASSETS/labels_no_visit_merge
     done

@@ -211,6 +211,16 @@ def get_splits(path_to_split_csv: str,
     }
     return patient_ids, label_values, label_times
 
+def get_patient_splits_by_patient_id(path_to_split_csv: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Given a list of patient IDs, split into train, val, and test sets.
+        Returns the `patient_ids` for each split."""
+    df_split = pd.read_csv(path_to_split_csv)
+    return (
+        df_split[df_split['split'] == 'train']['omop_person_id'].values,
+        df_split[df_split['split'] == 'val']['omop_person_id'].values,
+        df_split[df_split['split'] == 'test']['omop_person_id'].values,
+    )
+
 def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the idxs for each split within `patient_ids`."""
