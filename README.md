@@ -115,17 +115,13 @@ pip install -r requirements.txt
 
 For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
 
-You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
+You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
 
 Note that this currently only works on Linux machines.
 
 ```bash
+pip install femr==0.0.21
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-conda install bazel=6 -y
-pip install git+https://github.com/som-shahlab/femr.git@ehrshot_branch
-
-# pip install femr==0.0.20
-
 ```
 
 ## Download Private Assets
