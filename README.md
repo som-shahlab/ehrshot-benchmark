@@ -2,10 +2,6 @@
 
 A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[read the paper here](https://arxiv.org/abs/2307.02028)**. 
 
-Please note that the dataset + model are still being reviewed, and a download link will be provided once they are approved for public release.
-
-----
-
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 # 📖 Table of Contents
@@ -19,7 +15,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 # 🚀 Quick Start
 
-Please use the following steps to run the EHRSHOT benchmark.
+Use the following steps to run the EHRSHOT benchmark.
 
 **1)**: Install **EHRSHOT**
 
@@ -87,7 +83,7 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** [The EHRSHOT-2023 dataset is available on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
+**Access:** [The EHRSHOT-2023 dataset is on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
 
 EHRSHOT-2023 contains:
 * **6,739 patients**
