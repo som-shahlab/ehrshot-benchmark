@@ -124,9 +124,7 @@ pip install femr==0.0.21
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-## Download Private Assets
-
-[Go to Redivis here to download](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) several assets that we cannot redistribute publicly on Github This includes the dataset and the weights of the pre-trained foundation model (CLMBR) we benchmark.
+**3)**: Download dataset + model from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
 
 ## Folder Structure
 
