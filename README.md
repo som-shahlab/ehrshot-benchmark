@@ -45,9 +45,9 @@ pip install femr==0.0.21
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-**3)**: Download dataset + model from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
+**3)**: **Download dataset + model** from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
 
-**4)**: Run the benchmark end-to-end by running:
+**4)**: **Run** the benchmark end-to-end with:
 
 ```bash
 bash run_all.sh
