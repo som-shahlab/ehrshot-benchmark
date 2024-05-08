@@ -31,7 +31,8 @@ def plot_one_labeling_function(df: pd.DataFrame,
                                 score: str,
                                 model_heads: Optional[List[Tuple[str, str]]] = None,
                                 is_x_scale_log: bool = True,
-                                is_std_bars: bool = True):
+                                is_std_bars: bool = True,
+                                path_to_output_table: str = None):
     """
         Graph: Line plot of each model+head's results for a single labeling function as a function of `k`.
     
@@ -92,6 +93,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
     }).reset_index(drop = True)
 
     models: List[str] = df['model'].unique().tolist()
+    df_table = [] # Save what's actually plotted as a CSV
     for m_idx, model in enumerate(models):
         heads: List[str] = df[df['model'] == model]['head'].unique().tolist()
         for h_idx, head in enumerate(heads):
@@ -117,6 +119,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
             # Plot average line across all subtasks
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)
             ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
+            df_table.append(df_)
 
     # Plot aesthetics
     if is_x_scale_log:
@@ -128,6 +131,11 @@ def plot_one_labeling_function(df: pd.DataFrame,
     ax.set_xlabel("# of Train Examples per Class", fontsize=10)
     ax.set_xticks(ks, ks)
     ax.set_xticklabels(x_tick_labels)
+    
+    # Dump table
+    if path_to_output_table and len(df_table) > 0:
+        df_table = pd.concat(df_table)
+        df_table.to_csv(path_to_output_table, index=False)
 
 
     
@@ -136,7 +144,8 @@ def plot_one_task_group(df: pd.DataFrame,
                         task_group: str, 
                         score: str, 
                         model_heads: Optional[List[Tuple[str, str]]] = None, 
-                        is_x_scale_log: bool = True):    
+                        is_x_scale_log: bool = True,
+                        path_to_output_table: str = None):    
     """
         Graph: Aggregated line plot of each model+head's results for all of the labeling functions within a task group, as a function of `k`.
     
@@ -179,6 +188,7 @@ def plot_one_task_group(df: pd.DataFrame,
     }).reset_index(drop = True)
 
     models: List[str] = df['model'].unique().tolist()
+    df_table = [] # Save what's actually plotted as a CSV
     for m_idx, model in enumerate(models):
         heads: List[str] = df[df['model'] == model]['head'].unique().tolist()
         for h_idx, head in enumerate(heads):
@@ -198,6 +208,7 @@ def plot_one_task_group(df: pd.DataFrame,
             # Plot average line per model
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)
             ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
+            df_table.append(df_)
 
     # Plot aesthetics
     if is_x_scale_log:
@@ -209,6 +220,12 @@ def plot_one_task_group(df: pd.DataFrame,
     ax.set_xlabel("# of Train Examples per Class", fontsize=10)
     ax.set_xticks(ks, ks)
     ax.set_xticklabels(x_tick_labels)
+    
+    # Dump table
+    if path_to_output_table and len(df_table) > 0:
+        df_table = pd.concat(df_table)
+        df_table = df_table.rename(columns={'value' : 'mean'})
+        df_table.to_csv(path_to_output_table, index=False)
 
 
 def plot_one_task_group_box_plot(df: pd.DataFrame, 

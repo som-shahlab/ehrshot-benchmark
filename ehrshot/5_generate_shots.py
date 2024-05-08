@@ -36,7 +36,8 @@ from utils import (
     get_labels_and_features, 
     process_chexpert_labels, 
     convert_multiclass_to_binary_labels,
-    get_splits
+    get_splits,
+    get_rel_path
 )
 import femr.datasets
 from femr.labelers import LabeledPatients, load_labeled_patients
@@ -111,8 +112,9 @@ def generate_shots(k: int,
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate few-shot data for eval")
-    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_split_csv", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/splits.csv'), type=str, help="Path to CSV containing splits by patient ID")
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--n_replicates", type=int, help="Number of replicates to run for each `k`. Useful for creating std bars in plots", default=3, )
@@ -125,6 +127,7 @@ if __name__ == "__main__":
     N_REPLICATES: int = args.n_replicates
     PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
+    PATH_TO_SPLIT_CSV: str = args.path_to_split_csv
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
 
@@ -149,7 +152,7 @@ if __name__ == "__main__":
         label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
 
     # Train/val/test splits
-    patient_ids, label_values, label_times = get_splits(database, patient_ids, label_times, label_values)
+    patient_ids, label_values, label_times = get_splits(PATH_TO_SPLIT_CSV, patient_ids, label_times, label_values)
     logger.info(f"Train prevalence: {np.sum(label_values['train'] != 0) / label_values['train'].size}")
     logger.info(f"Val prevalence: {np.sum(label_values['val'] != 0) / label_values['val'].size}")
     logger.info(f"Test prevalence: {np.sum(label_values['test'] != 0) / label_values['test'].size}")

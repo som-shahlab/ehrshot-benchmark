@@ -2,20 +2,69 @@
 
 A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[read the paper here](https://arxiv.org/abs/2307.02028)**. 
 
-Please note that the dataset + model are still being reviewed, and a download link will be provided once they are approved for public release.
-
-----
-
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 # 📖 Table of Contents
-1. [Pre-trained Foundation Model](#models)
-2. [Dataset + Tasks](#dataset)
-3. [Comparison to Prior Work](#prior_work)
-4. [Installation](#installation)
-5. [Usage](#usage)
-6. [Citation](#citation)
+1. [Quick Start](#quick_start)
+2. [Pre-trained Foundation Model](#models)
+3. [Dataset + Tasks](#dataset)
+4. [Comparison to Prior Work](#prior_work)
+5. [Citation](#citation)
 
+<a name="quick_start"/>
+
+# 🚀 Quick Start
+
+Use the following steps to run the EHRSHOT benchmark.
+
+**1)**: Install **EHRSHOT**
+
+```bash
+conda create -n EHRSHOT_ENV python=3.10 -y
+conda activate EHRSHOT_ENV
+
+git clone https://github.com/som-shahlab/ehrshot-benchmark.git
+cd ehrshot-benchmark
+pip install -r requirements.txt
+```
+
+**2)**: Install **FEMR**
+
+For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
+
+You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
+
+Note that this currently only works on Linux machines.
+
+```bash
+pip install femr==0.0.21
+pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+
+**3)**: **Download dataset + model** from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
+
+**4)**: **Run** the benchmark end-to-end with:
+
+```bash
+bash run_all.sh
+```
+
+## Folder Structure
+
+Your final folder structure should look like this:
+
+- `ehrshot-benchmark/`
+  - `EHRSHOT_ASSETS/`
+    - `database/`
+      - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
+    - `labels/`
+      - *We provide this asset from Redivis, which contains labels and few-shot samples for all our tasks.*
+    - `models/`
+      - *We provide this asset from Redivis, which contains our pretrained foundation model for EHRs.*
+    - `splits.csv`
+      - *We provide this asset from Redivis, which determine which patient corresponds to which split.*
+  - `ehrshot/`
+    - *We provide the scripts to run the benchmark here*
 
 <a name="models"/>
 
@@ -34,9 +83,9 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Please Note:** Dataset release is currently being reviewed and the download link will be updated once it is publicly available.
+**Access:** [The EHRSHOT-2023 dataset is on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
 
-The EHRSHOT (version 1) dataset contains:
+EHRSHOT-2023 contains:
 * **6,739 patients**
 * **41.6 million clinical events**
 * **921,499 visits**
@@ -92,218 +141,6 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
   <tr> <td><a href="https://github.com/ratschlab/HIRID-ICU-Benchmark">HiRID-ICU</a></td> <td>HiRID</td> <td>✓</td> <td>--</td> <td>33k</td> <td>6</td> <td>--</td> <td>✓</td> <td>✓</td> <td>--</td> </tr>
   <tr> <td><a href="https://www.sciencedirect.com/science/article/pii/S1532046419302564?via%3Dihub">Solares 2020</a></td> <td>CPRD</td> <td>✓</td> <td>✓</td> <td>4M</td> <td>2</td> <td>--</td> <td>--</td> <td>--</td> <td>--</td> </tr>
 </table>
-
-
-<a name="installation"/>
-
-# 💿 Installation
-
-Please use the following steps to create an environment for running the EHRSHOT benchmark.
-
-**1)**: Install **EHRSHOT**
-
-```bash
-conda create -n EHRSHOT_ENV python=3.10 -y
-conda activate EHRSHOT_ENV
-
-git clone https://github.com/som-shahlab/ehrshot-benchmark.git
-cd ehrshot-benchmark
-pip install -r requirements.txt
-```
-
-**2)**: Install **FEMR**
-
-For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
-
-You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
-
-Note that this currently only works on Linux machines.
-
-```bash
-pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-conda install bazel=6 -y
-pip install git+https://github.com/som-shahlab/femr.git@ehrshot_branch
-
-# pip install femr==0.0.20
-
-```
-
-## Download Private Assets
-
-You will need to separately download several assets that we cannot redistribute publicly on Github.
-
-This includes the dataset itself, the weights of the pre-trained foundation model we benchmark, and the Athena OHDSI Ontology. 
-
-### A) Dataset & Foundation Model for EHRs
-
-**Please Note:** Dataset + model release is currently being reviewed and the download link will be updated once it is publicly available.
-
-Once this is downloaded, unzip it to get a folder called `EHRSHOT_ASSETS/`. Please move this folder to the root of this repo.
-
-### B) Athena OHDSI Ontology
-
-Our pipeline requires the user to provide an ontology in order to map medical codes to their parents/children. We use the default Athena OHDSI Ontology for this. 
-
-Unfortunately, we cannot redistribute the Athena OHDSI Ontology ourselves, so you must separately download it by following these steps:
-
-1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list). You may need to create an account.
-2. Click the green "Download" button at the top right of the website
-3. Click the purple "Download Vocabularies" button below the green "Download" button
-4. Name the bundle "athena_download" and select 5.x version
-5. Scroll to the bottom of the list, and click the blue "Download" button
-6. It will take some time for the download to be ready. Please [refresh the webpage here](https://athena.ohdsi.org/vocabulary/download-history) to check whether your download is ready. Once the download is ready, click "Download"
-7. After the download is complete, unzip the file and move all the files into the `EHRSHOT_ASSETS/athena_download/` folder in your repo.
-
-After downloading the Athena OHDSI Ontology, you will have to separately download the CPT subset of the ontology. You can follow the instructions in the `readme.txt` in your Athena download, or follow the steps below:
-
-1. Create a [UMLS account here](https://uts.nlm.nih.gov/uts/signup-login)
-2. Get your [UMLS API key here](https://uts.nlm.nih.gov/uts/edit-profile)
-3. From the `EHRSHOT_ASSETS/athena_download/` folder, run this command: `bash cpt.sh <YOUR UMLS API KEY>`
-
-Your ontology will then be ready to go!
-
-## Folder Structure
-
-Your final folder structure should look like this:
-
-- `ehrshot-benchmark/`
-  - `EHRSHOT_ASSETS/`
-    - `data/`
-      - *We provide this asset, which contains deidentified EHR data as CSVs.*
-    - `benchmark/`
-      - *We provide this asset, which contains labels and few-shot samples for all our tasks.*
-    - `models`
-      - *We provide this asset, which contains our pretrained foundation model for EHRs.*
-    - `athena_download/`
-      - *You will need to download and put the Athena OHDSI Ontology inside this folder. Please follow the instructions above to download it.*
-  - `ehrshot/`
-    - *We provide the scripts to run the benchmark here*
-
-<a name="usage"/>
-
-# 👩‍💻 Usage
-
-To execute the entire benchmark end-to-end, please run:
-
-```bash
-python3 run_all.py
-```
-
-----
-
-You can also run each of the steps individually by directly calling their corresponding Python/Bash files in the `ehrshot/` folder. Note that depending on your system, you may need to change the Bash scripts.
-
-Here is a breakdown of what each step in the pipeline does:
-
-**1)**: Convert the **EHRSHOT** CSV files into a format that the [FEMR library](https://github.com/som-shahlab/femr) can process.
-
-```bash
-python3 1_create_femr_database.py \
-    --path_to_input ../EHRSHOT_ASSETS/data \
-    --path_to_target ../EHRSHOT_ASSETS/femr \
-    --athena_download ../EHRSHOT_ASSETS/athena_download \
-    --num_threads 10
-```
-
-Alternatively, you can also run
-```bash
-sbatch 1_create_femr_database_slurm.sh
-```
-
-Please make sure you change the Bash script according to your system. You may not be able to run it as a slurm job.
-
-**2)**: Apply the labeling functions defined in [FEMR](https://github.com/som-shahlab/femr/blob/few_shot_ehr_benchmark/src/femr/labelers/benchmarks.py) to our dataset to generate labels for our benchmark tasks.
-
-Note that as part of our dataset release, we also include these labels in a CSV. Thus, you should skip to the label generation part of the script by setting the `--is_skip_label` flag.
-
-```bash
-python3 2_generate_labels_and_features.py \
-    --path_to_database ../EHRSHOT_ASSETS/femr/extract \
-    --path_to_output_dir ../EHRSHOT_ASSETS/benchmark \
-    --path_to_chexpert_csv ../EHRSHOT_ASSETS/benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
-    --labeling_function guo_los \
-    --is_skip_label \
-    --num_threads 10
-```
-
-In case you want to regenerate your labels, you can run the above command without the `--is_skip_label` flag.
-
-The above command runs it only for `guo_los` (Long Length of Stay) labeling function. You will need to individually run this script for each of the 15 tasks. Alternatively, you can run the Bash script shown below to iterate through every task automatically.
-
-```bash
-sbatch 2_generate_labels_and_features_slurm.sh
-```
-
-**3)**: Generate a CLMBR representation for each patient for each label. Below is an example of how to run it for one task (`guo_los`). 
-
-Note that this job **requires a GPU.**
-
-```bash
-python3 3_generate_clmbr_representations.py \
-    --path_to_clmbr_data ../EHRSHOT_ASSETS/models/clmbr_model \
-    --path_to_database ../EHRSHOT_ASSETS/femr/extract \
-    --path_to_labeled_featurized_data ../EHRSHOT_ASSETS/benchmark \
-    --path_to_save ../EHRSHOT_ASSETS/clmbr_reps \
-    --labeling_function guo_los
-```
-
-To run it for all tasks automatically, run the following Bash script:
-
-```bash
-sbatch 3_generate_clmbr_representations_slurm.sh
-```
-
-**4)**: Generate our `k`-shots for few-shot evaluation.
-
-Note that we provide the exact `k`-shots used in our paper with our data release. Please do not run this script if you want to use the `k`-shots we used in our paper.
-
-```bash
-python3 4_generate_shot.py \
-    --path_to_data ../EHRSHOT_ASSETS \
-    --labeling_function guo_los \
-    --num_replicates 1 \
-    --path_to_save ../EHRSHOT_ASSETS/benchmark \
-    --shot_strat few
-```
-
-To run it for all tasks automatically, run the following Bash script:
-
-```bash
-sbatch 4_generate_shot_slurm.sh
-```
-
-**5)**: Train our baseline models and generate performance metrics.
-
-```bash
-python3 5_eval.py \
-    --path_to_data ../EHRSHOT_ASSETS \
-    --labeling_function guo_los \
-    --num_replicates 5 \
-    --model_head logistic \
-    --is_tune_hyperparams \
-    --path_to_save ../EHRSHOT_ASSETS/output \
-    --shot_strat few
-```
-
-To run it for all tasks automatically, run the following Bash script:
-
-```bash
-sbatch 5_eval_slurm.sh
-```
-
-**6)**: Generate the plots we included in our paper.
-
-```bash
-python3 6_make_figures.py \
-    --path_to_eval ../EHRSHOT_ASSETS/output \
-    --path_to_save ../EHRSHOT_ASSETS/figures
-```
-
-or 
-
-```bash
-sbatch 6_make_figures_slurm.sh
-```
 
 # Citation
 

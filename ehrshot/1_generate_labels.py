@@ -3,7 +3,7 @@ import os
 import json
 from typing import List
 from loguru import logger
-from utils import LABELING_FUNCTIONS
+from utils import LABELING_FUNCTIONS, get_rel_path
 import pandas as pd
 
 from femr.datasets import PatientDatabase
@@ -28,8 +28,8 @@ from femr.labelers.benchmarks import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate labels for a specific task")
-    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_chexpert_csv", type=str, help="Path to CheXpert CSV file. Specific to CheXpert labeler", default=None,)
     parser.add_argument("--labeling_function", required=True, type=str, help="Name of task for which we are creating labels", choices=LABELING_FUNCTIONS, )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use", default=1, )
@@ -123,9 +123,13 @@ if __name__ == "__main__":
     logger.info("Finish | Label patients")
     
     # Force labels to be minute-level resolution for FEMR compatibility
+    n_positive_labels = 0
+    n_positive_patients = 0
     for patient, labels in labeled_patients.items():
         new_labels: List[Label] = [ Label(time=l.time.replace(second=0, microsecond=0), value=l.value) for l in labels ]
         labeled_patients[patient] = new_labels
+        n_positive_labels += sum([ 1 if l.value > 0 else 0 for l in labels ])
+        n_positive_patients += 1 if sum([ 1 if l.value > 0 else 0 for l in labels ]) > 0 else 0
 
     # Save labeled patients to simple CSV pipeline format
     logger.info(f"Saving labeled patients to `{PATH_TO_OUTPUT_FILE}`")
@@ -133,9 +137,13 @@ if __name__ == "__main__":
     
     # Logging
     logger.info("LabeledPatient stats:\n"
+                f"Labeler: {LABELING_FUNCTION}\n"
                 f"Total # of patients = {labeled_patients.get_num_patients(is_include_empty_labels=True)}\n"
                 f"Total # of patients with at least one label = {labeled_patients.get_num_patients(is_include_empty_labels=False)}\n"
-                f"Total # of labels = {labeled_patients.get_num_labels()}")
+                f"Total # of positive patients = {n_positive_patients}\n"
+                f"Total # of labels = {labeled_patients.get_num_labels()}\n"
+                f"Total # of positive labels = {n_positive_labels}\n"
+                f"Label prevalence = {n_positive_labels / labeled_patients.get_num_labels()}")
     logger.success("Done!")
 
 
