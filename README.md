@@ -9,13 +9,66 @@ Please note that the dataset + model are still being reviewed, and a download li
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 # 📖 Table of Contents
-1. [Pre-trained Foundation Model](#models)
-2. [Dataset + Tasks](#dataset)
-3. [Comparison to Prior Work](#prior_work)
-4. [Installation](#installation)
-5. [Usage](#usage)
-6. [Citation](#citation)
+1. [Quick Start](#quick_start)
+2. [Pre-trained Foundation Model](#models)
+3. [Dataset + Tasks](#dataset)
+4. [Comparison to Prior Work](#prior_work)
+5. [Citation](#citation)
 
+<a name="quick_start"/>
+
+# 🚀 Quick Start
+
+Please use the following steps to run the EHRSHOT benchmark.
+
+**1)**: Install **EHRSHOT**
+
+```bash
+conda create -n EHRSHOT_ENV python=3.10 -y
+conda activate EHRSHOT_ENV
+
+git clone https://github.com/som-shahlab/ehrshot-benchmark.git
+cd ehrshot-benchmark
+pip install -r requirements.txt
+```
+
+**2)**: Install **FEMR**
+
+For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
+
+You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
+
+Note that this currently only works on Linux machines.
+
+```bash
+pip install femr==0.0.21
+pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+
+**3)**: Download dataset + model from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
+
+**4)**: Run the benchmark end-to-end by running:
+
+```bash
+bash run_all.sh
+```
+
+## Folder Structure
+
+Your final folder structure should look like this:
+
+- `ehrshot-benchmark/`
+  - `EHRSHOT_ASSETS/`
+    - `database/`
+      - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
+    - `labels/`
+      - *We provide this asset from Redivis, which contains labels and few-shot samples for all our tasks.*
+    - `models/`
+      - *We provide this asset from Redivis, which contains our pretrained foundation model for EHRs.*
+    - `splits.csv`
+      - *We provide this asset from Redivis, which determine which patient corresponds to which split.*
+  - `ehrshot/`
+    - *We provide the scripts to run the benchmark here*
 
 <a name="models"/>
 
@@ -92,66 +145,6 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
   <tr> <td><a href="https://github.com/ratschlab/HIRID-ICU-Benchmark">HiRID-ICU</a></td> <td>HiRID</td> <td>✓</td> <td>--</td> <td>33k</td> <td>6</td> <td>--</td> <td>✓</td> <td>✓</td> <td>--</td> </tr>
   <tr> <td><a href="https://www.sciencedirect.com/science/article/pii/S1532046419302564?via%3Dihub">Solares 2020</a></td> <td>CPRD</td> <td>✓</td> <td>✓</td> <td>4M</td> <td>2</td> <td>--</td> <td>--</td> <td>--</td> <td>--</td> </tr>
 </table>
-
-
-<a name="installation"/>
-
-# 💿 Installation
-
-Please use the following steps to create an environment for running the EHRSHOT benchmark.
-
-**1)**: Install **EHRSHOT**
-
-```bash
-conda create -n EHRSHOT_ENV python=3.10 -y
-conda activate EHRSHOT_ENV
-
-git clone https://github.com/som-shahlab/ehrshot-benchmark.git
-cd ehrshot-benchmark
-pip install -r requirements.txt
-```
-
-**2)**: Install **FEMR**
-
-For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Medical Records)](https://github.com/som-shahlab/femr)**, a Python package for building deep learning models with EHR data. 
-
-You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
-
-Note that this currently only works on Linux machines.
-
-```bash
-pip install femr==0.0.21
-pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-```
-
-**3)**: Download dataset + model from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
-
-## Folder Structure
-
-Your final folder structure should look like this:
-
-- `ehrshot-benchmark/`
-  - `EHRSHOT_ASSETS/`
-    - `database/`
-      - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
-    - `labels/`
-      - *We provide this asset from Redivis, which contains labels and few-shot samples for all our tasks.*
-    - `models/`
-      - *We provide this asset from Redivis, which contains our pretrained foundation model for EHRs.*
-    - `splits.csv`
-      - *We provide this asset from Redivis, which determine which patient corresponds to which split.*
-  - `ehrshot/`
-    - *We provide the scripts to run the benchmark here*
-
-<a name="usage"/>
-
-# 👩‍💻 Usage
-
-To execute the entire benchmark end-to-end, please run:
-
-```bash
-bash run_all.sh
-```
 
 # Citation
 
