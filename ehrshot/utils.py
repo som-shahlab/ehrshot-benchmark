@@ -1,4 +1,3 @@
-import json
 import ast
 import pickle
 import os
@@ -19,74 +18,241 @@ from loguru import logger
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: int = 70
 SPLIT_VAL_CUTOFF: int = 85
+PATH_TO_SPLIT_CSV = '/share/pi/nigam/mwornow/ehrshot-benchmark-natasha/EHRSHOT_ASSETS/splits/person_id_map.csv'
 
 # Types of base models to test
-MODEL_2_NAME: Dict[str, str] = {
-    'count' : 'Count-based',
-    'clmbr' : 'CLMBR',
-    # 'gpt2-base' : 'GPT2-base (v9)',
-    # 'gpt2-medium' : 'GP2-medium (v9)',
-    # 'gpt2-large' : 'GP2-large (v9)',
-    # 'bert-base' : 'BERT-base (v9)',
-    # 'gpt2-base-v8_chunk:last_embed:last' : 'GPT2-base (v8)',
-    # 'bert-base-v8_chunk:last_embed:last' : 'BERT-base (v8)',
+MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
+    'count' : {
+        'label' : 'Count-based (v8)',
+        'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
+    },
+    'clmbr' : {
+        'label' : 'CLMBR (v8)',
+        'heads' : ['lr_lbfgs', ],
+    },
+    #'pytorch_clmbr' : {
+    #    'label' : 'Pytorch CLMBR (v8)',
+    #    'heads' : ['lr_lbfgs', 'lr_femr', 'rf', ],
+    #},
+    # 'gpt2-base-v8_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8_chunk:last_embed:mean' : {
+    #     'label' : 'GPT2-base:chunk=last,embed=mean (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-medium-v8_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-medium:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-large-v8_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-large:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'bert-base-v8_chunk:last_embed:last' : {
+    #     'label' : 'BERT-base:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'bert-base-v8_chunk:last_embed:mean' : {
+    #     'label' : 'BERT-base:chunk=last,embed=mean (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-1:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-4:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-6:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-8:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-10:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
+    # 'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
+    #     'label' : 'GPT2-base-12:chunk=last,embed=last (v8)',
+    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
+    # },
 }
-BASE_MODELS: List[str] = list(MODEL_2_NAME.keys())
 
 # Map each base model to a set of heads to test
-BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
-    'count' : ['gbm', 'lr_lbfgs', 'rf', ], 
-    'clmbr' : ['lr_lbfgs', 'rf', ],
-    'gpt2-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
-    'bert-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
-}
-HEAD_2_NAME: Dict[str, str] = {
-    'gbm' : 'GBM',
-    'lr_lbfgs' : 'LR',
-    'lr_femr' : 'LR',
-    'lr_newton-cg' : 'LR',
-    'protonet' : 'ProtoNet',
-    'rf' : 'Random Forest',
+HEAD_2_INFO: Dict[str, Dict[str, str]] = {
+    'gbm' : {
+        'label' : 'GBM',
+    },
+    'lr_lbfgs' : {
+        'label' : 'LR',
+    },
+    'lr_femr' : {
+        'label' : 'LR',
+    },
+    'lr_newton-cg' : {
+        'label' : 'LR',
+    },
+    'protonet' : {
+        'label' : 'ProtoNet',
+    },
+    'rf' : {
+        'label' : 'Random Forest',
+    },
 }
 
-# Labeling functions
-LABELING_FUNCTIONS: List[str] = [
-    # Guo et al. 2023
-    "guo_los",
-    "guo_readmission",
-    "guo_icu",
-    # New diagnosis
-    'new_pancan',
-    'new_celiac',
-    'new_lupus',
-    'new_acutemi',
-    'new_hypertension',
-    'new_hyperlipidemia',
-    # Instant lab values
-    "lab_thrombocytopenia",
-    "lab_hyperkalemia",
-    "lab_hypoglycemia",
-    "lab_hyponatremia",
-    "lab_anemia",
-    # Custom tasks
-    "chexpert"
-]
+# Plotting
+SCORE_MODEL_HEAD_2_COLOR = {
+    'auroc' : {
+        'count' : {
+            'gbm' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
+            'rf' : 'tab:orange',
+        },
+        'clmbr' : {
+            'lr_lbfgs' : 'tab:blue',
+        },
+        'pytorch_clmbr': {
+            'lr_femr' : 'tab:purple',
+        },
+        'gpt2-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:purple',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-base-v8_chunk:last_embed:mean' : {
+            'lr_lbfgs' : 'tab:pink',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-medium-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'indigo',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-large-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'plum',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'bert-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:olive',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'bert-base-v8_chunk:last_embed:mean' : {
+            'lr_lbfgs' : 'tab:cyan',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        # Epochs
+        'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'red',
+        },
+        'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'orange',
+        },
+        'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'yellow',
+        },
+        'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'green',
+        },
+        'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'blue',
+        },
+        'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'purple',
+        },
+    },
+    'auprc' : {
+        'count' : {
+            'lr_lbfgs' : 'tab:green',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'clmbr' : {
+            'lr_lbfgs' : 'tab:blue',
+        },
+        'pytorch_clmbr' : {
+            'lr_femr' : 'tab:purple',
+        },
+        'gpt2-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:purple',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-base-v8_chunk:last_embed:mean' : {
+            'lr_lbfgs' : 'tab:pink',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-medium-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'indigo',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'gpt2-large-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'plum',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'bert-base-v8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'tab:olive',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        'bert-base-v8_chunk:last_embed:mean' : {
+            'lr_lbfgs' : 'tab:cyan',
+            'gbm' : 'tab:red',
+            'rf' : 'tab:orange',
+        },
+        # Epochs
+        'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'red',
+        },
+        'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'orange',
+        },
+        'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'yellow',
+        },
+        'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'green',
+        },
+        'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'blue',
+        },
+        'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
+            'lr_lbfgs' : 'purple',
+        },
+    },
+}
 
 LABELING_FUNCTION_2_PAPER_NAME = {
+    # Guo et al. 2023
     "guo_los": "Long LOS",
     "guo_readmission": "30-day Readmission",
     "guo_icu": "ICU Admission",
+    # New diagnosis
+    "new_pancan": "Pancreatic Cancer",
+    "new_celiac": "Celiac",
+    "new_lupus": "Lupus",
+    "new_acutemi": "Acute MI",
+    "new_hypertension": "Hypertension",
+    "new_hyperlipidemia": "Hyperlipidemia",
+    # Instant lab values
     "lab_thrombocytopenia": "Thrombocytopenia",
     "lab_hyperkalemia": "Hyperkalemia",
     "lab_hypoglycemia": "Hypoglycemia",
     "lab_hyponatremia": "Hyponatremia",
     "lab_anemia": "Anemia",
-    "new_hypertension": "Hypertension",
-    "new_hyperlipidemia": "Hyperlipidemia",
-    "new_pancan": "Pancreatic Cancer",
-    "new_celiac": "Celiac",
-    "new_lupus": "Lupus",
-    "new_acutemi": "Acute MI",
+    # Custom tasks
     "chexpert": "Chest X-ray Findings"
 }
 
@@ -164,36 +330,12 @@ SHOT_STRATS = {
     'debug' : [10],
 }
 
-# Plotting
-SCORE_MODEL_HEAD_2_COLOR = {
-    'auroc' : {
-        'count' : {
-            'gbm' : 'tab:red',
-            'lr_lbfgs' : 'aqua',
-            'rf' : 'tab:orange',
-        },
-        'clmbr' : {
-            'lr_lbfgs' : 'tab:blue',
-        },
-    },
-    'auprc' : {
-        'count' : {
-            'gbm' : 'tab:red',
-            'lr_lbfgs' : 'aqua',
-            'rf' : 'tab:orange',
-        },
-        'clmbr' : {
-            'lr_lbfgs' : 'tab:blue',
-        },
-    },
-}
-
-def get_splits(path_to_split_csv: str,
+def get_splits(database: PatientDatabase, 
                 patient_ids: np.ndarray, 
                 label_times: np.ndarray, 
                 label_values: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """Return train/val/test splits for a given set of patients."""
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(path_to_split_csv, patient_ids)
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(database, patient_ids)
     patient_ids: Dict[str, np.ndarray] = {
         'train' : patient_ids[train_pids_idx],
         'val' : patient_ids[val_pids_idx],
@@ -211,20 +353,43 @@ def get_splits(path_to_split_csv: str,
     }
     return patient_ids, label_values, label_times
 
-def get_patient_splits_by_patient_id(path_to_split_csv: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+def get_splits(patient_ids: np.ndarray, 
+                label_times: np.ndarray, 
+                label_values: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    """Return train/val/test splits for a given set of patients."""
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(patient_ids)
+    patient_ids: Dict[str, np.ndarray] = {
+        'train' : patient_ids[train_pids_idx],
+        'val' : patient_ids[val_pids_idx],
+        'test' : patient_ids[test_pids_idx],
+    }
+    label_times: Dict[str, np.ndarray] = {
+        'train' : label_times[train_pids_idx],
+        'val' : label_times[val_pids_idx],
+        'test' : label_times[test_pids_idx],
+    }
+    label_values: Dict[str, np.ndarray] = {
+        'train' : label_values[train_pids_idx],
+        'val' : label_values[val_pids_idx],
+        'test' : label_values[val_pids_idx],
+    }
+    return patient_ids, label_values, label_times
+
+def get_patient_splits_by_patient_id() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the `patient_ids` for each split."""
-    df_split = pd.read_csv(path_to_split_csv)
+    df_split = pd.read_csv(PATH_TO_SPLIT_CSV)
     return (
         df_split[df_split['split'] == 'train']['omop_person_id'].values,
         df_split[df_split['split'] == 'val']['omop_person_id'].values,
         df_split[df_split['split'] == 'test']['omop_person_id'].values,
     )
 
-def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_patient_splits_by_idx(patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the idxs for each split within `patient_ids`."""
-    df_split = pd.read_csv(path_to_split_csv)
+    df_split = pd.read_csv(PATH_TO_SPLIT_CSV)
     split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
     for split in ['train', 'val', 'test']:
         for idx, id in enumerate(patient_ids.tolist()):
@@ -254,34 +419,27 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
     featurizations: Dict[str, np.ndarray] = {}
-    for model in BASE_MODELS:
+    for model in MODEL_2_INFO.keys():
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
-        logger.info(f"Loading features from: {path_to_feats_file}")
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
         
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
             feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = pickle.load(f)
-            if model == 'count':
-                feature_matrix, feature_patient_ids, feature_times = (
-                    feats[0],
-                    feats[1],
-                    feats[3], # NOTE: skip label_values in [2]
-                )
-            elif model == 'clmbr':
-                feature_matrix, feature_patient_ids, feature_times = (
-                    feats['data_matrix'],
-                    feats['patient_ids'],
-                    feats['labeling_time'],
-                )
-            elif model == 'motor':
+            
+            if isinstance(feats, dict):
                 feature_matrix, feature_patient_ids, feature_times = (
                     feats['data_matrix'],
                     feats['patient_ids'],
                     feats['labeling_time'],
                 )
             else:
-                assert False, f"Unsupported model: {model}"
+                feature_matrix, feature_patient_ids, feature_times = (
+                    feats[0],
+                    feats[1],
+                    feats[3], # NOTE: skip label_values in [2]
+                )
+
             feature_patient_ids = feature_patient_ids.astype(label_patient_ids.dtype)
             feature_times = feature_times.astype(label_times.dtype)
             assert feature_patient_ids.dtype == label_patient_ids.dtype, f'Error -- mismatched types between feature_patient_ids={feature_patient_ids.dtype} and label_patient_ids={label_patient_ids.dtype}'
@@ -426,21 +584,3 @@ def write_table_to_latex(df: pd.DataFrame, path_to_file: str, is_ignore_index: b
         f.write("\n")
         f.write("=======================================\n")
         f.write("=======================================\n")
-
-
-def get_rel_path(file: str, rel_path: str) -> str:
-    """Transforms a relative path from a specific file in the package `eclair/src/eclair/ into an absolute path"""
-    return os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(file)), rel_path)
-    )
-
-def dump_patient_to_json(patient, file):
-	events = []
-	for event in patient.events:
-		events.append({
-			'start' : str(event.start),
-			'end' : str(event.end),
-			'code' : event.code,
-			'table' : event.omop_table,
-		})
-	json.dump(events, open(file, 'w'), indent=2)

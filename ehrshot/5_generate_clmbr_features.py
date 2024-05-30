@@ -1,14 +1,13 @@
 import argparse
 import os
 from loguru import logger
-from utils import get_rel_path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate CLMBR / MOTOR patient representations (for all tasks at once)")
-    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
-    parser.add_argument("--path_to_features_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/features/'), type=str, help="Path to directory containing saved features")
-    parser.add_argument("--path_to_models_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/models/'), type=str, help="Path to directory where models are saved")
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
+    parser.add_argument("--path_to_models_dir", type=str, help="Path to directory where models are saved")
     parser.add_argument("--model", type=str, help="Name of foundation model to load. Options: 'motor' or 'clmbr'")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
@@ -48,6 +47,7 @@ if __name__ == "__main__":
             f" --dictionary {PATH_TO_DICTIONARY}"
             f" --task labeled_patients"
             f" --batch_size 131072"
+            f" --val_start 70"
             f" {hier_flag}"
             f" --labeled_patients_path {PATH_TO_LABELED_PATIENTS}"
         )

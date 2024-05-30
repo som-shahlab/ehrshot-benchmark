@@ -6,16 +6,12 @@ from typing import Any, Dict, List, Set, Tuple
 import numpy as np
 import pandas as pd
 import os
-import re
-import pickle
 import femr.datasets
 from loguru import logger
 from tqdm import tqdm
 
 from utils import (
     write_table_to_latex,
-    get_patient_splits_by_patient_id,
-    get_rel_path,
 )
 from plot import (
     plot_column_per_patient,
@@ -23,14 +19,15 @@ from plot import (
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Make plots/tables of cohort stats")
-    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_output_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/figures/'), type=str, help="Path to directory to save figures")
-    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
-    parser.add_argument("--path_to_split_csv", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/splits.csv'), type=str, help="Path to CSV containing splits by patient ID")
+    parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_input_dir", required=True, type=str, help="Path to folder containing all EHRSHOT cohort CSVs")
+    parser.add_argument("--path_to_splits_dir", required=True, type=str, help="Path to directory containing splits.json")
+    parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory to save figures")
     parser.add_argument("--num_threads", default=1, type=int, help="Number of processes to launch")
     return parser.parse_args()
 
-def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split_csv: str, num_threads: int):
+def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_splits_dir: str, num_threads: int):
     # Get list of all patient IDs in labeled patients
     patient_database = femr.datasets.PatientDatabase(path_to_database)
     all_patient_ids = np.array(sorted(list([ pid for pid in patient_database ])))
@@ -45,7 +42,7 @@ def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split
 
     logger.success("Start | Writing CSVs in parallel")
     task_args: List[Tuple[str, List[int]]] = [
-        (paths_to_csvs[i], path_to_database, path_to_split_csv, patient_ids_chunks[i])
+        (paths_to_csvs[i], path_to_database, path_to_splits_dir, patient_ids_chunks[i])
         for i in range(len(patient_ids_chunks))
     ]
     with multiprocessing.get_context("forkserver").Pool(num_threads) as pool:
@@ -74,17 +71,9 @@ def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split
     logger.success(f"Done creating df_demo!")
 
 def compute_demographics(args):
-    path_to_csv, path_to_database, path_to_split_csv, patient_ids = args
+    path_to_csv, path_to_database, path_to_splits_dir, patient_ids = args
     patient_database = femr.datasets.PatientDatabase(path_to_database)
-    
-    # Load splits
-    splits = get_patient_splits_by_patient_id(path_to_split_csv)
-    splits = {
-        'train' : splits[0],
-        'val' : splits[1],
-        'test' : splits[2],
-    }
-
+    splits = json.load(open(os.path.join(path_to_splits_dir, 'splits.json'), 'r'))
     rows = []
     for idx, pid in enumerate(patient_ids):
         is_male: bool = False
@@ -160,33 +149,26 @@ def compute_demographics(args):
 if __name__ == "__main__":
     args = parse_args()
     PATH_TO_DATABASE: str = args.path_to_database
-    PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
-    PATH_TO_SPLIT_CSV: str = args.path_to_split_csv
-    PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir    
+    PATH_TO_INPUT_DIR: str = args.path_to_input_dir
+    PATH_TO_LABELS_AND_FEATS_DIR: str = args.path_to_labels_and_feats_dir
+    PATH_TO_SPLITS_DIR: str = args.path_to_splits_dir
+    PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_LATEX_TABLES_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, 'latex_tables.txt')
     NUM_THREADS: int = args.num_threads
     os.makedirs(PATH_TO_OUTPUT_DIR, exist_ok=True)
     if os.path.exists(PATH_TO_LATEX_TABLES_FILE):
         os.remove(PATH_TO_LATEX_TABLES_FILE)
 
-    # Load FEMR database
-    database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
-    
     # Load splits
-    splits = get_patient_splits_by_patient_id(PATH_TO_SPLIT_CSV)
-    splits = {
-        'train' : splits[0],
-        'val' : splits[1],
-        'test' : splits[2],
-    }
+    splits: Dict[str, List[int]] = json.load(open(os.path.join(PATH_TO_SPLITS_DIR, 'splits.json'), 'r'))
 
     # Load all labels from CSVs
     logger.info("Start | Creating df_labels.csv")
     if not os.path.exists(os.path.join(PATH_TO_OUTPUT_DIR, 'df_labels.csv')):
         dfs: List[pd.DataFrame] = []
-        for labeling_function in os.listdir(PATH_TO_LABELS_DIR):
-            if os.path.isdir(os.path.join(PATH_TO_LABELS_DIR, labeling_function)):
-                df_ = pd.read_csv(os.path.join(PATH_TO_LABELS_DIR, f"{labeling_function}/labeled_patients.csv"))
+        for labeling_function in os.listdir(PATH_TO_LABELS_AND_FEATS_DIR):
+            if os.path.isdir(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, labeling_function)):
+                df_ = pd.read_csv(os.path.join(PATH_TO_LABELS_AND_FEATS_DIR, f"{labeling_function}/labeled_patients.csv"))
                 df_['task'] = labeling_function
                 df_['split'] = df_['patient_id'].apply(lambda x: 'train' if x in splits['train'] else ('val' if x in splits['val'] else 'test'))
                 dfs.append(df_)
@@ -195,27 +177,21 @@ if __name__ == "__main__":
     df_labels = pd.read_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'df_labels.csv'))
     logger.info("Finish | Creating df_labels.csv")
 
-    # Load all patients from FEMR database
+    # Load all patient events from CSVs
     logger.info("Start | Creating df_merged.csv")
     if not os.path.exists(os.path.join(PATH_TO_OUTPUT_DIR, 'df_merged.csv')):
-        df_merged = []
-        for pid in database:
-            for event in database[pid]:
-                df_merged.append({
-                    'patient_id' : pid,
-                    'code' : event.code,
-                    'visit_id' : event.visit_id,
-                })
-        df_merged = pd.DataFrame(df_merged)
+        dfs: List[pd.DataFrame] = []
+        for cohort_csv in os.listdir(PATH_TO_INPUT_DIR):
+            dfs.append(pd.read_csv(os.path.join(PATH_TO_INPUT_DIR, cohort_csv)))
+        df_merged: pd.DataFrame = pd.concat(dfs, ignore_index=True)
         df_merged.to_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'df_merged.csv'), index=False)
-    else:
-        df_merged = pd.read_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'df_merged.csv'))
+    df_merged = pd.read_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'df_merged.csv'))
     logger.info("Finish | Creating df_merged.csv")
 
     # Load pre-computed patient demographics
     logger.info("Start | Creating df_demo.csv")
     if not os.path.exists(os.path.join(PATH_TO_OUTPUT_DIR, 'df_demo.csv')):
-        create_df_demo(PATH_TO_DATABASE, PATH_TO_OUTPUT_DIR, PATH_TO_SPLIT_CSV, NUM_THREADS)
+        create_df_demo(PATH_TO_DATABASE, PATH_TO_OUTPUT_DIR, PATH_TO_SPLITS_DIR, NUM_THREADS)
     df_demo = pd.read_csv(os.path.join(PATH_TO_OUTPUT_DIR, 'df_demo.csv'))
     logger.info("Finish | Creating df_demo.csv")
 

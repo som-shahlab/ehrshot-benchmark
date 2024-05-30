@@ -4,13 +4,13 @@ import os
 from typing import Dict, List, Set
 from loguru import logger
 import collections
-from utils import check_file_existence_and_handle_force_refresh, get_rel_path
+from utils import check_file_existence_and_handle_force_refresh
 
 from femr.labelers import load_labeled_patients, LabeledPatients, Label
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Consolidate all labels to speed up featurization")
-    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
