@@ -125,7 +125,7 @@ def merge_html_tables(path_to_output_dir: str):
             name = LABELING_FUNCTION_2_PAPER_NAME[name] if name in LABELING_FUNCTION_2_PAPER_NAME else (TASK_GROUP_2_PAPER_NAME[name] if name in TASK_GROUP_2_PAPER_NAME else name)
             table_html = open(os.path.join(path_to_output_dir, file), 'r').read()
             table_html = table_html.replace('\n', '')
-            html_contents.append(f'<h6>{name}</h6>\n' + table_html)
+            html_contents.append(f'<h5>{name}</h5>\n' + table_html)
     with open(os.path.join(path_to_output_dir, 'merged.html'), 'w') as fd:
         for c in html_contents:
             fd.write(c + '\n\n')
