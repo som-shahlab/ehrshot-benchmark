@@ -37,7 +37,7 @@ You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
 Note that this currently only works on Linux machines.
 
 ```bash
-pip install femr==0.0.21
+pip install femr-cuda==0.0.20
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
@@ -55,13 +55,19 @@ Your final folder structure should look like this:
 
 - `ehrshot-benchmark/`
   - `EHRSHOT_ASSETS/`
-    - `database/`
+    - `femr/`
       - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
-    - `labels/`
-      - *We provide this asset from Redivis, which contains labels and few-shot samples for all our tasks.*
+    - `benchmark/`
+      - *We provide this asset from Redivis, which contains labels + few-shot samples for all our tasks.*
+    - `features/`
+      - *We provide this asset from Redivis, which contains preprocessed count + CLMBR-based featurizations.*
     - `models/`
-      - *We provide this asset from Redivis, which contains our pretrained foundation model for EHRs.*
-    - `splits.csv`
+      - *We provide this asset from Redivis, which contains the weights of our pretrained foundation model (CLMBR).*
+    - `results/`
+      - *We provide this asset from Redivis, which contains raw results from our running of our benchmark on the baseline models.*
+    - `figures/`
+      - *We provide this asset from Redivis, which contains figures summarizing the expected results of running our benchmark.*
+    - `splits/`
       - *We provide this asset from Redivis, which determine which patient corresponds to which split.*
   - `ehrshot/`
     - *We provide the scripts to run the benchmark here*
