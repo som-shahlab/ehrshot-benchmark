@@ -9,7 +9,8 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 2. [Pre-trained Foundation Model](#models)
 3. [Dataset + Tasks](#dataset)
 4. [Comparison to Prior Work](#prior_work)
-5. [Citation](#citation)
+5. [Other](#other)
+6. [Citation](#citation)
 
 <a name="quick_start"/>
 
@@ -55,18 +56,22 @@ Your final folder structure should look like this:
 
 - `ehrshot-benchmark/`
   - `EHRSHOT_ASSETS/`
-    - `femr/`
-      - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
+    - `athena_download/`
+      - *We do NOT provide this asset. You will have to follow the instructions in the section "Downloading the Athena Ontology" below. However, you can skip this entirely by using the FEMR extract included in our Redivis download.*
     - `benchmark/`
       - *We provide this asset from Redivis, which contains labels + few-shot samples for all our tasks.*
+    - `data/`
+      - *We provide this asset from Redivis, which contains a CSV containing the entire dataset.*
     - `features/`
       - *We provide this asset from Redivis, which contains preprocessed count + CLMBR-based featurizations.*
+    - `femr/`
+      - *We provide this asset from Redivis, which contains deidentified EHR data as a [FEMR](https://github.com/som-shahlab/ehrshot-femr) extract.*
+    - `figures/`
+      - *We provide this asset from Redivis, which contains figures summarizing the expected results of running our benchmark.*
     - `models/`
       - *We provide this asset from Redivis, which contains the weights of our pretrained foundation model (CLMBR).*
     - `results/`
       - *We provide this asset from Redivis, which contains raw results from our running of our benchmark on the baseline models.*
-    - `figures/`
-      - *We provide this asset from Redivis, which contains figures summarizing the expected results of running our benchmark.*
     - `splits/`
       - *We provide this asset from Redivis, which determine which patient corresponds to which split.*
   - `ehrshot/`
@@ -148,6 +153,31 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
   <tr> <td><a href="https://www.sciencedirect.com/science/article/pii/S1532046419302564?via%3Dihub">Solares 2020</a></td> <td>CPRD</td> <td>✓</td> <td>✓</td> <td>4M</td> <td>2</td> <td>--</td> <td>--</td> <td>--</td> <td>--</td> </tr>
 </table>
 
+<a name="other"/>
+# Other
+
+## Downloading the Athena Ontology
+
+The FEMR extract provided in the Redivis download contains all the necessary concepts, so you can ignore this so long as you skip running the bash script `1_create_femr_database.sh`.
+
+If you want to recreate the FEMR extract from scratch, however, then you'll need to download the Athena ontology yourself:
+1. Go to the [Athena website at this link](https://athena.ohdsi.org/vocabulary/list). You may need to create an account.
+2. Click the green "Download" button at the top right of the website
+3. Click the purple "Download Vocabularies" button below the green "Download" button
+4. Name the bundle "athena_download" and select 5.x version
+5. Scroll to the bottom of the list, and click the blue "Download" button
+6. It will take some time for the download to be ready. Please [refresh the webpage here](https://athena.ohdsi.org/vocabulary/download-history) to check whether your download is ready. Once the download is ready, click "Download"
+7. After the download is complete, unzip the file and move all the files into the `EHRSHOT_ASSETS/athena_download/` folder in your repo.
+
+After downloading the Athena OHDSI Ontology, you will have to separately download the CPT subset of the ontology. You can follow the instructions in the `readme.txt` in your Athena download, or follow the steps below:
+
+1. Create a [UMLS account here](https://uts.nlm.nih.gov/uts/signup-login)
+2. Get your [UMLS API key here](https://uts.nlm.nih.gov/uts/edit-profile)
+3. From the `EHRSHOT_ASSETS/athena_download/` folder, run this command: `bash cpt.sh <YOUR UMLS API KEY>`
+
+Your ontology will then be ready to go!
+
+<a name="citation"/>
 # Citation
 
 If you find this project helpful, please cite [our paper](https://arxiv.org/abs/2307.02028):
@@ -165,4 +195,4 @@ If you find this project helpful, please cite [our paper](https://arxiv.org/abs/
 
 # License
 
-The source code of this repo is released under the Apache License 2.0. The model license are listed on their corresponding webpages.
+The source code of this repo is released under the Apache License 2.0. The model license and dataset license are listed on their corresponding webpages.
