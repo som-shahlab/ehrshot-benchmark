@@ -34,7 +34,6 @@ import scipy
 import lightgbm as lgb
 import femr
 import femr.datasets
-# import femr.models.conjugate_gradient # TODO
 from femr.labelers import load_labeled_patients, LabeledPatients
 
 '''
@@ -108,22 +107,14 @@ def run_evaluation(X_train: np.ndarray,
     elif model_head_base == "lr":
         # Logistic Regresion
         solver: str = model_head_parts[1] # "newton-cg" or "lbfgs" etc.
-        # TODO - start
-        if solver == 'femr':
-            solver = 'lbfgs'
-        # TODO - end
-        if solver == 'femr':
-            # Use FEMR implementation of conjugate gradient method
-            model = femr.models.conjugate_gradient.train_logistic_regression(X_train, y_train.astype(float), X_val, y_val.astype(float))
-        else:
-            # Use built-in SKLearn solver
-            scaler = MaxAbsScaler().fit(X_train)
-            X_train = scaler.fit_transform(X_train)
-            X_val = scaler.transform(X_val)
-            X_test = scaler.transform(X_test)
-            model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
-            model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
-            logger.info(f"Best hparams: {model.get_params()}")
+        # Use built-in SKLearn solver
+        scaler = MaxAbsScaler().fit(X_train)
+        X_train = scaler.fit_transform(X_train)
+        X_val = scaler.transform(X_val)
+        X_test = scaler.transform(X_test)
+        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
+        model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
+        logger.info(f"Best hparams: {model.get_params()}")
     elif model_head_base == "protonet":
         # ProtoNet
         model = ProtoNetCLMBRClassifier()
@@ -133,15 +124,9 @@ def run_evaluation(X_train: np.ndarray,
     logger.critical(f"Finish | Fitting {model_head}...")
     
     # Calculate probabilistic preds
-    if model_head == 'lr_femr' and False: # TODO - remove
-        # FEMR only returns model weights, so need to manually calculate probs
-        y_train_proba = 1/(1 + np.exp(-np.dot(X_train, model)))
-        y_val_proba = 1/(1 + np.exp(-np.dot(X_val, model)))
-        y_test_proba = 1/(1 + np.exp(-np.dot(X_test, model)))
-    else:
-        y_train_proba = model.predict_proba(X_train)[::, 1]
-        y_val_proba = model.predict_proba(X_val)[::, 1]
-        y_test_proba = model.predict_proba(X_test)[::, 1]
+    y_train_proba = model.predict_proba(X_train)[::, 1]
+    y_val_proba = model.predict_proba(X_val)[::, 1]
+    y_test_proba = model.predict_proba(X_test)[::, 1]
     
     # AUROC
     train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
