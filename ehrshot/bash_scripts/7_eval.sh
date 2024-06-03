@@ -8,6 +8,7 @@ path_to_database='../../EHRSHOT_ASSETS/femr/extract'
 path_to_labels_dir='../../EHRSHOT_ASSETS/benchmark'
 path_to_features_dir='../../EHRSHOT_ASSETS/features'
 path_to_output_dir='../../EHRSHOT_ASSETS/results'
+path_to_split_csv='../../EHRSHOT_ASSETS/splits/person_id_map.csv'
 
 labeling_functions=(
     "chexpert" # CheXpert first b/c slowest
@@ -32,6 +33,6 @@ num_threads=20
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
-        sbatch 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_output_dir ${labeling_function} ${shot_strat} $num_threads
+        sbatch 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${labeling_function} ${shot_strat} $num_threads
     done
 done

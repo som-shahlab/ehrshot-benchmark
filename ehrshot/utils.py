@@ -11,14 +11,13 @@ from sklearn.metrics import pairwise_distances
 import femr
 from femr.labelers import LabeledPatients
 from femr.datasets import PatientDatabase
-import femr.extension.dataloader
 from loguru import logger
 
 # SPLITS
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: int = 70
 SPLIT_VAL_CUTOFF: int = 85
-PATH_TO_SPLIT_CSV = '/share/pi/nigam/mwornow/ehrshot-benchmark-natasha/EHRSHOT_ASSETS/splits/person_id_map.csv'
+path_to_split_csv = '/share/pi/nigam/mwornow/ehrshot-benchmark-natasha/EHRSHOT_ASSETS/splits/person_id_map.csv'
 
 # Types of base models to test
 MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
@@ -30,58 +29,6 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
         'label' : 'CLMBR (v8)',
         'heads' : ['lr_lbfgs', ],
     },
-    #'pytorch_clmbr' : {
-    #    'label' : 'Pytorch CLMBR (v8)',
-    #    'heads' : ['lr_lbfgs', 'lr_femr', 'rf', ],
-    #},
-    # 'gpt2-base-v8_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8_chunk:last_embed:mean' : {
-    #     'label' : 'GPT2-base:chunk=last,embed=mean (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-medium-v8_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-medium:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-large-v8_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-large:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'bert-base-v8_chunk:last_embed:last' : {
-    #     'label' : 'BERT-base:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'bert-base-v8_chunk:last_embed:mean' : {
-    #     'label' : 'BERT-base:chunk=last,embed=mean (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-1:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-4:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-6:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-8:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-10:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
-    # 'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
-    #     'label' : 'GPT2-base-12:chunk=last,embed=last (v8)',
-    #     'heads' : ['gbm', 'lr_lbfgs', 'rf'],
-    # },
 }
 
 # Map each base model to a set of heads to test
@@ -90,9 +37,6 @@ HEAD_2_INFO: Dict[str, Dict[str, str]] = {
         'label' : 'GBM',
     },
     'lr_lbfgs' : {
-        'label' : 'LR',
-    },
-    'lr_femr' : {
         'label' : 'LR',
     },
     'lr_newton-cg' : {
@@ -117,58 +61,6 @@ SCORE_MODEL_HEAD_2_COLOR = {
         'clmbr' : {
             'lr_lbfgs' : 'tab:blue',
         },
-        'pytorch_clmbr': {
-            'lr_femr' : 'tab:purple',
-        },
-        'gpt2-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:purple',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-base-v8_chunk:last_embed:mean' : {
-            'lr_lbfgs' : 'tab:pink',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-medium-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'indigo',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-large-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'plum',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'bert-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:olive',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'bert-base-v8_chunk:last_embed:mean' : {
-            'lr_lbfgs' : 'tab:cyan',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        # Epochs
-        'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'red',
-        },
-        'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'orange',
-        },
-        'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'yellow',
-        },
-        'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'green',
-        },
-        'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'blue',
-        },
-        'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'purple',
-        },
     },
     'auprc' : {
         'count' : {
@@ -181,55 +73,6 @@ SCORE_MODEL_HEAD_2_COLOR = {
         },
         'pytorch_clmbr' : {
             'lr_femr' : 'tab:purple',
-        },
-        'gpt2-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:purple',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-base-v8_chunk:last_embed:mean' : {
-            'lr_lbfgs' : 'tab:pink',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-medium-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'indigo',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'gpt2-large-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'plum',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'bert-base-v8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'tab:olive',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'bert-base-v8_chunk:last_embed:mean' : {
-            'lr_lbfgs' : 'tab:cyan',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        # Epochs
-        'gpt2-base-v8-epoch-1_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'red',
-        },
-        'gpt2-base-v8-epoch-4_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'orange',
-        },
-        'gpt2-base-v8-epoch-6_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'yellow',
-        },
-        'gpt2-base-v8-epoch-8_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'green',
-        },
-        'gpt2-base-v8-epoch-10_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'blue',
-        },
-        'gpt2-base-v8-epoch-12_chunk:last_embed:last' : {
-            'lr_lbfgs' : 'purple',
         },
     },
 }
@@ -330,12 +173,12 @@ SHOT_STRATS = {
     'debug' : [10],
 }
 
-def get_splits(database: PatientDatabase, 
+def get_splits(path_to_split_csv: str,
                 patient_ids: np.ndarray, 
                 label_times: np.ndarray, 
                 label_values: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """Return train/val/test splits for a given set of patients."""
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(database, patient_ids)
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(path_to_split_csv, patient_ids)
     patient_ids: Dict[str, np.ndarray] = {
         'train' : patient_ids[train_pids_idx],
         'val' : patient_ids[val_pids_idx],
@@ -353,43 +196,20 @@ def get_splits(database: PatientDatabase,
     }
     return patient_ids, label_values, label_times
 
-
-def get_splits(patient_ids: np.ndarray, 
-                label_times: np.ndarray, 
-                label_values: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-    """Return train/val/test splits for a given set of patients."""
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(patient_ids)
-    patient_ids: Dict[str, np.ndarray] = {
-        'train' : patient_ids[train_pids_idx],
-        'val' : patient_ids[val_pids_idx],
-        'test' : patient_ids[test_pids_idx],
-    }
-    label_times: Dict[str, np.ndarray] = {
-        'train' : label_times[train_pids_idx],
-        'val' : label_times[val_pids_idx],
-        'test' : label_times[test_pids_idx],
-    }
-    label_values: Dict[str, np.ndarray] = {
-        'train' : label_values[train_pids_idx],
-        'val' : label_values[val_pids_idx],
-        'test' : label_values[val_pids_idx],
-    }
-    return patient_ids, label_values, label_times
-
-def get_patient_splits_by_patient_id() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_patient_splits_by_patient_id(path_to_split_csv: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the `patient_ids` for each split."""
-    df_split = pd.read_csv(PATH_TO_SPLIT_CSV)
+    df_split = pd.read_csv(path_to_split_csv)
     return (
         df_split[df_split['split'] == 'train']['omop_person_id'].values,
         df_split[df_split['split'] == 'val']['omop_person_id'].values,
         df_split[df_split['split'] == 'test']['omop_person_id'].values,
     )
 
-def get_patient_splits_by_idx(patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
         Returns the idxs for each split within `patient_ids`."""
-    df_split = pd.read_csv(PATH_TO_SPLIT_CSV)
+    df_split = pd.read_csv(path_to_split_csv)
     split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
     for split in ['train', 'val', 'test']:
         for idx, id in enumerate(patient_ids.tolist()):
@@ -400,6 +220,32 @@ def get_patient_splits_by_idx(patient_ids: np.ndarray) -> Tuple[np.ndarray, np.n
         split_2_idxs['val'],
         split_2_idxs['test'],
     )
+
+def compute_feature_label_alignment(label_pids, label_dates, feature_pids, feature_dates):
+    result = np.zeros(label_pids.shape[0], dtype=np.uint32)
+    j: int = 0
+    for i in range(label_pids.shape[0]):
+        while True:
+            if j + 1 >= feature_pids.shape[0]:
+                break
+            elif feature_pids[j] < label_pids[i]:
+                # Need to go ahead
+                pass
+            else:
+                next_pid = feature_pids[j + 1]
+                next_date = feature_dates[j + 1]
+
+                if next_pid != label_pids[i]:
+                    break
+
+                if next_date > label_dates[i]:
+                    break
+            j += 1
+
+        if feature_pids[j] != label_pids[i] or feature_dates[j] != label_dates[i]:
+            raise RuntimeError(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
+        result[i] = j
+    return result
 
 def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str]) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
@@ -450,10 +296,10 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
             feature_patient_ids, feature_times = feature_patient_ids[sort_order], feature_times[sort_order]
 
             # Align label times with feature times
-            join_indices = femr.extension.dataloader.compute_feature_label_alignment(label_patient_ids, 
-                                                                                     label_times.astype(np.int64), 
-                                                                                     feature_patient_ids, 
-                                                                                     feature_times.astype(np.int64))
+            join_indices = compute_feature_label_alignment(label_patient_ids, 
+                                                            label_times.astype(np.int64), 
+                                                            feature_patient_ids, 
+                                                            feature_times.astype(np.int64))
             feature_matrix = feature_matrix[sort_order[join_indices], :]
 
             # Validate that our alignment was successful

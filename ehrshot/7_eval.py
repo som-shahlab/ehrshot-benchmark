@@ -164,6 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory containing saved features")
     parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory where results will be saved")
+    parser.add_argument("--path_to_split_csv", required=True, type=str, help="Path to CSV of splits")
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTION_2_PAPER_NAME.keys(), )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
@@ -179,6 +180,7 @@ if __name__ == "__main__":
     PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
+    PATH_TO_SPLIT_CSV: str = args.path_to_split_csv
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
     PATH_TO_SHOTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
@@ -197,7 +199,7 @@ if __name__ == "__main__":
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
     patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(patient_ids)
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
     
     # Load shot assignments for this task
     with open(PATH_TO_SHOTS) as f:

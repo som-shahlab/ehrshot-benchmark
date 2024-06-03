@@ -33,6 +33,7 @@ for labeling_function in "${labeling_functions[@]}"; do
     python3 ../6_generate_shots.py \
         --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
         --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark \
+        --path_to_split_csv ../../EHRSHOT_ASSETS/splits/person_id_map.csv \
         --labeling_function ${labeling_function} \
         --shot_strat ${shot_strat} \
         --n_replicates 5
