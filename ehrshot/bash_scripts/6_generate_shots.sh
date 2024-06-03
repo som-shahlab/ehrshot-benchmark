@@ -24,18 +24,18 @@ labeling_functions=(
     "lab_hypoglycemia"
     "lab_hyponatremia"
     "lab_anemia"
-    # "chexpert"
+    "chexpert"
 )
 shot_strats=("all")
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
-    python3 ../5_generate_shots.py \
+    python3 ../6_generate_shots.py \
+        --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
+        --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark \
         --labeling_function ${labeling_function} \
         --shot_strat ${shot_strat} \
-        --n_replicates 5 &
-        # --path_to_database ../../EHRSHOT_ASSETS/database_no_visit_merge \
-        # --path_to_labels_dir ../../EHRSHOT_ASSETS/labels_no_visit_merge
+        --n_replicates 5
     done
 done
 

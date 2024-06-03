@@ -1,16 +1,17 @@
 import argparse
 import pickle
 import os
+from typing import Any, Dict
 from loguru import logger
 from femr.featurizers import AgeFeaturizer, CountFeaturizer, FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients
-from utils import check_file_existence_and_handle_force_refresh, get_rel_path
+from utils import check_file_existence_and_handle_force_refresh
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate count-based featurizations for GBM models (for all tasks at once)")
-    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
-    parser.add_argument("--path_to_features_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/features/'), type=str, help="Path to directory containing saved features")
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
@@ -24,7 +25,6 @@ if __name__ == "__main__":
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'count_features.pkl')
-    os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
 
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)

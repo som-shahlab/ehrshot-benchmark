@@ -4,8 +4,13 @@
 # ChexPert = 4 hrs total
 # CheXPert will be the bottleneck, so total run time should be ~4 hrs
 
+path_to_database='../../EHRSHOT_ASSETS/femr/extract'
+path_to_labels_dir='../../EHRSHOT_ASSETS/benchmark'
+path_to_features_dir='../../EHRSHOT_ASSETS/features'
+path_to_output_dir='../../EHRSHOT_ASSETS/results'
+
 labeling_functions=(
-    # "chexpert" # CheXpert first b/c slowest
+    "chexpert" # CheXpert first b/c slowest
     "guo_los"
     "guo_readmission"
     "guo_icu"
@@ -27,10 +32,6 @@ num_threads=20
 
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
-        if [[ $* == *--is_use_slurm* ]]; then
-            sbatch 6__eval_helper.sh ${labeling_function} ${shot_strat} $num_threads
-        else
-            bash 6__eval_helper.sh ${labeling_function} ${shot_strat} $num_threads
-        fi
+        sbatch 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_output_dir ${labeling_function} ${shot_strat} $num_threads
     done
 done

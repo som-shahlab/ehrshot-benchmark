@@ -15,10 +15,9 @@ from sklearn.ensemble import RandomForestClassifier
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
 from utils import (
-    LABELING_FUNCTIONS,
+    LABELING_FUNCTION_2_PAPER_NAME,
     SHOT_STRATS,
-    BASE_MODELS,
-    BASE_MODEL_2_HEADS,
+    MODEL_2_INFO,
     get_labels_and_features, 
     process_chexpert_labels, 
     convert_multiclass_to_binary_labels,
@@ -27,8 +26,7 @@ from utils import (
     XGB_PARAMS, 
     RF_PARAMS,
     ProtoNetCLMBRClassifier, 
-    get_patient_splits_by_idx,
-    get_rel_path,
+    get_patient_splits_by_idx
 )
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from scipy.sparse import issparse
@@ -36,7 +34,7 @@ import scipy
 import lightgbm as lgb
 import femr
 import femr.datasets
-# import femr.models.conjugate_gradient
+# import femr.models.conjugate_gradient # TODO
 from femr.labelers import load_labeled_patients, LabeledPatients
 
 '''
@@ -110,18 +108,22 @@ def run_evaluation(X_train: np.ndarray,
     elif model_head_base == "lr":
         # Logistic Regresion
         solver: str = model_head_parts[1] # "newton-cg" or "lbfgs" etc.
-        # if solver == 'femr':
-        #     # Use FEMR implementation of conjugate gradient method
-        #     model = femr.models.conjugate_gradient.train_logistic_regression(X_train, y_train.astype(float), X_val, y_val.astype(float))
-        # else:
-        # Use built-in SKLearn solver
-        scaler = MaxAbsScaler().fit(X_train)
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-        X_test = scaler.transform(X_test)
-        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
-        model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
-        logger.info(f"Best hparams: {model.get_params()}")
+        # TODO - start
+        if solver == 'femr':
+            solver = 'lbfgs'
+        # TODO - end
+        if solver == 'femr':
+            # Use FEMR implementation of conjugate gradient method
+            model = femr.models.conjugate_gradient.train_logistic_regression(X_train, y_train.astype(float), X_val, y_val.astype(float))
+        else:
+            # Use built-in SKLearn solver
+            scaler = MaxAbsScaler().fit(X_train)
+            X_train = scaler.fit_transform(X_train)
+            X_val = scaler.transform(X_val)
+            X_test = scaler.transform(X_test)
+            model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
+            model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
+            logger.info(f"Best hparams: {model.get_params()}")
     elif model_head_base == "protonet":
         # ProtoNet
         model = ProtoNetCLMBRClassifier()
@@ -131,7 +133,7 @@ def run_evaluation(X_train: np.ndarray,
     logger.critical(f"Finish | Fitting {model_head}...")
     
     # Calculate probabilistic preds
-    if model_head == 'lr_femr':
+    if model_head == 'lr_femr' and False: # TODO - remove
         # FEMR only returns model weights, so need to manually calculate probs
         y_train_proba = 1/(1 + np.exp(-np.dot(X_train, model)))
         y_val_proba = 1/(1 + np.exp(-np.dot(X_val, model)))
@@ -173,13 +175,12 @@ def run_evaluation(X_train: np.ndarray,
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
-    parser.add_argument("--path_to_database", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/database/'), type=str, help="Path to FEMR patient database")
-    parser.add_argument("--path_to_labels_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/labels/'), type=str, help="Path to directory containing saved labels")
-    parser.add_argument("--path_to_features_dir", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/features/'), type=str, help="Path to directory containing saved features")
-    parser.add_argument("--path_to_output_dir",  default=get_rel_path(__file__, '../EHRSHOT_ASSETS/outputs/'), type=str, help="Path to directory where results will be saved")
-    parser.add_argument("--path_to_split_csv", default=get_rel_path(__file__, '../EHRSHOT_ASSETS/splits.csv'), type=str, help="Path to CSV containing splits by patient ID")
+    parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
+    parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory containing saved features")
+    parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory where results will be saved")
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
-    parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTIONS, )
+    parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTION_2_PAPER_NAME.keys(), )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
@@ -192,7 +193,6 @@ if __name__ == "__main__":
     IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
-    PATH_TO_SPLIT_CSV: str = args.path_to_split_csv
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
     PATH_TO_SHOTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, f"{SHOT_STRAT}_shots_data.json")
@@ -210,11 +210,10 @@ if __name__ == "__main__":
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
 
     # Load labels for this task
-    logger.info(f"Loading labels for task: {LABELING_FUNCTION}")
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
     patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
-
+    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(patient_ids)
+    
     # Load shot assignments for this task
     with open(PATH_TO_SHOTS) as f:
         few_shots_dict: Dict[str, Dict] = json.load(f)
@@ -236,8 +235,8 @@ if __name__ == "__main__":
     results: List[Dict[str, Any]] = []
     
     # For each base model we are evaluating...
-    for model in BASE_MODELS:
-        model_heads: List[str] = BASE_MODEL_2_HEADS[model]
+    for model in MODEL_2_INFO.keys():
+        model_heads: List[str] = MODEL_2_INFO[model]['heads']
         # For each head we can add to the top of this model...
         for head in model_heads:
             # Unpack each individual featurization we want to test
