@@ -12,7 +12,7 @@ cd ehrshot/bash_scripts
 # bash 2_generate_labels.h
 
 # Consolidate all labels together to speed up feature generation process
-# bash 3_consolidate_labels.sh
+bash 3_consolidate_labels.sh
 
 # Generate count-based feature representations
 bash 4_generate_count_features.sh
