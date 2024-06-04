@@ -24,7 +24,7 @@ labeling_functions=(
     "lab_hypoglycemia"
     "lab_hyponatremia"
     "lab_anemia"
-    # "chexpert"
+    # "chexpert" -- This depends on having access to NOTES, which we can't redistribute. Use the labels in the Redivis data release instead.
 )
 
 mkdir -p ../../EHRSHOT_ASSETS/benchmark
@@ -34,7 +34,6 @@ do
     python3 ../2_generate_labels.py \
         --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
         --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark \
-        --path_to_chexpert_csv ../../EHRSHOT_ASSETS/benchmark/chexpert/chexpert_labeled_radiology_notes.csv \
         --labeling_function ${labeling_function} \
         --num_threads 20
 done
