@@ -157,7 +157,35 @@ if __name__ == "__main__":
             continue
         dfs.append(pd.read_csv(path_to_csv))
     df_results: pd.DataFrame = pd.concat(dfs, ignore_index=True)
+    
+    ####################################
+    ####################################
+    #
+    # Plots
+    #
+    ####################################
+    ####################################
 
+    print("Plotting Models: ", MODEL_HEADS)
+
+    # Plotting individual AUROC/AUPRC plot for each labeling function
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_labeling_functions()'):
+        if score == 'brier': continue
+        plot_all_labeling_functions(df_results, score, PATH_TO_OUTPUT_DIR, 
+                                    model_heads=MODEL_HEADS, is_x_scale_log=True, is_std_bars=True)
+
+    # Plotting aggregated auroc and auprc plots by task groups
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_groups()'):
+        if score == 'brier': continue
+        plot_all_task_groups(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR, 
+                             model_heads=MODEL_HEADS, is_x_scale_log=True)
+
+    # plotting aggregated auroc and auprc box plots by task groups
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_group_box_plots()'):
+        if score == 'brier': continue
+        plot_all_task_group_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
+                                      model_heads=MODEL_HEADS)
+        
     
     ####################################
     ####################################
@@ -278,31 +306,3 @@ if __name__ == "__main__":
             df_.to_html(os.path.join(path_to_output_dir_, f'{task_group}_pretty.html'), classes=['leaderboard_table'], index=False)
         # Merge together all HTML tables for easy copying
         merge_html_tables(path_to_output_dir_)
-    
-    ####################################
-    ####################################
-    #
-    # Plots
-    #
-    ####################################
-    ####################################
-
-    print("Plotting Models: ", MODEL_HEADS)
-
-    # Plotting individual AUROC/AUPRC plot for each labeling function
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_labeling_functions()'):
-        if score == 'brier': continue
-        plot_all_labeling_functions(df_results, score, PATH_TO_OUTPUT_DIR, 
-                                    model_heads=MODEL_HEADS, is_x_scale_log=True, is_std_bars=True)
-
-    # Plotting aggregated auroc and auprc plots by task groups
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_groups()'):
-        if score == 'brier': continue
-        plot_all_task_groups(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR, 
-                             model_heads=MODEL_HEADS, is_x_scale_log=True)
-
-    # plotting aggregated auroc and auprc box plots by task groups
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_group_box_plots()'):
-        if score == 'brier': continue
-        plot_all_task_group_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
-                                      model_heads=MODEL_HEADS)
