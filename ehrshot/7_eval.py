@@ -36,17 +36,6 @@ import femr
 import femr.datasets
 from femr.labelers import load_labeled_patients, LabeledPatients
 
-'''
-python3 7_eval.py \
-    --path_to_database '../EHRSHOT_ASSETS/femr/extract' \
-    --path_to_labels_dir '../EHRSHOT_ASSETS/custom_benchmark' \
-    --path_to_features_dir '../EHRSHOT_ASSETS/custom_hf_features' \
-    --path_to_output_dir '../EHRSHOT_ASSETS/results_hf' \
-    --labeling_function 'guo_icu' \
-    --shot_strat 'all' \
-    --num_threads 20
-'''
-
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
         Thus, we ned to use `PredefinedSplit` to force the proper splits."""
