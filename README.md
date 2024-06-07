@@ -42,7 +42,7 @@ pip install femr-cuda==0.0.20 dm-haiku==0.0.9 optax==0.1.4
 pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-**3)**: **Download dataset + model** from [Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
+**3)**: **Download dataset + model** from [Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
 
 **4)**: **Run** the benchmark end-to-end with:
 
@@ -94,7 +94,7 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** [The EHRSHOT dataset is on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
+**Access:** [The EHRSHOT dataset is on Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
 
 EHRSHOT contains:
 * **6,739 patients**
