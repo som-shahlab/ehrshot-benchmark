@@ -94,9 +94,9 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** [The EHRSHOT-2023 dataset is on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
+**Access:** [The EHRSHOT dataset is on Redivis here](https://redivis.com/ShahLab/editor/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
 
-EHRSHOT-2023 contains:
+EHRSHOT contains:
 * **6,739 patients**
 * **41.6 million clinical events**
 * **921,499 visits**
