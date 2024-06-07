@@ -8,25 +8,22 @@ import numpy as np
 import datetime
 import torch.nn as nn
 from sklearn.metrics import pairwise_distances
-import femr
 from femr.labelers import LabeledPatients
-from femr.datasets import PatientDatabase
 from loguru import logger
 
 # SPLITS
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: int = 70
 SPLIT_VAL_CUTOFF: int = 85
-path_to_split_csv = '/share/pi/nigam/mwornow/ehrshot-benchmark-natasha/EHRSHOT_ASSETS/splits/person_id_map.csv'
 
 # Types of base models to test
 MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
     'count' : {
-        'label' : 'Count-based (v8)',
+        'label' : 'Count-based',
         'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
     },
     'clmbr' : {
-        'label' : 'CLMBR (v8)',
+        'label' : 'CLMBR',
         'heads' : ['lr_lbfgs', ],
     },
 }

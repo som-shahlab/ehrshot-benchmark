@@ -8,7 +8,9 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
+import collections
 import pandas as pd
+import sklearn
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -59,7 +61,8 @@ def run_evaluation(X_train: np.ndarray,
                     y_val: np.ndarray, 
                     y_test: np.ndarray, 
                     model_head: str, 
-                    n_jobs: int = 1) -> Tuple[Any, Dict[str, float]]:
+                    n_jobs: int = 1,
+                    test_patient_ids: np.ndarray = None) -> Tuple[Any, Dict[str, float]]:
     logger.critical(f"Start | Training {model_head}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
@@ -67,6 +70,7 @@ def run_evaluation(X_train: np.ndarray,
     logger.info(f"Train prevalence:  {np.mean(y_train)}")
     logger.info(f"Val prevalence:  {np.mean(y_val)}")
     logger.info(f"Test prevalence:  {np.mean(y_test)}")
+    logger.info(f"Test pids:  {len(test_patient_ids)} | {len(y_test)} | {len(set(test_patient_ids))}")
 
     # Shuffle training set
     np.random.seed(X_train.shape[0])
@@ -117,35 +121,51 @@ def run_evaluation(X_train: np.ndarray,
     y_val_proba = model.predict_proba(X_val)[::, 1]
     y_test_proba = model.predict_proba(X_test)[::, 1]
     
-    # AUROC
-    train_auroc = metrics.roc_auc_score(y_train, y_train_proba)
-    val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
-    test_auroc = metrics.roc_auc_score(y_test, y_test_proba)
-    logger.info(f"Train AUROC: {train_auroc}")
-    logger.info(f"Val AUROC:   {val_auroc}")
-    logger.info(f"Test AUROC:  {test_auroc}")
-    
-    # Brier Score
-    train_brier = metrics.brier_score_loss(y_train, y_train_proba)
-    val_brier = metrics.brier_score_loss(y_val, y_val_proba)
-    test_brier = metrics.brier_score_loss(y_test, y_test_proba)
-    logger.info(f"Train brier score: {train_brier}")
-    logger.info(f"Val brier score:   {val_brier}")
-    logger.info(f"Test brier score:  {test_brier}")
-    
-    # Precision
-    train_auprc = metrics.average_precision_score(y_train, y_train_proba)
-    val_auprc = metrics.average_precision_score(y_val, y_val_proba)
-    test_auprc = metrics.average_precision_score(y_test, y_test_proba)
-    logger.info(f"Train AUPRC: {train_auprc}")
-    logger.info(f"Val AUPRC:   {val_auprc}")
-    logger.info(f"Test AUPRC:  {test_auprc}")
-
-    return model, {
-        'auroc' : test_auroc,
-        'auprc' : test_auprc,
-        'brier' : test_brier,
+    metric_dict = {
+        'auroc': metrics.roc_auc_score,
+        'brier': metrics.brier_score_loss,
+        'auprc': metrics.average_precision_score,
     }
+    
+    # Calculate metrics
+    scores = {}
+    for metric, func in metric_dict.items():
+        scores[metric] = {}
+        train_score = func(y_train, y_train_proba)
+        val_score = func(y_val, y_val_proba)
+        test_score = func(y_test, y_test_proba)
+
+        logger.info(f"Train {metric} score: {train_score}")
+        logger.info(f"Val {metric} score:   {val_score}")
+        logger.info(f"Test {metric} score:  {test_score}")
+
+        test_set = sorted(list(set(test_patient_ids)))
+
+        score_list = []
+        for i in range(1000): # 1k bootstrap replicates
+            sample = sklearn.utils.resample(test_set, random_state=i)
+            counts = collections.Counter(sample)
+            weights = np.zeros_like(test_patient_ids)
+
+            for i, p in enumerate(test_patient_ids):
+                weights[i] = counts[p]
+
+            score_val = func(y_test, y_test_proba, sample_weight=weights)
+            score_list.append(score_val)
+
+        # 95% CI
+        lower, upper = np.percentile(score_list, [2.5, 97.5])
+
+        # Std
+        std = np.std(score_list, ddof=1)
+
+        scores[metric]['score'] = test_score
+        scores[metric]['std'] = std
+        scores[metric]['lower'] = lower
+        scores[metric]['mean'] = np.mean(score_list)
+        scores[metric]['upper'] = upper
+
+    return model, scores
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
@@ -222,6 +242,8 @@ if __name__ == "__main__":
             X_test: np.ndarray = feature_matrixes[model][test_pids_idx]
             y_test: np.ndarray = label_values[test_pids_idx]
             
+            test_patient_ids = patient_ids[test_pids_idx]
+            
             # For each subtask in this task... 
             # NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
@@ -269,8 +291,8 @@ if __name__ == "__main__":
                             y_test_k = y_test[:, sub_task_idx]
 
                         # Fit model with hyperparameter tuning
-                        best_model, scores = run_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS)
-                        
+                        best_model, scores = run_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
+
                         # Save results
                         for score_name, score_value in scores.items():
                             results.append({
@@ -281,7 +303,11 @@ if __name__ == "__main__":
                                 'replicate' : replicate,
                                 'k' : k,
                                 'score' : score_name,
-                                'value' : score_value,
+                                'value' : score_value['score'],
+                                'std' : score_value['std'],
+                                'lower' : score_value['lower'],
+                                'mean' : score_value['mean'],
+                                'upper' : score_value['upper'],
                             })
 
     logger.info(f"Saving results to: {PATH_TO_OUTPUT_FILE}")
