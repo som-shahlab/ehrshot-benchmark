@@ -116,18 +116,31 @@ def plot_all_task_group_box_plots(df_results: pd.DataFrame,
     return fig
 
 
-def merge_html_tables(path_to_output_dir: str):
-    # Merge together all HTML tables for easy copying
-    html_contents = []
+def merge_html_tables(path_to_output_dir: str, score: str):
+    # Merge together all .html tables for easy copying
+    contents = []
     for file in os.listdir(path_to_output_dir):
         if file.endswith('_pretty.html'):
             name = file.replace('_pretty.html', '')
             name = LABELING_FUNCTION_2_PAPER_NAME[name] if name in LABELING_FUNCTION_2_PAPER_NAME else (TASK_GROUP_2_PAPER_NAME[name] if name in TASK_GROUP_2_PAPER_NAME else name)
-            table_html = open(os.path.join(path_to_output_dir, file), 'r').read()
-            table_html = table_html.replace('\n', '')
-            html_contents.append(f'<h5>{name}</h5>\n' + table_html)
-    with open(os.path.join(path_to_output_dir, 'merged.html'), 'w') as fd:
-        for c in html_contents:
+            table = open(os.path.join(path_to_output_dir, file), 'r').read()
+            table = table.replace('\n', '')
+            contents.append(f'<h5>{name}</h5>\n' + table)
+    with open(os.path.join(path_to_output_dir, '../', score + '_merged.html'), 'w') as fd:
+        for c in contents:
+            fd.write(c + '\n\n')
+
+def merge_md_tables(path_to_output_dir: str, score: str):
+    # Merge together all .md tables for easy copying
+    contents = []
+    for file in os.listdir(path_to_output_dir):
+        if file.endswith('_pretty_all.md'):
+            name = file.replace('_pretty_all.md', '')
+            name = LABELING_FUNCTION_2_PAPER_NAME[name] if name in LABELING_FUNCTION_2_PAPER_NAME else (TASK_GROUP_2_PAPER_NAME[name] if name in TASK_GROUP_2_PAPER_NAME else name)
+            table = open(os.path.join(path_to_output_dir, file), 'r').read()
+            contents.append(f'# {name}\n' + table + '\n\n')
+    with open(os.path.join(path_to_output_dir, '../', score + '_merged_all.md'), 'w') as fd:
+        for c in contents:
             fd.write(c + '\n\n')
 
 def parse_args():
@@ -157,34 +170,6 @@ if __name__ == "__main__":
             continue
         dfs.append(pd.read_csv(path_to_csv))
     df_results: pd.DataFrame = pd.concat(dfs, ignore_index=True)
-    
-    ####################################
-    ####################################
-    #
-    # Plots
-    #
-    ####################################
-    ####################################
-
-    print("Plotting Models: ", MODEL_HEADS)
-
-    # Plotting individual AUROC/AUPRC plot for each labeling function
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_labeling_functions()'):
-        if score == 'brier': continue
-        plot_all_labeling_functions(df_results, score, PATH_TO_OUTPUT_DIR, 
-                                    model_heads=MODEL_HEADS, is_x_scale_log=True, is_std_bars=True)
-
-    # Plotting aggregated auroc and auprc plots by task groups
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_groups()'):
-        if score == 'brier': continue
-        plot_all_task_groups(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR, 
-                             model_heads=MODEL_HEADS, is_x_scale_log=True)
-
-    # plotting aggregated auroc and auprc box plots by task groups
-    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_group_box_plots()'):
-        if score == 'brier': continue
-        plot_all_task_group_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
-                                      model_heads=MODEL_HEADS)
         
     
     ####################################
@@ -250,6 +235,9 @@ if __name__ == "__main__":
             df_.columns = [ str(x) for x in df_.columns ]
             df_ = df_.rename(columns={'-1' : 'All'})
             df_.to_csv(os.path.join(path_to_output_dir_, f'{sub_task}_pretty.csv'), index=False)
+            # Create Markdown table with just `All`
+            df_all_ = df_[['model', 'head', 'All']]
+            df_all_.to_markdown(os.path.join(path_to_output_dir_, f'{sub_task}_pretty_all.md'), index=False)
             # Create HTML Table with multicolumn header
             df_['model'] = df_['model'] + ' - ' + df_['head']
             df_ = df_.drop(columns=['head'])
@@ -259,7 +247,8 @@ if __name__ == "__main__":
             ] + [ ('K', x) for x in df_.columns[2:] ])
             df_.to_html(os.path.join(path_to_output_dir_, f'{sub_task}_pretty.html'), classes=['leaderboard_table'], index=False)
         # Merge together all HTML tables for easy copying
-        merge_html_tables(path_to_output_dir_)
+        merge_html_tables(path_to_output_dir_, score)
+        merge_md_tables(path_to_output_dir_, score)
 
     # Table for each (task group, score)
     #   Rows = model + head
@@ -296,6 +285,9 @@ if __name__ == "__main__":
             df_.columns = [ str(x) for x in df_.columns ]
             df_ = df_.rename(columns={'-1' : 'All'})
             df_.to_csv(os.path.join(path_to_output_dir_, f'{task_group}_pretty.csv'), index=False)
+            # Create Markdown table with just `All`
+            df_all_ = df_[['model', 'head', 'All']]
+            df_all_.to_markdown(os.path.join(path_to_output_dir_, f'{task_group}_pretty_all.md'), index=False)
             # Create HTML Table with multicolumn header
             df_['model'] = df_['model'] + ' - ' + df_['head']
             df_ = df_.drop(columns=['head'])
@@ -305,4 +297,33 @@ if __name__ == "__main__":
             ] + [ ('K', x) for x in df_.columns[2:] ])
             df_.to_html(os.path.join(path_to_output_dir_, f'{task_group}_pretty.html'), classes=['leaderboard_table'], index=False)
         # Merge together all HTML tables for easy copying
-        merge_html_tables(path_to_output_dir_)
+        merge_html_tables(path_to_output_dir_, score)
+        merge_md_tables(path_to_output_dir_, score)
+        
+    ####################################
+    ####################################
+    #
+    # Plots
+    #
+    ####################################
+    ####################################
+
+    print("Plotting Models: ", MODEL_HEADS)
+
+    # Plotting individual AUROC/AUPRC plot for each labeling function
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_labeling_functions()'):
+        if score == 'brier': continue
+        plot_all_labeling_functions(df_results, score, PATH_TO_OUTPUT_DIR, 
+                                    model_heads=MODEL_HEADS, is_x_scale_log=True, is_std_bars=True)
+
+    # Plotting aggregated auroc and auprc plots by task groups
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_groups()'):
+        if score == 'brier': continue
+        plot_all_task_groups(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR, 
+                             model_heads=MODEL_HEADS, is_x_scale_log=True)
+
+    # plotting aggregated auroc and auprc box plots by task groups
+    for score in tqdm(df_results['score'].unique(), desc='plot_all_task_group_box_plots()'):
+        if score == 'brier': continue
+        plot_all_task_group_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
+                                      model_heads=MODEL_HEADS)
