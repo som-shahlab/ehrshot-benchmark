@@ -24,6 +24,8 @@ SPLIT_VAL_CUTOFF: int = 85
 MODEL_2_NAME: Dict[str, str] = {
     'count' : 'Count-based',
     'clmbr' : 'CLMBR',
+    'motor': 'MOTOR',
+    # 'motor_fixed': 'MOTOR',
     # 'gpt2-base' : 'GPT2-base (v9)',
     # 'gpt2-medium' : 'GP2-medium (v9)',
     # 'gpt2-large' : 'GP2-large (v9)',
@@ -36,7 +38,8 @@ BASE_MODELS: List[str] = list(MODEL_2_NAME.keys())
 # Map each base model to a set of heads to test
 BASE_MODEL_2_HEADS: Dict[str, List[str]] = {
     'count' : ['gbm', 'lr_lbfgs', 'rf', ], 
-    'clmbr' : ['lr_lbfgs', 'rf', ],
+    'clmbr' : ['lr_lbfgs', ],
+    'motor' : ['lr_lbfgs', ],
     'gpt2-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
     'bert-base-v8_chunk:last_embed:last' : ['gbm', 'lr_lbfgs', 'rf', ], 
 }
@@ -244,7 +247,7 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
     featurizations: Dict[str, np.ndarray] = {}
-    for model in BASE_MODELS:
+    for model in ('motor', ):
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         logger.info(f"Loading features from: {path_to_feats_file}")
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
@@ -266,9 +269,9 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
                 )
             elif model == 'motor':
                 feature_matrix, feature_patient_ids, feature_times = (
-                    feats['data_matrix'],
+                    feats['representations'],
                     feats['patient_ids'],
-                    feats['labeling_time'],
+                    feats['prediction_times'],
                 )
             else:
                 assert False, f"Unsupported model: {model}"
@@ -349,7 +352,8 @@ def filter_df(df: pd.DataFrame,
             labeling_function: Optional[str] = None, 
             task_group: Optional[str] = None,
             sub_tasks: Optional[List[str]] = None,
-            model_heads: Optional[List[Tuple[str, str]]] = None) -> pd.DataFrame:
+            model_heads: Optional[List[Tuple[str, str]]] = None,
+            k: Optional[int] = None) -> pd.DataFrame:
     """Filters results df based on various criteria."""
     df = df.copy()
     if score:
@@ -366,6 +370,8 @@ def filter_df(df: pd.DataFrame,
         for model_head in model_heads:
             mask = mask | ((df['model'] == model_head[0]) & (df['head'] == model_head[1]))
         df = df[mask]
+    if k is not None:
+        df = df[df['k'] == k]
     return df
 
 class ProtoNetCLMBRClassifier(nn.Module):
