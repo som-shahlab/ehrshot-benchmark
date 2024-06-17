@@ -84,7 +84,7 @@ def run_evaluation(X_train: np.ndarray,
     model_head_base: str = model_head_parts[0]
     if model_head_base == "gbm":
         # XGBoost
-        model = lgb.LGBMClassifier()
+        model = lgb.LGBMClassifier(random_state=0)
         # NOTE: Need to set `min_child_samples = 1`, which specifies the minimum number of samples required in a leaf (terminal node).
         # This is necessary for few-shot learning, since we may have very few samples in a leaf node.
         # Otherwise the GBM model will refuse to learn anything
@@ -94,7 +94,7 @@ def run_evaluation(X_train: np.ndarray,
     elif model_head_base == "rf":
         RF_PARAMS['min_samples_leaf'] = [ 1 ]
         RF_PARAMS['min_samples_split'] = [ 2 ]
-        model = RandomForestClassifier()
+        model = RandomForestClassifier(random_state=0)
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, RF_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head_base == "lr":
@@ -105,7 +105,7 @@ def run_evaluation(X_train: np.ndarray,
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
-        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000)
+        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000, random_state=0)
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head_base == "protonet":
