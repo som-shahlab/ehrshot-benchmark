@@ -24,6 +24,7 @@ if __name__ == "__main__":
     score_map = collections.defaultdict(dict)
     
     LABELING_FUNCTIONS: List[str] = [ x for x in os.listdir(path_to_results_dir) if os.path.isdir(os.path.join(path_to_results_dir, x)) ]
+    SUBTASKS = []
 
     print("Labeling functions:", LABELING_FUNCTIONS)
     for label in LABELING_FUNCTIONS:
@@ -33,20 +34,26 @@ if __name__ == "__main__":
         for (model, head) in list(set(list(zip(df['model'], df['head'])))):
             df_ = df[(df['model'] == model) & (df['head'] == head)]
             for idx, row in df_.iterrows():
-                score_map[(row['score'], label, model, head)] = {
+                if label.startswith('chex'):
+                    subtask = 'chex_' + str(row['sub_task'])
+                else:
+                    subtask = label
+                SUBTASKS.append(subtask)
+                score_map[(row['score'], subtask, model, head)] = {
                     'score' : float(row['value']),
                     'lower' : float(row['lower']),
                     'upper' : float(row['upper']),
                     'std' : float(row['std']),
                 }
+    SUBTASKS = list(set(SUBTASKS))
 
     print("\n\nIndividual Tasks\n\n")
     for score in ['auroc', 'auprc']:
         print("==== SCORE:", score, "====")
-        for label in LABELING_FUNCTIONS:
-            print(label)
+        for subtask in SUBTASKS:
+            print(subtask)
             for model, head in model_heads:
-                v = score_map[(score, label, model, head)]
+                v = score_map[(score, subtask, model, head)]
                 est = v['score']
                 lower = v['lower']
                 upper = v['upper']
@@ -58,15 +65,16 @@ if __name__ == "__main__":
     for score in ['auroc', 'auprc']:
         print("==== SCORE:", score, "====")
         for p in prefixes:
+            if p != 'chex' or score != 'auprc': continue
             print(p)
             for model, head in model_heads:
                 total = 0
                 variance = 0
                 count = 0
-                for l in LABELING_FUNCTIONS:
-                    if l.startswith(p):
-                        total += score_map[(score, l, model, head)]['score']
-                        variance += score_map[(score, l, model, head)]['std']**2
+                for subtask in SUBTASKS:
+                    if subtask.startswith(p):
+                        total += score_map[(score, subtask, model, head)]['score']
+                        variance += score_map[(score, subtask, model, head)]['std']**2
                         count += 1
                 est = total / count
                 std = math.sqrt(variance / count**2)
