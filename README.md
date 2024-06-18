@@ -154,6 +154,7 @@ In contrast, **EHRSHOT** contains (1) the full breadth of longitudinal data that
 </table>
 
 <a name="other"/>
+
 # Other
 
 ## Downloading the Athena Ontology
@@ -178,6 +179,7 @@ After downloading the Athena OHDSI Ontology, you will have to separately downloa
 Your ontology will then be ready to go!
 
 <a name="citation"/>
+
 # Citation
 
 If you find this project helpful, please cite [our paper](https://arxiv.org/abs/2307.02028):
