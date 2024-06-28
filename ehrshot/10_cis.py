@@ -65,7 +65,6 @@ if __name__ == "__main__":
     for score in ['auroc', 'auprc']:
         print("==== SCORE:", score, "====")
         for p in prefixes:
-            if p != 'chex' or score != 'auprc': continue
             print(p)
             for model, head in model_heads:
                 total = 0
