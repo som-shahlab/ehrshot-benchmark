@@ -1,3 +1,11 @@
+"""Run this script to view the vocabulary of the CLMBR model in human-readable format.
+
+This works by converting `EHRSHOT_ASSETS/data/dictionary` (which is a .msgpack file) into three .json files:
+    * dictionary.json => Raw representation of the exact contents in dictionary (which is a .msgpack file)
+    * token_2_code.json => Dictionary where [key] = token ID (e.g. '0'), [value] = code (e.g. 'SNOMED/3950001')
+    * token_2_description.json => Dictionary where [key] = token ID (e.g. '0'), [value] = code (e.g. 'Birth')
+"""
+
 import msgpack
 import json
 import femr.datasets
