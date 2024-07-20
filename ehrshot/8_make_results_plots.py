@@ -220,6 +220,7 @@ if __name__ == "__main__":
     for score in df_means['score'].unique():
         path_to_output_dir_: str = os.path.join(PATH_TO_OUTPUT_DIR, 'individual_tasks', score)
         for sub_task in df_means['sub_task'].unique():
+            breakpoint()
             os.makedirs(path_to_output_dir_, exist_ok=True)
             df_ = filter_df(df_means, sub_tasks=[sub_task], score=score, model_heads=MODEL_HEADS).sort_values(by=['model', 'head', 'k'])
             df_ = df_.rename(columns = {'value' : 'mean' })

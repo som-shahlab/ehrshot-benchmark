@@ -178,11 +178,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTION_2_PAPER_NAME.keys(), )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
+    parser.add_argument("--heads", default=None, help="Comma separated list. If specified, then only consider heads in this list, e.g. `finetune_layers=1,finetune_layers=2`")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     LABELING_FUNCTION: str = args.labeling_function
+    VALID_HEADS: Optional[List[str]] = None if args.heads is None else args.heads.split(',')
     SHOT_STRAT: str = args.shot_strat
     NUM_THREADS: int = args.num_threads
     IS_FORCE_REFRESH: bool = args.is_force_refresh
@@ -207,6 +209,7 @@ if __name__ == "__main__":
 
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
+    logger.info(f"Loading task {LABELING_FUNCTION} with {len(labeled_patients)} labeled patients.")
     patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
     train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
     
@@ -229,17 +232,23 @@ if __name__ == "__main__":
     # Results will be stored as a CSV with columns:
     #   sub_task, model, head, replicate, score_name, score_value, k
     results: List[Dict[str, Any]] = []
+    if df_existing is not None:
+        results += df_existing.to_dict(orient='records')
     
     # For each base model we are evaluating...
     for model in MODEL_2_INFO.keys():
         model_heads: List[str] = MODEL_2_INFO[model]['heads']
         # For each head we can add to the top of this model...
         for head in model_heads:
+            if VALID_HEADS is not None and head not in VALID_HEADS:
+                # Skip heads (if specified)
+                continue
+
             # Unpack each individual featurization we want to test
             assert model in feature_matrixes, f"Feature matrix not found for `{model}`. Are you sure you have generated features for this model? If not, you'll need to rerun `generate_features.py` or `generate_clmbr_representations.py`."
-            X_train: np.ndarray = feature_matrixes[model][train_pids_idx]
-            X_val: np.ndarray = feature_matrixes[model][val_pids_idx]
-            X_test: np.ndarray = feature_matrixes[model][test_pids_idx]
+            X_train: np.ndarray = feature_matrixes[model]['frozen'][train_pids_idx]
+            X_val: np.ndarray = feature_matrixes[model]['frozen'][val_pids_idx]
+            X_test: np.ndarray = feature_matrixes[model]['frozen'][test_pids_idx]
             y_test: np.ndarray = label_values[test_pids_idx]
             
             test_patient_ids = patient_ids[test_pids_idx]
@@ -262,7 +271,6 @@ if __name__ == "__main__":
                             logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Overwriting these rows because `is_force_refresh` is TRUE.")
                         else:
                             logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Skipping this combination because `is_force_refresh` is FALSE.")
-                            results += existing_rows.to_dict(orient='records')
                             continue
                     else:
                         # Append
@@ -277,7 +285,7 @@ if __name__ == "__main__":
                     # For each replicate of this k-shot sample...
                     for replicate in replicates:
                         logger.success(f"Model: {model} | Head: {head} | Task: {sub_task} | k: {k} | replicate: {replicate}")
-                        
+
                         # Get X/Y train/val for this k-shot sample     
                         shot_dict: Dict[str, List[int]] = few_shots_dict[sub_task][str(k)][str(replicate)]               
                         X_train_k: np.ndarray = X_train[shot_dict["train_idxs"]]

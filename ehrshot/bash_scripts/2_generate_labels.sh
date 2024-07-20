@@ -4,7 +4,7 @@
 #SBATCH --error=logs/2_generate_labels_%A.err
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=normal
-#SBATCH --mem=200G
+#SBATCH --mem=300G
 #SBATCH --cpus-per-task=22
 
 # Time to run: 6 mins
@@ -33,7 +33,7 @@ for labeling_function in "${labeling_functions[@]}"
 do
     python3 ../2_generate_labels.py \
         --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
-        --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark \
+        --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark-full \
         --labeling_function ${labeling_function} \
         --num_threads 20
 done
