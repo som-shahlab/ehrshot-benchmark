@@ -15,187 +15,157 @@ from femr.extension import datasets as extension_datasets
 from femr.labelers import Label
 from femr.featurizers.core import ColumnValue, Featurizer
 from femr.featurizers.utils import OnlineStatistics
+from femr.featurizers.featurizers import get_patient_birthdate
 
 # Additional imports
 from femr.featurizers.featurizers import _reshuffle_count_time_bins, exclusion_helper, ReservoirSampler
 # TODO: Remove count featurizer
 from femr.featurizers.featurizers import CountFeaturizer
 
-class TextFeaturizer(Featurizer):
+import torch
+from llm2vec import LLM2Vec
+
+class LLMFeaturizer(Featurizer):
     """
-    Produces one column per each diagnosis code, procedure code, and prescription code.
-    The value in each column is the count of how many times that code appears in the patient record
-    before the corresponding label.
-    TODO: Add what is actually generated based on the data that we will find
+    Produces LLM-encoded representation of patient.
     """
 
-    def __init__(
-        self,
-        is_ontology_expansion: bool = False,
-        excluded_codes: Iterable[str] = [],
-        excluded_event_filter: Optional[Callable[[Event], bool]] = None,
-        time_bins: Optional[List[datetime.timedelta]] = None,
-        numeric_value_decile: bool = False,
-        string_value_combination: bool = False,
-        characters_for_string_values: int = 100,
-    ):
-        """
-        Args:
-            is_ontology_expansion (bool, optional): If TRUE, then do ontology expansion when counting codes.
+    def __init__(self):
+        self.column_names = ['age', 'race', 'gender']
+        self.embedding_dim = 4096
+        # Filled during preprocessing
+        self.pid_serializations: Dict[int, str] = {}
 
-                Example:
-                    If `is_ontology_expansion=True` and your ontology is:
-                        Code A -> Code B -> Code C
-                    Where "->" denotes "is a parent of" relationship (i.e. A is a parent of B, B is a parent of C).
-                    Then if we see 2 occurrences of Code "C", we count 2 occurrences of Code "B" and Code "A".
+        # Filled during aggregation
+        self.pids: List[int] = []
+        self.serializations: List[str] = []
+        self.encodings: np.ndarray = np.array([])
 
-            excluded_codes (List[str], optional): A list of femr codes that we will ignore. Defaults to [].
-
-            time_bins (Optional[List[datetime.timedelta]], optional): Group counts into buckets.
-                Starts from the label time, and works backwards according to each successive value in `time_bins`.
-
-                These timedeltas should be positive values, and will be internally converted to negative values
-
-                If last value is `None`, then the last bucket will be from the penultimate value in `time_bins` to the
-                    start of the patient's first event.
-
-                Examples:
-                    `time_bins = [
-                        datetime.timedelta(days=90),
-                        datetime.timedelta(days=180)
-                    ]`
-                        will create the following buckets:
-                            [label time, -90 days], [-90 days, -180 days];
-                    `time_bins = [
-                        datetime.timedelta(days=90),
-                        datetime.timedelta(days=180),
-                        datetime.timedelta(years=100)
-                    ]`
-                        will create the following buckets:
-                            [label time, -90 days], [-90 days, -180 days], [-180 days, -100 years];]
-        """
-        self.is_ontology_expansion: bool = is_ontology_expansion
-        self.excluded_event_filter = functools.partial(
-            exclusion_helper, fallback_function=excluded_event_filter, excluded_codes_set=set(excluded_codes)
-        )
-        self.time_bins: Optional[List[datetime.timedelta]] = time_bins
-        self.characters_for_string_values: int = characters_for_string_values
-
-        self.numeric_value_decile = numeric_value_decile
-        self.string_value_combination = string_value_combination
-
-        if self.time_bins is not None:
-            assert len(set(self.time_bins)) == len(
-                self.time_bins
-            ), f"You cannot have duplicate values in the `time_bins` argument. You passed in: {self.time_bins}"
-
-        self.observed_codes: Set[str] = set()
-        self.observed_string_value: Dict[Tuple[str, str], int] = collections.defaultdict(int)
-        self.observed_numeric_value: Dict[str, ReservoirSampler] = collections.defaultdict(
-            functools.partial(ReservoirSampler, 10000, 100)
-        )
-
-        self.finalized = False
-
-    def get_codes(self, code: str, ontology: extension_datasets.Ontology) -> Iterator[str]:
-        if self.is_ontology_expansion:
-            for subcode in ontology.get_all_parents(code):
-                yield subcode
-        else:
-            yield code
-
-    def get_columns(self, event, ontology: extension_datasets.Ontology) -> Iterator[int]:
-        if event.value is None:
-            for code in self.get_codes(event.code, ontology):
-                # If we haven't seen this code before, then add it to our list of included codes
-                if code in self.code_to_column_index:
-                    yield self.code_to_column_index[code]
-        elif type(event.value) is str:
-            k = (event.code, event.value[: self.characters_for_string_values])
-            if k in self.code_string_to_column_index:
-                yield self.code_string_to_column_index[k]
-        else:
-            if event.code in self.code_value_to_column_index:
-                column, quantiles = self.code_value_to_column_index[event.code]
-                for i, (start, end) in enumerate(zip(quantiles, quantiles[1:])):
-                    if start <= event.value < end:
-                        yield i + column
+    def get_num_columns(self) -> int:
+        return self.embedding_dim
 
     def preprocess(self, patient: Patient, labels: List[Label], ontology: extension_datasets.Ontology):
-        """Add every event code in this patient's timeline to `codes`."""
+        
+        data = {'age': 0, 'race': 0, 'gender': 0}
+        race_dict = {1: 'american indian', 2: 'asian', 3: 'black', 4: 'pacific islander', 5: 'white'}
+        gender_dict = {'F': 'female', 'M': 'male'}
+        patient_birth_date: datetime = get_patient_birthdate(patient)
+        
         for event in patient.events:
-            # Check for excluded events
-            if self.excluded_event_filter is not None and self.excluded_event_filter(event):
-                continue
+            if event.code.startswith('Race/'):
+                data['race'] = race_dict[int(event.code.split('/')[1])]
+            elif event.code.startswith('Gender/'):
+                data['gender'] = gender_dict[event.code.split('/')[1]]
+        # Debug: assume same age across all labels for first test run
+        label = labels[0]
+        data['age'] = int((label.time - patient_birth_date).days / 365)
 
-            if event.value is None:
-                for code in self.get_codes(event.code, ontology):
-                    # If we haven't seen this code before, then add it to our list of included codes
-                    self.observed_codes.add(code)
-            elif type(event.value) is str:
-                if self.string_value_combination:
-                    self.observed_string_value[(event.code, event.value[: self.characters_for_string_values])] += 1
-            else:
-                if self.numeric_value_decile:
-                    self.observed_numeric_value[event.code].add(event.value)
+        # Text serialization of all data
+        instruction = "Classify the following description of a patient as being at risk for death or not: "
+        text = f"The patient is a {data['age']} year-old {data['gender']} of {data['race']} race."
+        text = instruction + text
+        
+        self.pid_serializations[patient.patient_id] = text
+        return
+        # text_events = []
+        
+        # for event in patient.events:
+        #     # Check for excluded events
+        #     if self.excluded_event_filter is not None and self.excluded_event_filter(event):
+        #         continue
+
+        #     # # Sequenital processing of all codes
+        #     # if event.value is None:
+        #     #     # for code in self.get_codes(event.code, ontology):
+        #     #         # If we haven't seen this code before, then add it to our list of included codes
+        #     #     text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code})")
+        #     # elif type(event.value) is str:
+        #     #     if self.string_value_combination:
+        #     #         # TODO: Might add self.characters_for_string_values to the string value
+        #     #         text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code}): {event.value}")
+        #     # else:
+        #     #     if self.numeric_value_decile:
+        #     #         text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code}): {event.value}")
+
+        #     # Extract some relevant information
+
+        #     basic_information = {}
+        #     if event.code == 'SNOMED/3950001':
+        #         # get age from substracting 2022 from event.start
+        #         # TODO: This is an approximation - unclear prediction times (I guess different for tasks)
+        #         basic_information['born'] = int(event.start.year)
+        #     elif event.code.startswith('Race/'):
+        #         race_dict = {1: 'american_indian', 2: 'asian', 3: 'black', 4: 'pacific_islander', 5: 'white'}
+        #         basic_information['race'] = race_dict[event.code.split('/')[1]]
+        #     elif event.code.startswith('Gener/'):
+        #         gender_dict = {'F': 'female', 'M': 'male'}
+        #         basic_information['gender'] = gender_dict[event.code.split('/')[1]]
+        #     elif event.code == ('Inpatient Visit (Visit/IP)'):
+        #         if 'hospital_visits' not in basic_information:
+        #             basic_information['hospital_visits'] = 0
+        #         basic_information['hospital_visits'] += 1
+        #     elif event.code == ('Outpatient Visit (Visit/OP)'):
+        #         if 'outpatient_visits' not in basic_information:
+        #             basic_information['outpatient_visits'] = 0
+        #         basic_information['outpatient_visits'] += 1
+        #     
+        #     # Some relevant diseases
+        #     # Essential hypertension (SNOMED/59621000)
+        #     # Diabetes -> not in examples (SNOMED/73211009)
+        #     # Hyperlipidemia (SNOMED/55822004)
+        #     # Low back pain (SNOMED/279039007)
+        #     # Chronic obstructive lung disease (SNOMED/13645005)
+        #     elif event.code.startswith('SNOMED/'):
+        #         cond_dict = {
+        #             '59621000': 'hypertension',
+        #             '73211009': 'diabetes',
+        #             '55822004': 'hyperlipidemia',
+        #             '279039007': 'low_back_pain',
+        #             '13645005': 'copd',
+        #         }
+        #         code = event.code.split('/')[1]
+        #         if code in cond_dict:
+        #             basic_information[cond_dict[code]] == 1
+
+        #     self.patient_basic_information[patient.patient_id] = basic_information
+                    
 
     @classmethod
     def aggregate_preprocessed_featurizers(  # type: ignore[override]
         cls, featurizers: List[CountFeaturizer]
     ) -> CountFeaturizer:
-        """After preprocessing a CountFeaturizer using multiprocessing (resulting in the list of featurizers
-        contained in `featurizers`), this method aggregates all those featurizers into one CountFeaturizer.
-
-        We need to collect all the unique event codes identified by each featurizer, and then create a new
-        featurizer that combines all these codes
+        """After preprocessing a LLMFeaturizer using multiprocessing (resulting in the list of featurizers
+        contained in `featurizers`), this method aggregates all those featurizers into one LLMFeaturizer.
         """
         if len(featurizers) == 0:
             raise ValueError("You must pass in at least one featurizer to `aggregate_preprocessed_featurizers`")
 
-        template_featurizer: CountFeaturizer = featurizers[0]
+        # Combine all self.serialization of all featurizers
+        merged_serializations: dict[int, str] = {}
+        for featurizer in featurizers:
+            merged_serializations.update(featurizer.pid_serializations)
 
-        for featurizer in featurizers[1:]:
-            template_featurizer.observed_codes |= featurizer.observed_codes
-            for k1, v1 in template_featurizer.observed_string_value.items():
-                featurizer.observed_string_value[k1] += v1
-            for k2, v2 in template_featurizer.observed_numeric_value.items():
-                featurizer.observed_numeric_value[k2].values += v2.values
+        # Fix ordering of patients
+        pids = list(merged_serializations.keys())
+        serializations = [merged_serializations[pid] for pid in pids]
+
+        model = LLM2Vec.from_pretrained(
+            "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
+            peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            torch_dtype=torch.bfloat16,
+        )
+        def encode_texts(texts: List[str]) -> np.ndarray:
+            return np.array(model.encode(texts, batch_size=32))
+        merged_encodings = encode_texts(serializations) 
+
+        template_featurizer: LLMFeaturizer = featurizers[0]
+        template_featurizer.pids = pids
+        template_featurizer.serializations = serializations
+        template_featurizer.encodings = merged_encodings
 
         return template_featurizer
 
-    def finalize(self):
-        if self.finalized:
-            return
-
-        self.finalized = True
-        self.code_to_column_index = {}
-        self.code_string_to_column_index = {}
-        self.code_value_to_column_index = {}
-
-        self.num_columns = 0
-
-        for code in sorted(list(self.observed_codes)):
-            self.code_to_column_index[code] = self.num_columns
-            self.num_columns += 1
-
-        for (code, val), count in sorted(list(self.observed_string_value.items())):
-            if count > 1:
-                self.code_string_to_column_index[(code, val)] = self.num_columns
-                self.num_columns += 1
-
-        for code, values in sorted(list(self.observed_numeric_value.items())):
-            quantiles = sorted(list(set(np.quantile(values.values, np.linspace(0, 1, num=11)[1:-1]))))
-            quantiles = [float("-inf")] + quantiles + [float("inf")]
-            self.code_value_to_column_index[code] = (self.num_columns, quantiles)
-            self.num_columns += len(quantiles) - 1
-
-    def get_num_columns(self) -> int:
-        self.finalize()
-
-        if self.time_bins is None:
-            return self.num_columns
-        else:
-            return self.num_columns * len(self.time_bins)
 
     def featurize(
         self,
@@ -203,131 +173,29 @@ class TextFeaturizer(Featurizer):
         labels: List[Label],
         ontology: Optional[extension_datasets.Ontology],
     ) -> List[List[ColumnValue]]:
-        self.finalize()
-        if ontology is None:
-            raise ValueError("`ontology` can't be `None` for CountFeaturizer")
-
+        """ Return text representation of patient at each label. """
+        
+        assert ontology is not None, "Ontology cannot be `None` for LLMFeaturizer"
         all_columns: List[List[ColumnValue]] = []
+        # Outer list is per label
+        # Inner list is the list of features for that label
 
-        if self.time_bins is None:
-            # Count the number of times each code appears in the patient's timeline
-            # [key] = column idx
-            # [value] = count of occurrences of events with that code (up to the label at `label_idx`)
-            code_counter: Dict[int, int] = defaultdict(int)
-
-            label_idx = 0
-            for event in patient.events:
-                if self.excluded_event_filter is not None and self.excluded_event_filter(event):
-                    continue
-
-                while event.start > labels[label_idx].time:
-                    label_idx += 1
-                    # Create all features for label at index `label_idx`
-                    all_columns.append([ColumnValue(code, count) for code, count in code_counter.items()])
-                    if label_idx >= len(labels):
-                        # We've reached the end of the labels for this patient,
-                        # so no point in continuing to count events past this point.
-                        # Instead, we just return the counts of all events up to this point.
-                        return all_columns
-
-                for column_idx in self.get_columns(event, ontology):
-                    code_counter[column_idx] += 1
-
-            # For all labels that occur past the last event, add all
-            # events' total counts as these labels' feature values (basically,
-            # the featurization of these labels is the count of every single event)
-            for _ in labels[label_idx:]:
-                all_columns.append([ColumnValue(code, count) for code, count in code_counter.items()])
-
-        else:
-            # First, sort time bins in ascending order (i.e. [100 days, 90 days, 1 days] -> [1, 90, 100])
-            time_bins: List[datetime.timedelta] = sorted([x for x in self.time_bins if x is not None])
-
-            codes_per_bin: Dict[int, Deque[Tuple[int, datetime.datetime]]] = {
-                i: deque() for i in range(len(self.time_bins) + 1)
-            }
-
-            code_counts_per_bin: Dict[int, Dict[int, int]] = {
-                i: defaultdict(int) for i in range(len(self.time_bins) + 1)
-            }
-
-            label_idx = 0
-            for event in patient.events:
-                if self.excluded_event_filter is not None and self.excluded_event_filter(event):
-                    continue
-                while event.start > labels[label_idx].time:
-                    _reshuffle_count_time_bins(
-                        time_bins,
-                        codes_per_bin,
-                        code_counts_per_bin,
-                        labels[label_idx],
-                    )
-                    label_idx += 1
-                    # Create all features for label at index `label_idx`
-                    all_columns.append(
-                        [
-                            ColumnValue(
-                                code + i * self.num_columns,
-                                count,
-                            )
-                            for i in range(len(self.time_bins))
-                            for code, count in code_counts_per_bin[i].items()
-                        ]
-                    )
-
-                    if label_idx >= len(labels):
-                        # We've reached the end of the labels for this patient,
-                        # so no point in continuing to count events past this point.
-                        # Instead, we just return the counts of all events up to this point.
-                        return all_columns
-
-                for column_idx in self.get_columns(event, ontology):
-                    codes_per_bin[0].append((column_idx, event.start))
-                    code_counts_per_bin[0][column_idx] += 1
-
-            for label in labels[label_idx:]:
-                _reshuffle_count_time_bins(
-                    time_bins,
-                    codes_per_bin,
-                    code_counts_per_bin,
-                    label,
-                )
-                all_columns.append(
-                    [
-                        ColumnValue(
-                            code + i * self.num_columns,
-                            count,
-                        )
-                        for i in range(len(self.time_bins))
-                        for code, count in code_counts_per_bin[i].items()
-                    ]
-                )
+        patient_encoding = self.encodings[self.pids.index(patient.patient_id)]
+        
+        for label in labels:
+            # Copy encoding for each label
+            # TODO: Add label specific encodings
+            all_columns.append([ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)])
 
         return all_columns
 
     def is_needs_preprocessing(self) -> bool:
-        return True
+        return True 
 
     def __repr__(self) -> str:
-        return f"CountFeaturizer(number of included codes={self.num_columns})"
+        # return f"LLMFeaturizer(number of included codes={self.num_columns})"
+        return f"LLMFeaturizer()"
 
     def get_column_name(self, column_idx: int) -> str:
-        def helper(actual_idx):
-            for code, idx in self.code_to_column_index.items():
-                if idx == actual_idx:
-                    return code
-            for (code, val), idx in self.code_string_to_column_index.items():
-                if idx == actual_idx:
-                    return f"{code} {val}"
-
-            for code, (idx, quantiles) in self.code_value_to_column_index.items():
-                offset = actual_idx - idx
-                if 0 <= offset < len(quantiles) - 1:
-                    return f"{code} [{quantiles[offset]}, {quantiles[offset+1]})"
-
-            raise RuntimeError("Could not find name for " + str(actual_idx))
-
-        if self.time_bins is None:
-            return helper(column_idx)
-        else:
-            return helper(column_idx % self.num_columns) + f"_{self.time_bins[column_idx // self.num_columns]}"
+        return "Embedding"
+        

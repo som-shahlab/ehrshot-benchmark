@@ -11,7 +11,7 @@
 
 mkdir -p ../../EHRSHOT_ASSETS/features
 
-python3 ../4_generate_count_features.py \
+python3 ../4_generate_text_features.py \
     --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
     --path_to_labels_dir ../../EHRSHOT_ASSETS/benchmark \
     --path_to_features_dir ../../EHRSHOT_ASSETS/features \
