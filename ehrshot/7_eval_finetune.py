@@ -2,7 +2,6 @@
     Output is a CSV with headers:
         sub_task, model, head, replicate, score_name, score_value, k
 """
-
 import argparse
 import json
 import os
@@ -41,7 +40,7 @@ import femr.datasets
 import torch
 from jaxtyping import Float
 from femr.labelers import load_labeled_patients, LabeledPatients
-from hf_ehr.utils import load_config_from_path, load_tokenizer_old_from_path, load_model_old_from_path
+from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path
 from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
@@ -136,11 +135,11 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
     if model.base_model_name == 'mamba':
         layers = model.base_model.layers
     elif model.base_model_name == 'hyena':
-        layers = model.base_model.hyena.backbone.layers
+        layers = model.base_model.layers
     elif model.base_model_name == 'gpt2':
         layers = model.base_model.h
     elif model.base_model_name == 'bert':
-        layers = model.base_model.layer
+        layers = model.base_model.encoder.layer
     else:
         raise ValueError(f"Base model `{model.base_model_name}` not supported.")
 
@@ -160,6 +159,81 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     return model, layers
 
+def finetune_pytorch_model(X_train: np.ndarray, 
+                           y_train: np.ndarray, 
+                           model: torch.nn.Module, 
+                           optimizer,
+                           criterion,
+                           pad_token_id: int,
+                           model_name: str, 
+                           model_head: str, 
+                           batch_size: int,
+                           n_epochs: int,
+                           device: str) -> torch.nn.Module:
+    torch.manual_seed(X_train.shape[0])
+    model.train()
+    for epoch in range(n_epochs):
+        for batch_start in tqdm(range(0, X_train.shape[0], batch_size), desc=f'Finetuning: epoch={epoch} | model={model_name[:15]} | head={model_head[:15]} | k={X_train.shape[0]}', total=X_train.shape[0] // batch_size):
+            # Subset training batch
+            X_train_batch = X_train[batch_start:batch_start+batch_size]
+            y_train_batch = y_train[batch_start:batch_start+batch_size]
+            
+            # Tokenize batch
+            input_ids = torch.tensor(X_train_batch, device=device)
+            attention_mask = (input_ids != pad_token_id).int()
+            batch = {
+                'input_ids': input_ids,
+                'attention_mask': attention_mask,
+            }
+            if "hyena" in model_name:
+                batch.pop('attention_mask')
+
+            # Run model to get logits for each class
+            logits: Float[torch.Tensor, 'B C'] = model(**batch)
+            assert logits.shape == (X_train_batch.shape[0], 2)
+
+            # Compute CE loss v. true binary labels
+            binary_labels: Float[torch.Tensor, 'B'] = torch.tensor(y_train_batch, device=device).long()
+            loss = criterion(logits, binary_labels)
+
+            # Backprop
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+    return model
+
+def eval_pytorch_model(X_train: np.ndarray,
+                        X_val: np.ndarray,
+                        X_test: np.ndarray,
+                        y_train: np.ndarray,
+                        y_val: np.ndarray,
+                        y_test: np.ndarray,
+                        model: torch.nn.Module, 
+                        pad_token_id: int,
+                        model_name: str, 
+                        model_head: str, 
+                        batch_size: int,
+                        device: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    model.eval()
+    y_train_proba, y_val_proba, y_test_proba = [], [], []
+    with torch.no_grad():
+        for X, y, split in zip([X_train, X_val, X_test], [y_train_proba, y_val_proba, y_test_proba], ['train', 'val', 'test']):
+            for batch_start in tqdm(range(0, X.shape[0], batch_size), desc=f'Inference: split={split} | model={model_name[:15]} | head={model_head[:15]}', total=X.shape[0] // batch_size):
+                X_batch = X[batch_start:batch_start+batch_size]
+                input_ids = torch.tensor(X_batch, device=device)
+                attention_mask = (input_ids != pad_token_id).int()
+                batch = {
+                    'input_ids': input_ids,
+                    'attention_mask': attention_mask,
+                }
+                if "hyena" in model_name:
+                    batch.pop('attention_mask')
+                y.append(model.predict_proba(**batch)[::, 1].detach().cpu().numpy())
+    y_train_proba = np.concatenate(y_train_proba)
+    y_val_proba = np.concatenate(y_val_proba)
+    y_test_proba = np.concatenate(y_test_proba)
+    return y_train_proba, y_val_proba, y_test_proba
+
 def run_finetune_evaluation(X_train: np.ndarray,
                             X_val: np.ndarray, 
                             X_test: np.ndarray, 
@@ -171,7 +245,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
                             path_to_ckpt: str,
                             batch_size: int = 4,
                             n_epochs: int = 2,
-                            lr: float = 1e-4,
+                            lr: float = 1e-5,
                             n_jobs: int = 1,
                             test_patient_ids: np.ndarray = None) -> Tuple[Any, Dict[str, float]]:
     logger.critical(f"Start | Training {model_head}")
@@ -194,8 +268,8 @@ def run_finetune_evaluation(X_train: np.ndarray,
     device: str = 'cuda'
     finetune_strat = model_head.split("_")[1] # "layers=n" or "full"
     embed_strat: str = [ x for x in model_name.split("_") if x.split(":")[0] == 'embed' ][0].split(":")[1] # "mean" or "last"
-    tokenizer = load_tokenizer_old_from_path(path_to_ckpt) # TODO - update to new tokenizer format
-    model = load_model_old_from_path(path_to_ckpt)
+    tokenizer = load_tokenizer_from_path(path_to_ckpt)
+    model = load_model_from_path(path_to_ckpt)
     model = CookbookModelWithClassificationHead(model, embed_strat, 2)
     model, layers = setup_finetuning(model, finetune_strat)
     ## Sanity checks
@@ -223,60 +297,17 @@ def run_finetune_evaluation(X_train: np.ndarray,
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.functional.cross_entropy
 
-    logger.critical(f"Start | Fitting model=`{model_name}` | head=`{model_head}`...")
-    
     # Finetune `model`
-    pad_token_id = tokenizer.pad_token_id
-    torch.manual_seed(X_train.shape[0])
-    model.train()
-    for epoch in range(n_epochs):
-        for batch_start in tqdm(range(0, X_train.shape[0], batch_size), desc=f'Training: epoch={epoch} | model={model_name} | head={model_head}', total=X_train.shape[0] // batch_size):
-            # Subset training batch
-            X_train_batch = X_train[batch_start:batch_start+batch_size]
-            y_train_batch = y_train[batch_start:batch_start+batch_size]
-            
-            # Tokenize batch
-            input_ids = torch.tensor(X_train_batch, device=device)
-            attention_mask = (input_ids != pad_token_id).int()
-            batch = {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask if "hyena" not in model_name else None,
-            }
-
-            # Run model to get logits for each class
-            logits: Float[torch.Tensor, 'B C'] = model(**batch)
-            assert logits.shape == (X_train_batch.shape[0], 2)
-
-            # Compute CE loss v. true binary labels
-            binary_labels: Float[torch.Tensor, 'B'] = torch.tensor(y_train_batch, device=device).long()
-            loss = criterion(logits, binary_labels)
-
-            # Backprop
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        
-    logger.critical(f"Finish | Fitting model=`{model_name}` | head=`{model_head}`...")
+    pad_token_id: int = tokenizer.pad_token_id
+    logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}`")
+    model = finetune_pytorch_model(X_train, y_train, model, optimizer, criterion, pad_token_id, model_name, model_head, batch_size, n_epochs, device)
+    logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}`")
     
     # Calculate probabilistic preds
-    model.eval()
-    y_train_proba, y_val_proba, y_test_proba = [], [], []
-    with torch.no_grad():
-        for X, y, split in zip([X_train, X_val, X_test], [y_train_proba, y_val_proba, y_test_proba], ['train', 'val', 'test']):
-            for batch_start in tqdm(range(0, X.shape[0], batch_size), desc=f'Inference: split={split} | model={model_name} | head={model_head}', total=X.shape[0] // batch_size):
-                X_batch = X[batch_start:batch_start+batch_size]
-                input_ids = torch.tensor(X_batch, device=device)
-                attention_mask = (input_ids != pad_token_id).int()
-                batch = {
-                    'input_ids': input_ids,
-                    'attention_mask': attention_mask if "hyena" not in model_name else None,
-                }
-                y.append(model.predict_proba(**batch)[::, 1].detach().cpu().numpy())
+    logger.critical(f"Start | Evaling model=`{model_name}` | head=`{model_head}`")
+    y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train, X_val, X_test, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
+    logger.critical(f"Finish | Evaling model=`{model_name}` | head=`{model_head}`")
     model.to('cpu')
-    
-    y_train_proba = np.concatenate(y_train_proba)
-    y_val_proba = np.concatenate(y_val_proba)
-    y_test_proba = np.concatenate(y_test_proba)
     
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
@@ -369,7 +400,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     # Finetuning
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning")
-    parser.add_argument("--n_epochs", type=int, default=3, help="Number of epochs for finetuning")
+    parser.add_argument("--n_epochs", type=int, default=2, help="Number of epochs for finetuning")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -391,12 +422,6 @@ if __name__ == "__main__":
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
-        
-    # If results already exist, then append new results to existing file
-    df_existing: Optional[pd.DataFrame] = None
-    if os.path.exists(PATH_TO_OUTPUT_FILE):
-        logger.warning(f"Results already exist @ `{PATH_TO_OUTPUT_FILE}`.")
-        df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
     
     # Determine which models to load
     # Useful for saving memory by only loading featurizations for models we need
@@ -421,43 +446,46 @@ if __name__ == "__main__":
     # Load FEMR Patient Database
     database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
 
-    # Load labels for this task
+    # Load all labeled patients
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
     logger.info(f"Loading task {LABELING_FUNCTION} with {len(labeled_patients)} labeled patients.")
-    patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR, models_to_keep=models_to_keep)
-    train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
     
     # Load shot assignments for this task
     with open(PATH_TO_SHOTS) as f:
         few_shots_dict: Dict[str, Dict] = json.load(f)
-
-    # Preprocess certain non-binary labels
-    if LABELING_FUNCTION == "chexpert":
-        label_values = process_chexpert_labels(label_values)
-        sub_tasks: List[str] = CHEXPERT_LABELS
-    elif LABELING_FUNCTION.startswith('lab_'):
-       # Lab value is multi-class, convert to binary
-        label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
-        sub_tasks: List[str] = [LABELING_FUNCTION]
-    else:
-        # Binary classification
-        sub_tasks: List[str] = [LABELING_FUNCTION]
-        
-    # Results will be stored as a CSV with columns:
-    #   sub_task, model, head, replicate, score_name, score_value, k
-    results: List[Dict[str, Any]] = []
-    if df_existing is not None:
-        results += df_existing.to_dict(orient='records')
     
     # For each base model we are evaluating...
     for model in MODEL_2_INFO.keys():
+            
         model_heads: List[str] = MODEL_2_INFO[model]['heads']
         BATCH_SIZE = MODEL_2_INFO[model]['batch_size'] if 'batch_size' in MODEL_2_INFO[model] else BATCH_SIZE
+
+        # TODO -- hack; batch sizes are scaled to V100, so double if A100 / H100
+        if 'a100' in os.environ['SLURM_JOB_PARTITION'] or 'h100' in os.environ['SLURM_JOB_PARTITION']:
+            BATCH_SIZE *= 2
+        
         # For each head we can add to the top of this model...
         for head in model_heads:
             if VALID_HEADS is not None and head not in VALID_HEADS:
                 # Skip heads (if specified)
                 continue
+
+            # Load labels/features for this task + model_head
+            patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR, models_to_keep=[ model ])
+            train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
+
+            # Preprocess certain non-binary labels
+            if LABELING_FUNCTION == "chexpert":
+                label_values = process_chexpert_labels(label_values)
+                sub_tasks: List[str] = CHEXPERT_LABELS
+            elif LABELING_FUNCTION.startswith('lab_'):
+            # Lab value is multi-class, convert to binary
+                label_values = convert_multiclass_to_binary_labels(label_values, threshold=1)
+                sub_tasks: List[str] = [LABELING_FUNCTION]
+            else:
+                # Binary classification
+                sub_tasks: List[str] = [LABELING_FUNCTION]
+                
             assert model in feature_matrixes, f"Feature matrix not found for `{model}`. Are you sure you have generated features for this model? If not, you'll need to rerun `generate_features.py` or `generate_clmbr_representations.py`."
             
             # Unpack each individual featurization we want to test
@@ -481,6 +509,22 @@ if __name__ == "__main__":
             # NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
+                
+                ############################
+                # ! Do loading of previous results here so that we reload any results that
+                # ! were generated in a concurrently running SLURM job
+                # If results already exist, then append new results to existing file
+                df_existing: Optional[pd.DataFrame] = None
+                if os.path.exists(PATH_TO_OUTPUT_FILE):
+                    logger.warning(f"Results already exist @ `{PATH_TO_OUTPUT_FILE}`.")
+                    df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
+                # Results will be stored as a CSV with columns:
+                #   sub_task, model, head, replicate, score_name, score_value, k
+                results: List[Dict[str, Any]] = []
+                if df_existing is not None:
+                    results += df_existing.to_dict(orient='records')
+                ############################
+                
                 # Check if results already exist for this model/head/shot_strat in `results.csv`
                 if df_existing is not None:
                     existing_rows: pd.DataFrame = df_existing[
@@ -508,6 +552,11 @@ if __name__ == "__main__":
 
                     # Save best model according to val AUROC
                     best_model_val_auroc: float = -1
+
+                    # If k = -1, then we use all data points. So each replicate is the exact same thing, just repeat 5 times so we can get a std
+                    if k == -1:
+                        replicates = [ replicates[0] ] * 5
+                        assert len(replicates) == 5
 
                     # For each replicate of this k-shot sample...
                     for replicate in replicates:
@@ -573,8 +622,9 @@ if __name__ == "__main__":
                                 'upper' : score_value['upper'],
                             })
 
-    logger.info(f"Saving results to: {PATH_TO_OUTPUT_FILE}")
-    df: pd.DataFrame = pd.DataFrame(results)
-    logger.info(f"Added {df.shape[0] - (df_existing.shape[0] if df_existing is not None else 0)} rows")
-    df.to_csv(PATH_TO_OUTPUT_FILE, ignore_index=True)
+                        # Save results to CSV after each (model, head, sub_task, k, replicate) is calculated
+                        logger.critical(f"Saving results for {model} + {head} + {k} (replicate={replicate}) to: {PATH_TO_OUTPUT_FILE}")
+                        df: pd.DataFrame = pd.DataFrame(results)
+                        logger.critical(f"Added {df.shape[0] - (df_existing.shape[0] if df_existing is not None else 0)} rows")
+                        df.to_csv(PATH_TO_OUTPUT_FILE, index=False)
     logger.success("Done!")
