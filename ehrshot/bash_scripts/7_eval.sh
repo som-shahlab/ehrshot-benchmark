@@ -13,7 +13,7 @@ path_to_output_dir='../../EHRSHOT_ASSETS/results'
 path_to_split_csv='../../EHRSHOT_ASSETS/splits/person_id_map.csv'
 
 labeling_functions=(
-    "chexpert" # CheXpert first b/c slowest
+#     "chexpert" # CheXpert first b/c slowest
     "guo_los"
     "guo_readmission"
     "guo_icu"
@@ -23,12 +23,12 @@ labeling_functions=(
     "new_celiac"
     "new_lupus"
     "new_acutemi"
-    # Labs take long time -- need more GB
-    "lab_thrombocytopenia"
-    "lab_hyperkalemia"
-    "lab_hyponatremia"
-    "lab_anemia"
-    "lab_hypoglycemia" # will OOM at 200G on `gpu` partition
+#     # Labs take long time -- need more GB
+#     "lab_thrombocytopenia"
+#     "lab_hyperkalemia"
+#     "lab_hyponatremia"
+#     "lab_anemia"
+#     "lab_hypoglycemia" # will OOM at 200G on `gpu` partition
 )
 shot_strats=("all")
 num_threads=20

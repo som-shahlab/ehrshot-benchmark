@@ -24,6 +24,8 @@ from femr.featurizers.featurizers import CountFeaturizer
 
 import torch
 from llm2vec import LLM2Vec
+import re
+import pandas as pd
 
 class LLMFeaturizer(Featurizer):
     """
@@ -38,8 +40,28 @@ class LLMFeaturizer(Featurizer):
 
         # Filled during aggregation
         self.pids: List[int] = []
+        self.pid_to_index: Dict[int, int] = {}
         self.serializations: List[str] = []
         self.encodings: np.ndarray = np.array([])
+        
+        # Custom ontologies
+        cpt4 = pd.read_csv('ehrshot/custom_ontologies/cpt4.csv')
+        cpt4 = cpt4.set_index('com.medigy.persist.reference.type.clincial.CPT.code')['label'].to_dict()
+        icd10pcs = pd.read_csv('ehrshot/custom_ontologies/PClassR_v2023-1.csv', skiprows=1)
+        icd10pcs.columns = icd10pcs.columns.str.strip("'")
+        icd10pcs['ICD-10-PCS CODE'] = icd10pcs['ICD-10-PCS CODE'].str.strip("'")
+        icd10pcs = icd10pcs.set_index('ICD-10-PCS CODE')['ICD-10-PCS CODE DESCRIPTION'].to_dict()
+        cvx = pd.read_csv('ehrshot/custom_ontologies/cvx.csv', sep="|", header=None)
+        cvx = dict(zip(cvx.iloc[:, 0], cvx.iloc[:, 2]))
+        custom_ontologies = {
+            'CPT4': cpt4,
+            'ICD10PCS': icd10pcs,
+            'CVX': cvx,
+        }
+        # Make all keys to strings, remove all whitespaces around, and lowerspace them
+        for name, ontology in custom_ontologies.items():
+            custom_ontologies[name] = {str(k).strip().lower(): v for k, v in ontology.items()}
+        self.custom_ontologies = custom_ontologies
 
     def get_num_columns(self) -> int:
         return self.embedding_dim
@@ -51,85 +73,86 @@ class LLMFeaturizer(Featurizer):
         gender_dict = {'F': 'female', 'M': 'male'}
         patient_birth_date: datetime = get_patient_birthdate(patient)
         
-        for event in patient.events:
-            if event.code.startswith('Race/'):
-                data['race'] = race_dict[int(event.code.split('/')[1])]
-            elif event.code.startswith('Gender/'):
-                data['gender'] = gender_dict[event.code.split('/')[1]]
+        # Single sentence for age, gender, race
+        # for event in patient.events:
+        #     if event.code.startswith('Race/'):
+        #         data['race'] = race_dict[int(event.code.split('/')[1])]
+        #     elif event.code.startswith('Gender/'):
+        #         data['gender'] = gender_dict[event.code.split('/')[1]]
+        # # Debug: assume same age across all labels for first test run
+        # label = labels[0]
+        # data['age'] = int((label.time - patient_birth_date).days / 365)
+        # text = f"The patient is a {data['age']} year-old {data['gender']} of {data['race']} race."
+        
+        # Serialization of all codes
+        text_events = []
+        text_set = set()
+        
+        # Add age manually
         # Debug: assume same age across all labels for first test run
         label = labels[0]
-        data['age'] = int((label.time - patient_birth_date).days / 365)
+        age = int((label.time - patient_birth_date).days / 365)
+        text_events.append(f"- Age: {age}")
+        
+        # Exclude some non-informative codes
+        re_exlude_description_prefixes = re.compile(r"^(CARE\_SITE\/|Birth|Plan Stop Reason|Patient discharge)")
+        
+        # Custom onlogies
+        re_ontologies = re.compile(r"^(CPT4\/|ICD10PCS\/|CVX\/)")
+        
+        # Remove some suffixes:
+        # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
+        # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
+        # 'by Manual count'
+        re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
+        
+        for event in patient.events:
+            description = ontology.get_text_description(event.code)
+            # if len(text_events) >= 40:
+            #     break
+            if re_exlude_description_prefixes.match(description):
+                continue
+            if re_ontologies.match(event.code):
+                ontology_name = event.code.split('/')[0]
+                code = event.code.split('/')[1].lower()
+                if code in self.custom_ontologies[ontology_name]:
+                    description = self.custom_ontologies[ontology_name][code]
+                else:
+                    continue
+                
+            # Remove some irrelevant artifacts
+            # Remove all [*] - often correspond to units
+            description = re.sub(r"\[.*\]", "", description)
+            # Remove suffixes
+            description = re_exclude_description_suffixes.sub("", description)
+            # Remove repeated whitespaces
+            description = re.sub(r"\s+", " ", description)
+            description = description.strip()
+            
+            # Each code only once
+            if description in text_set:
+                continue
+            text_set.add(description)
+            
+            if type(event.value) is str:
+                text_events.append(f"- {description}: {event.value}")
+            # TODO: Add handling of numeric values
+            else:
+                text_events.append(f"- {description}")
+            
+        text = '\n'.join(text_events)
+        # print('-'*20)
+        # print('-'*20)
+        # print(text)
 
         # Text serialization of all data
-        instruction = "Classify the following description of a patient as being at risk for death or not: "
-        text = f"The patient is a {data['age']} year-old {data['gender']} of {data['race']} race."
+        # instruction = "Classify the following description of a patient as being at risk for death or not: "
+        instruction = ""
         text = instruction + text
         
         self.pid_serializations[patient.patient_id] = text
         return
-        # text_events = []
-        
-        # for event in patient.events:
-        #     # Check for excluded events
-        #     if self.excluded_event_filter is not None and self.excluded_event_filter(event):
-        #         continue
-
-        #     # # Sequenital processing of all codes
-        #     # if event.value is None:
-        #     #     # for code in self.get_codes(event.code, ontology):
-        #     #         # If we haven't seen this code before, then add it to our list of included codes
-        #     #     text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code})")
-        #     # elif type(event.value) is str:
-        #     #     if self.string_value_combination:
-        #     #         # TODO: Might add self.characters_for_string_values to the string value
-        #     #         text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code}): {event.value}")
-        #     # else:
-        #     #     if self.numeric_value_decile:
-        #     #         text_events.append(f"{event.start}, {ontology.get_text_description(event.code)} ({event.code}): {event.value}")
-
-        #     # Extract some relevant information
-
-        #     basic_information = {}
-        #     if event.code == 'SNOMED/3950001':
-        #         # get age from substracting 2022 from event.start
-        #         # TODO: This is an approximation - unclear prediction times (I guess different for tasks)
-        #         basic_information['born'] = int(event.start.year)
-        #     elif event.code.startswith('Race/'):
-        #         race_dict = {1: 'american_indian', 2: 'asian', 3: 'black', 4: 'pacific_islander', 5: 'white'}
-        #         basic_information['race'] = race_dict[event.code.split('/')[1]]
-        #     elif event.code.startswith('Gener/'):
-        #         gender_dict = {'F': 'female', 'M': 'male'}
-        #         basic_information['gender'] = gender_dict[event.code.split('/')[1]]
-        #     elif event.code == ('Inpatient Visit (Visit/IP)'):
-        #         if 'hospital_visits' not in basic_information:
-        #             basic_information['hospital_visits'] = 0
-        #         basic_information['hospital_visits'] += 1
-        #     elif event.code == ('Outpatient Visit (Visit/OP)'):
-        #         if 'outpatient_visits' not in basic_information:
-        #             basic_information['outpatient_visits'] = 0
-        #         basic_information['outpatient_visits'] += 1
-        #     
-        #     # Some relevant diseases
-        #     # Essential hypertension (SNOMED/59621000)
-        #     # Diabetes -> not in examples (SNOMED/73211009)
-        #     # Hyperlipidemia (SNOMED/55822004)
-        #     # Low back pain (SNOMED/279039007)
-        #     # Chronic obstructive lung disease (SNOMED/13645005)
-        #     elif event.code.startswith('SNOMED/'):
-        #         cond_dict = {
-        #             '59621000': 'hypertension',
-        #             '73211009': 'diabetes',
-        #             '55822004': 'hyperlipidemia',
-        #             '279039007': 'low_back_pain',
-        #             '13645005': 'copd',
-        #         }
-        #         code = event.code.split('/')[1]
-        #         if code in cond_dict:
-        #             basic_information[cond_dict[code]] == 1
-
-        #     self.patient_basic_information[patient.patient_id] = basic_information
                     
-
     @classmethod
     def aggregate_preprocessed_featurizers(  # type: ignore[override]
         cls, featurizers: List[CountFeaturizer]
@@ -147,6 +170,9 @@ class LLMFeaturizer(Featurizer):
 
         # Fix ordering of patients
         pids = list(merged_serializations.keys())
+        pid_to_index: Dict[int, int] = {}
+        for i, pid in enumerate(pids):
+            pid_to_index[pid] = i
         serializations = [merged_serializations[pid] for pid in pids]
 
         model = LLM2Vec.from_pretrained(
@@ -154,13 +180,17 @@ class LLMFeaturizer(Featurizer):
             peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
             device_map="cuda" if torch.cuda.is_available() else "cpu",
             torch_dtype=torch.bfloat16,
+            max_length=8192,
+            doc_max_length=8192,
         )
         def encode_texts(texts: List[str]) -> np.ndarray:
-            return np.array(model.encode(texts, batch_size=32))
-        merged_encodings = encode_texts(serializations) 
+            return np.array(model.encode(texts, batch_size=8))
+        merged_encodings = encode_texts(serializations)
+        del model
 
         template_featurizer: LLMFeaturizer = featurizers[0]
         template_featurizer.pids = pids
+        template_featurizer.pid_to_index = pid_to_index
         template_featurizer.serializations = serializations
         template_featurizer.encodings = merged_encodings
 
@@ -179,13 +209,24 @@ class LLMFeaturizer(Featurizer):
         all_columns: List[List[ColumnValue]] = []
         # Outer list is per label
         # Inner list is the list of features for that label
-
-        patient_encoding = self.encodings[self.pids.index(patient.patient_id)]
         
-        for label in labels:
-            # Copy encoding for each label
-            # TODO: Add label specific encodings
-            all_columns.append([ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)])
+        # Use the dictionary for fast lookups
+        patient_index = self.pid_to_index.get(patient.patient_id)
+        patient_encoding = self.encodings[patient_index]
+
+        # Precompute the common feature list for the patient
+        # common_features = [ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)]
+        # Do the same with map function
+        common_features = list(map(lambda i: ColumnValue(i, patient_encoding[i]), range(self.embedding_dim)))
+        # TODO: Currently duplicate the features for each label
+        all_columns = [common_features for _ in labels]
+
+        # patient_encoding = self.encodings[self.pids.index(patient.patient_id)]
+        
+        # for _ in labels:
+        #     # Copy encoding for each label
+        #     # TODO: Add label specific encodings
+        #     all_columns.append([ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)])
 
         return all_columns
 

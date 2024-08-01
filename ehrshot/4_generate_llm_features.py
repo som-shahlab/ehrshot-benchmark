@@ -30,7 +30,7 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'text_features.pkl')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'llm_features_out.pkl')
 
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)

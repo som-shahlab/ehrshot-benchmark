@@ -18,12 +18,22 @@ SPLIT_VAL_CUTOFF: int = 85
 
 # Types of base models to test
 MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
+# Removed count based model for debugging
     'count' : {
         'label' : 'Count-based',
-        'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
+        # 'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
+        'heads' : ['lr_lbfgs', ],
     },
     'clmbr' : {
         'label' : 'CLMBR',
+        'heads' : ['lr_lbfgs', ],
+    },
+    'agr' : {
+        'label' : 'Age, Gender, Race',
+        'heads' : ['lr_lbfgs', ],
+    },
+    'llm' : {
+        'label' : 'Llama 3.1',
         'heads' : ['lr_lbfgs', ],
     },
 }
@@ -58,6 +68,12 @@ SCORE_MODEL_HEAD_2_COLOR = {
         'clmbr' : {
             'lr_lbfgs' : 'tab:blue',
         },
+        'llm' : {
+            'lr_lbfgs' : 'tab:pink',
+        },
+        'agr' : {
+            'lr_lbfgs' : 'tab:brown',
+        },
     },
     'auprc' : {
         'count' : {
@@ -70,6 +86,12 @@ SCORE_MODEL_HEAD_2_COLOR = {
         },
         'pytorch_clmbr' : {
             'lr_femr' : 'tab:purple',
+        },
+        'llm' : {
+            'lr_lbfgs' : 'tab:pink',
+        },
+        'agr' : {
+            'lr_lbfgs' : 'tab:brown',
         },
     },
 }
@@ -127,13 +149,13 @@ TASK_GROUP_2_LABELING_FUNCTION = {
         "guo_readmission",
         "guo_icu"
     ],
-    "lab_values": [
-        "lab_thrombocytopenia",
-        "lab_hyperkalemia",
-        "lab_hypoglycemia",
-        "lab_hyponatremia",
-        "lab_anemia"
-    ],
+#     "lab_values": [
+#         "lab_thrombocytopenia",
+#         "lab_hyperkalemia",
+#         "lab_hypoglycemia",
+#         "lab_hyponatremia",
+#         "lab_anemia"
+#     ],
     "new_diagnoses": [
         "new_hypertension",
         "new_hyperlipidemia",
@@ -142,9 +164,9 @@ TASK_GROUP_2_LABELING_FUNCTION = {
         "new_lupus",
         "new_acutemi"
     ],
-    "chexpert": [
-        "chexpert"
-    ]
+ #    "chexpert": [
+ #        "chexpert"
+ #    ]
 }
 
 # Hyperparameter search

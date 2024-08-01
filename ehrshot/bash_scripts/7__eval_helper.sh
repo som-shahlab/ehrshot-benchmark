@@ -3,10 +3,10 @@
 #SBATCH --output=logs/7__eval_helper_%A.out
 #SBATCH --error=logs/7__eval_helper_%A.err
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=normal,gpu,nigam-v100
-#SBATCH --mem=200G
-#SBATCH --cpus-per-task=20
-#SBATCH --exclude=secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
+#SBATCH --partition=compute
+#SBATCH --mem=80G
+#SBATCH --cpus-per-task=10
+#--exclude=secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
 
 python3 ../7_eval.py \
     --path_to_database $1 \

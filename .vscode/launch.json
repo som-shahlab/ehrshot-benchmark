@@ -14,9 +14,27 @@
         },
 
         {
+            "name": "Python Debugger: Generate AGR Features",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/4_generate_agr_features.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_to_database", "~/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract",
+                "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark",
+                "--path_to_features_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/features",
+                "--num_threads", "20",
+                "--is_force_refresh"
+            ],
+
+        },
+
+        {
             "name": "Python Debugger: Generate LLM Features",
             "type": "debugpy",
             "request": "launch",
+            "justMyCode": false,
             "program": "${workspaceFolder}/ehrshot/4_generate_llm_features.py",
             "console": "integratedTerminal",
             "args": [
@@ -27,6 +45,18 @@
                 "--is_force_refresh"
             ],
 
+        },
+
+        {
+            "name": "Python Debugger: 10_cis.py",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/10_cis.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_to_results_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/results"
+            ], 
         }
     ]
 }

@@ -16,14 +16,18 @@ if __name__ == "__main__":
 
     model_heads = [
         ('clmbr', 'lr_lbfgs'),
-        ('count', 'gbm'),
-        ('count', 'rf'),
+        # ('count', 'gbm'),
+        # ('count', 'rf'),
         ('count', 'lr_lbfgs'),
+        ('agr', 'lr_lbfgs'),
+        ('llm', 'lr_lbfgs'),
     ]
 
     score_map = collections.defaultdict(dict)
     
     LABELING_FUNCTIONS: List[str] = [ x for x in os.listdir(path_to_results_dir) if os.path.isdir(os.path.join(path_to_results_dir, x)) ]
+    # Debug: Remove lab and chexpert tasks
+    LABELING_FUNCTIONS = [ x for x in LABELING_FUNCTIONS if not x.startswith('lab') and not x.startswith('chexpert') ]
     SUBTASKS = []
 
     print("Labeling functions:", LABELING_FUNCTIONS)
