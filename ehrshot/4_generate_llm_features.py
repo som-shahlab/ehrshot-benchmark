@@ -1,17 +1,11 @@
 import argparse
 import pickle
 import os
-from typing import Any, Dict
 from loguru import logger
-from femr.featurizers import AgeFeaturizer, FeaturizerList
+from femr.featurizers import FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients
 from custom_featurizers import LLMFeaturizer
 from utils import check_file_existence_and_handle_force_refresh
-
-import torch
-from llm2vec import LLM2Vec
-from typing import Callable, Deque, Dict, Iterable, Iterator, List, Optional, Set, Tuple
-import numpy as np
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate text-based featurizations for LLM models (for all tasks at once)")

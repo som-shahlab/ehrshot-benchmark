@@ -1,31 +1,29 @@
 from __future__ import annotations
 
-import collections
 import datetime
-import functools
-import random
-from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 import numpy as np
 
 # Following original femr.featurizers
-from femr import Event, Patient
+from femr import Patient
 from femr.extension import datasets as extension_datasets
 from femr.labelers import Label
 from femr.featurizers.core import ColumnValue, Featurizer
-from femr.featurizers.utils import OnlineStatistics
 from femr.featurizers.featurizers import get_patient_birthdate
 
 # Additional imports
-from femr.featurizers.featurizers import _reshuffle_count_time_bins, exclusion_helper, ReservoirSampler
 # TODO: Remove count featurizer
 from femr.featurizers.featurizers import CountFeaturizer
 
 import torch
-from llm2vec import LLM2Vec
+import torch.nn.functional as F
+from torch import Tensor
+from transformers import AutoTokenizer, AutoModel
 import re
 import pandas as pd
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 class LLMFeaturizer(Featurizer):
     """
@@ -34,7 +32,10 @@ class LLMFeaturizer(Featurizer):
 
     def __init__(self):
         self.column_names = ['age', 'race', 'gender']
-        self.embedding_dim = 4096
+        # Llama 3
+        # self.embedding_dim = 4096
+        # Qwen 2
+        self.embedding_dim = 3584
         # Filled during preprocessing
         self.pid_serializations: Dict[int, str] = {}
 
@@ -67,13 +68,11 @@ class LLMFeaturizer(Featurizer):
         return self.embedding_dim
 
     def preprocess(self, patient: Patient, labels: List[Label], ontology: extension_datasets.Ontology):
-        
-        data = {'age': 0, 'race': 0, 'gender': 0}
-        race_dict = {1: 'american indian', 2: 'asian', 3: 'black', 4: 'pacific islander', 5: 'white'}
-        gender_dict = {'F': 'female', 'M': 'male'}
-        patient_birth_date: datetime = get_patient_birthdate(patient)
-        
+            
         # Single sentence for age, gender, race
+        # data = {'age': 0, 'race': 0, 'gender': 0}
+        # race_dict = {1: 'american indian', 2: 'asian', 3: 'black', 4: 'pacific islander', 5: 'white'}
+        # gender_dict = {'F': 'female', 'M': 'male'}
         # for event in patient.events:
         #     if event.code.startswith('Race/'):
         #         data['race'] = race_dict[int(event.code.split('/')[1])]
@@ -84,69 +83,71 @@ class LLMFeaturizer(Featurizer):
         # data['age'] = int((label.time - patient_birth_date).days / 365)
         # text = f"The patient is a {data['age']} year-old {data['gender']} of {data['race']} race."
         
-        # Serialization of all codes
-        text_events = []
-        text_set = set()
+        def serialize_unique_codes(events):
+            # Serialization of all codes
+            text_events = []
+            text_set = set()
+            
+            # Exclude some non-informative codes
+            re_exlude_description_prefixes = re.compile(r"^(CARE\_SITE\/|Birth|Plan Stop Reason|Patient discharge)")
+            
+            # Custom onlogies
+            re_ontologies = re.compile(r"^(CPT4\/|ICD10PCS\/|CVX\/)")
+            
+            # Remove some suffixes:
+            # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
+            # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
+            # 'by Manual count'
+            re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
+            
+            for event in events:
+                description = ontology.get_text_description(event.code)
+                # if len(text_events) >= 40:
+                #     break
+                if re_exlude_description_prefixes.match(description):
+                    continue
+                if re_ontologies.match(event.code):
+                    ontology_name = event.code.split('/')[0]
+                    code = event.code.split('/')[1].lower()
+                    if code in self.custom_ontologies[ontology_name]:
+                        description = self.custom_ontologies[ontology_name][code]
+                    else:
+                        continue
+                    
+                # Remove some irrelevant artifacts
+                # Remove all [*] - often correspond to units
+                description = re.sub(r"\[.*\]", "", description)
+                # Remove suffixes
+                description = re_exclude_description_suffixes.sub("", description)
+                # Remove repeated whitespaces
+                description = re.sub(r"\s+", " ", description)
+                description = description.strip()
+                
+                # Each code only once
+                if description in text_set:
+                    continue
+                text_set.add(description)
+                
+                if type(event.value) is str:
+                    text_events.append(f"- {description}: {event.value}")
+                # TODO: Add handling of numeric values
+                else:
+                    text_events.append(f"- {description}")
+                
+            text = '\n'.join(text_events)
+            # print('-'*20)
+            # print('-'*20)
+            # print(text)
+            return text
+        
+        text = serialize_unique_codes(patient.events)
         
         # Add age manually
-        # Debug: assume same age across all labels for first test run
         label = labels[0]
+        patient_birth_date: datetime = get_patient_birthdate(patient)
         age = int((label.time - patient_birth_date).days / 365)
-        text_events.append(f"- Age: {age}")
+        text = f"- Age: {age}\n" + text
         
-        # Exclude some non-informative codes
-        re_exlude_description_prefixes = re.compile(r"^(CARE\_SITE\/|Birth|Plan Stop Reason|Patient discharge)")
-        
-        # Custom onlogies
-        re_ontologies = re.compile(r"^(CPT4\/|ICD10PCS\/|CVX\/)")
-        
-        # Remove some suffixes:
-        # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
-        # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
-        # 'by Manual count'
-        re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
-        
-        for event in patient.events:
-            description = ontology.get_text_description(event.code)
-            # if len(text_events) >= 40:
-            #     break
-            if re_exlude_description_prefixes.match(description):
-                continue
-            if re_ontologies.match(event.code):
-                ontology_name = event.code.split('/')[0]
-                code = event.code.split('/')[1].lower()
-                if code in self.custom_ontologies[ontology_name]:
-                    description = self.custom_ontologies[ontology_name][code]
-                else:
-                    continue
-                
-            # Remove some irrelevant artifacts
-            # Remove all [*] - often correspond to units
-            description = re.sub(r"\[.*\]", "", description)
-            # Remove suffixes
-            description = re_exclude_description_suffixes.sub("", description)
-            # Remove repeated whitespaces
-            description = re.sub(r"\s+", " ", description)
-            description = description.strip()
-            
-            # Each code only once
-            if description in text_set:
-                continue
-            text_set.add(description)
-            
-            if type(event.value) is str:
-                text_events.append(f"- {description}: {event.value}")
-            # TODO: Add handling of numeric values
-            else:
-                text_events.append(f"- {description}")
-            
-        text = '\n'.join(text_events)
-        # print('-'*20)
-        # print('-'*20)
-        # print(text)
-
-        # Text serialization of all data
-        # instruction = "Classify the following description of a patient as being at risk for death or not: "
         instruction = ""
         text = instruction + text
         
@@ -174,20 +175,101 @@ class LLMFeaturizer(Featurizer):
         for i, pid in enumerate(pids):
             pid_to_index[pid] = i
         serializations = [merged_serializations[pid] for pid in pids]
+        
+        ###########################################################################################
+        # Qwen models
+        def last_token_pool(last_hidden_states: Tensor,
+                            attention_mask: Tensor) -> Tensor:
+            left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+            if left_padding:
+                return last_hidden_states[:, -1]
+            else:
+                sequence_lengths = attention_mask.sum(dim=1) - 1
+                batch_size = last_hidden_states.shape[0]
+                return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
-        model = LLM2Vec.from_pretrained(
-            "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
-            peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.bfloat16,
-            max_length=8192,
-            doc_max_length=8192,
-        )
-        def encode_texts(texts: List[str]) -> np.ndarray:
-            return np.array(model.encode(texts, batch_size=8))
-        merged_encodings = encode_texts(serializations)
+        def get_detailed_instruct(task_description: str, query: str) -> str:
+            return f'Instruct: {task_description}\nQuery: {query}'
+
+        # TODO: If want to use intructions, check format
+        # Each query must come with a one-sentence instruction that describes the task
+        # task = 'Given a web search query, retrieve relevant passages that answer the query'
+        # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
+
+        tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(device)
+        
+        class TextsDataset(Dataset):
+            def __init__(self, texts):
+                self.texts = texts 
+
+            def __len__(self):
+                return len(self.texts)
+
+            def __getitem__(self, idx):
+                return self.texts[idx]
+
+        def encode(texts: List[str], batch_size: int) -> np.ndarray:
+            with torch.no_grad():
+                dataloader = DataLoader(TextsDataset(serializations), batch_size=batch_size, shuffle=False)
+                all_embeddings = []
+                for batch in tqdm(dataloader, desc="Processing Batches"):
+                    batch_dict = tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(device)
+                    outputs = model(**batch_dict)
+                    embeddings = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+                    normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
+                    all_embeddings.append(normalized_embeddings)
+                return np.concatenate(all_embeddings, axis=0)
+        
+        merged_encodings = encode(serializations, batch_size=8)
         del model
 
+        ###########################################################################################
+        # LLM2Vec models
+        
+        # LLM2Vec-Llama3-supervised
+        # model = LLM2Vec.from_pretrained(
+        #     "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
+        #     peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
+        #     device_map="cuda" if torch.cuda.is_available() else "cpu",
+        #     torch_dtype=torch.bfloat16,
+        #     max_length=8192,
+        #     doc_max_length=8192,
+        # )
+
+        # LLM2Vec-Llama3-supervised
+        # model_path = "/home/sthe14/llm2vec/output"
+        # llm2vec_llama3_1_8b_supervised = ModelMeta(
+        #     loader=_loader(
+        #         LLM2VecWrapper,
+        #         base_model_name_or_path=model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
+        #         peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
+        #         device_map="auto",
+        #         torch_dtype=torch.bfloat16,
+        #     ),
+        #     name="local/LLM2Vec-Meta-Llama-3.1-8B-Instruct-mntp-supervised",
+        #     languages=["eng_Latn"],
+        #     open_source=True,
+        #     revision=None,
+        #     release_date="2024-04-09",
+        # )
+        
+        # LLM2Vec-Llama3.1-supervised
+        # model = LLM2Vec.from_pretrained(
+        #     model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
+        #     peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
+        #     device_map="cuda" if torch.cuda.is_available() else "cpu",
+        #     torch_dtype=torch.bfloat16,
+        #     max_length=8192,
+        #     doc_max_length=8192,
+        # )
+        # def encode_texts(texts: List[str]) -> np.ndarray:
+        #     return np.array(model.encode(texts, batch_size=8))
+        # merged_encodings = encode_texts(serializations)
+        # del model
+
+        # Add serializations to template featurizer
         template_featurizer: LLMFeaturizer = featurizers[0]
         template_featurizer.pids = pids
         template_featurizer.pid_to_index = pid_to_index
