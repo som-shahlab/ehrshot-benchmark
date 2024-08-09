@@ -14,7 +14,20 @@
         },
 
         {
-            "name": "Python Debugger: Generate AGR Features",
+            "name": "Python Debugger: 3_consolidate_labels.py",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/3_consolidate_labels.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark",
+                "--is_force_refresh"
+            ], 
+        },
+
+        {
+            "name": "Python Debugger: 4 Generate AGR Features",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
@@ -31,7 +44,7 @@
         },
 
         {
-            "name": "Python Debugger: Generate LLM Features",
+            "name": "Python Debugger: 4 Generate LLM Features",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
@@ -41,7 +54,7 @@
                 "--path_to_database", "~/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract",
                 "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark",
                 "--path_to_features_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/features",
-                "--num_threads", "20",
+                "--num_threads", "1",
                 "--is_force_refresh"
             ],
 

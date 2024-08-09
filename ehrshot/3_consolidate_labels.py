@@ -25,12 +25,16 @@ if __name__ == "__main__":
 
     # Get all labels currently in `PATH_TO_LABELS_DIR`
     labeling_functions: List[str] = os.listdir(PATH_TO_LABELS_DIR)
+    # TODO: For faster testing only include tasks 'new_*' and 'guo_*'
+    labeling_functions = [x for x in labeling_functions if x.startswith('new_') or x.startswith('guo_')]
     logger.info(f"Found {len(labeling_functions)} labeling functions to merge: {labeling_functions}")
     
     # Merge all predictions times for all labels across all tasks into a single file,
     # so that we can later generate features for all of them at once.
     logger.info("Start | Consolidate patients")
     patient_2_label_times: Dict[int, Set[datetime.datetime]] = collections.defaultdict(set)
+    # TODO: Labels are reduced to prediction times, which leads to reduction of 1,178,654 to 406,379
+    # Could try to keep them separate for each task for task specific processing for LLM features
     for lf in labeling_functions:
         labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(PATH_TO_LABELS_DIR, lf, 'labeled_patients.csv'))
         for patient_id, labels in labeled_patients.items():

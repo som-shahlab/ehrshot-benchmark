@@ -23,6 +23,7 @@ from transformers import AutoTokenizer, AutoModel
 import re
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset
+from llm2vec import LLM2Vec
 from tqdm import tqdm
 
 class LLMFeaturizer(Featurizer):
@@ -31,14 +32,16 @@ class LLMFeaturizer(Featurizer):
     """
 
     def __init__(self):
-        self.column_names = ['age', 'race', 'gender']
-        # Llama 3
-        # self.embedding_dim = 4096
+        # Llama 3(.1)
+        self.embedding_dim = 4096
         # Qwen 2
-        self.embedding_dim = 3584
-        # Filled during preprocessing
-        self.pid_serializations: Dict[int, str] = {}
+        # self.embedding_dim = 3584
 
+        # Filled during preprocessing
+        # Dict of int and list of strings
+        self.pid_label_serializations: Dict[int, List[str]] = {}
+        self.pid_serializations: Dict[int, str] = {}
+        
         # Filled during aggregation
         self.pids: List[int] = []
         self.pid_to_index: Dict[int, int] = {}
@@ -69,20 +72,6 @@ class LLMFeaturizer(Featurizer):
 
     def preprocess(self, patient: Patient, labels: List[Label], ontology: extension_datasets.Ontology):
             
-        # Single sentence for age, gender, race
-        # data = {'age': 0, 'race': 0, 'gender': 0}
-        # race_dict = {1: 'american indian', 2: 'asian', 3: 'black', 4: 'pacific islander', 5: 'white'}
-        # gender_dict = {'F': 'female', 'M': 'male'}
-        # for event in patient.events:
-        #     if event.code.startswith('Race/'):
-        #         data['race'] = race_dict[int(event.code.split('/')[1])]
-        #     elif event.code.startswith('Gender/'):
-        #         data['gender'] = gender_dict[event.code.split('/')[1]]
-        # # Debug: assume same age across all labels for first test run
-        # label = labels[0]
-        # data['age'] = int((label.time - patient_birth_date).days / 365)
-        # text = f"The patient is a {data['age']} year-old {data['gender']} of {data['race']} race."
-        
         def serialize_unique_codes(events):
             # Serialization of all codes
             text_events = []
@@ -135,23 +124,31 @@ class LLMFeaturizer(Featurizer):
                     text_events.append(f"- {description}")
                 
             text = '\n'.join(text_events)
-            # print('-'*20)
-            # print('-'*20)
-            # print(text)
             return text
+
+        label_serializations: List[str] = []
+        for label in labels:
+            # According to existing feature processing, all events before or at the label time are included
+            text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
         
-        text = serialize_unique_codes(patient.events)
+            # Add age manually
+            patient_birth_date: datetime = get_patient_birthdate(patient)
+            age = int((label.time - patient_birth_date).days / 365)
+            text = f"- Age: {age}\n" + text
         
-        # Add age manually
-        label = labels[0]
-        patient_birth_date: datetime = get_patient_birthdate(patient)
-        age = int((label.time - patient_birth_date).days / 365)
-        text = f"- Age: {age}\n" + text
+            # TODO: Get task specific labels for be able to add task specific instructions
+            # Add instruction
+            instruction = ""
+            text = instruction + text
+
+            label_serializations.append(text)
+            
+            # TODO: Debug - only consider serialization for first label
+            break
         
-        instruction = ""
-        text = instruction + text
-        
-        self.pid_serializations[patient.patient_id] = text
+        self.pid_label_serializations[patient.patient_id] = label_serializations
+        # TODO: Debug - test out to use serialization before first and earliest label
+        self.pid_serializations[patient.patient_id] = label_serializations[0]
         return
                     
     @classmethod
@@ -178,52 +175,52 @@ class LLMFeaturizer(Featurizer):
         
         ###########################################################################################
         # Qwen models
-        def last_token_pool(last_hidden_states: Tensor,
-                            attention_mask: Tensor) -> Tensor:
-            left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
-            if left_padding:
-                return last_hidden_states[:, -1]
-            else:
-                sequence_lengths = attention_mask.sum(dim=1) - 1
-                batch_size = last_hidden_states.shape[0]
-                return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
+        # def last_token_pool(last_hidden_states: Tensor,
+        #                     attention_mask: Tensor) -> Tensor:
+        #     left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+        #     if left_padding:
+        #         return last_hidden_states[:, -1]
+        #     else:
+        #         sequence_lengths = attention_mask.sum(dim=1) - 1
+        #         batch_size = last_hidden_states.shape[0]
+        #         return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
-        def get_detailed_instruct(task_description: str, query: str) -> str:
-            return f'Instruct: {task_description}\nQuery: {query}'
+        # def get_detailed_instruct(task_description: str, query: str) -> str:
+        #     return f'Instruct: {task_description}\nQuery: {query}'
 
-        # TODO: If want to use intructions, check format
-        # Each query must come with a one-sentence instruction that describes the task
-        # task = 'Given a web search query, retrieve relevant passages that answer the query'
-        # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
+        # # TODO: If want to use intructions, check format
+        # # Each query must come with a one-sentence instruction that describes the task
+        # # task = 'Given a web search query, retrieve relevant passages that answer the query'
+        # # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
 
-        tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(device)
+        # tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(device)
         
-        class TextsDataset(Dataset):
-            def __init__(self, texts):
-                self.texts = texts 
+        # class TextsDataset(Dataset):
+        #     def __init__(self, texts):
+        #         self.texts = texts 
 
-            def __len__(self):
-                return len(self.texts)
+        #     def __len__(self):
+        #         return len(self.texts)
 
-            def __getitem__(self, idx):
-                return self.texts[idx]
+        #     def __getitem__(self, idx):
+        #         return self.texts[idx]
 
-        def encode(texts: List[str], batch_size: int) -> np.ndarray:
-            with torch.no_grad():
-                dataloader = DataLoader(TextsDataset(serializations), batch_size=batch_size, shuffle=False)
-                all_embeddings = []
-                for batch in tqdm(dataloader, desc="Processing Batches"):
-                    batch_dict = tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(device)
-                    outputs = model(**batch_dict)
-                    embeddings = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
-                    normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
-                    all_embeddings.append(normalized_embeddings)
-                return np.concatenate(all_embeddings, axis=0)
+        # def encode(texts: List[str], batch_size: int) -> np.ndarray:
+        #     with torch.no_grad():
+        #         dataloader = DataLoader(TextsDataset(serializations), batch_size=batch_size, shuffle=False)
+        #         all_embeddings = []
+        #         for batch in tqdm(dataloader, desc="Processing Batches"):
+        #             batch_dict = tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(device)
+        #             outputs = model(**batch_dict)
+        #             embeddings = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+        #             normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
+        #             all_embeddings.append(normalized_embeddings)
+        #         return np.concatenate(all_embeddings, axis=0)
         
-        merged_encodings = encode(serializations, batch_size=8)
-        del model
+        # merged_encodings = encode(serializations, batch_size=8)
+        # del model
 
         ###########################################################################################
         # LLM2Vec models
@@ -238,36 +235,20 @@ class LLMFeaturizer(Featurizer):
         #     doc_max_length=8192,
         # )
 
-        # LLM2Vec-Llama3-supervised
-        # model_path = "/home/sthe14/llm2vec/output"
-        # llm2vec_llama3_1_8b_supervised = ModelMeta(
-        #     loader=_loader(
-        #         LLM2VecWrapper,
-        #         base_model_name_or_path=model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
-        #         peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
-        #         device_map="auto",
-        #         torch_dtype=torch.bfloat16,
-        #     ),
-        #     name="local/LLM2Vec-Meta-Llama-3.1-8B-Instruct-mntp-supervised",
-        #     languages=["eng_Latn"],
-        #     open_source=True,
-        #     revision=None,
-        #     release_date="2024-04-09",
-        # )
-        
         # LLM2Vec-Llama3.1-supervised
-        # model = LLM2Vec.from_pretrained(
-        #     model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
-        #     peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
-        #     device_map="cuda" if torch.cuda.is_available() else "cpu",
-        #     torch_dtype=torch.bfloat16,
-        #     max_length=8192,
-        #     doc_max_length=8192,
-        # )
-        # def encode_texts(texts: List[str]) -> np.ndarray:
-        #     return np.array(model.encode(texts, batch_size=8))
-        # merged_encodings = encode_texts(serializations)
-        # del model
+        model_path = "/home/sthe14/llm2vec/output"
+        model = LLM2Vec.from_pretrained(
+            model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
+            peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            torch_dtype=torch.bfloat16,
+            max_length=8192,
+            doc_max_length=8192,
+        )
+        def encode_texts(texts: List[str]) -> np.ndarray:
+            return np.array(model.encode(texts, batch_size=8))
+        merged_encodings = encode_texts(serializations)
+        del model
 
         # Add serializations to template featurizer
         template_featurizer: LLMFeaturizer = featurizers[0]
