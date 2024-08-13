@@ -6,6 +6,7 @@ from femr.featurizers import FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients
 from custom_featurizers import LLMFeaturizer
 from utils import check_file_existence_and_handle_force_refresh
+import numpy as np
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate text-based featurizations for LLM models (for all tasks at once)")
@@ -24,6 +25,7 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
+    # TODO
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'llm_features_out.pkl')
 
     # Force refresh
@@ -37,16 +39,16 @@ if __name__ == "__main__":
     # they've had in their record up to the prediction timepoint for each label
     # age = AgeFeaturizer()
     text = LLMFeaturizer()
-    featurizer_age_text = FeaturizerList([text])
+    featurizer_text = FeaturizerList([text])
 
     # Preprocessing the featurizers -- this includes processes such as normalizing age
     logger.info("Start | Preprocess featurizers")
-    featurizer_age_text.preprocess_featurizers(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
+    featurizer_text.preprocess_featurizers(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
     logger.info("Finish | Preprocess featurizers")
 
     # Run actual featurization for each patient
     logger.info("Start | Featurize patients")
-    results = featurizer_age_text.featurize(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
+    results = featurizer_text.featurize(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
     feature_matrix, patient_ids, label_values, label_times = (
         results[0],
         results[1],
@@ -54,6 +56,9 @@ if __name__ == "__main__":
         results[3],
     )
     logger.info("Finish | Featurize patients")
+    
+    # Ensure that all final features sum up to the same value as the generated embeddings
+    assert np.allclose(featurizer_text.featurizers[0].embeddings.sum(axis=0), feature_matrix.sum(axis=0))
 
     # Save results
     logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")

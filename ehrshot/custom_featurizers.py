@@ -25,6 +25,7 @@ import pandas as pd
 from torch.utils.data import DataLoader, Dataset
 from llm2vec import LLM2Vec
 from tqdm import tqdm
+import random
 
 class LLMFeaturizer(Featurizer):
     """
@@ -38,15 +39,13 @@ class LLMFeaturizer(Featurizer):
         # self.embedding_dim = 3584
 
         # Filled during preprocessing
-        # Dict of int and list of strings
-        self.pid_label_serializations: Dict[int, List[str]] = {}
-        self.pid_serializations: Dict[int, str] = {}
+        # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
+        self.pid_label_idx_serializations: Dict[Tuple[int, int], int] = {}
         
         # Filled during aggregation
-        self.pids: List[int] = []
-        self.pid_to_index: Dict[int, int] = {}
-        self.serializations: List[str] = []
-        self.encodings: np.ndarray = np.array([])
+        # Numpy array of embeddings according to order of .items() of pid_label_idx_serializations
+        self.embeddings: np.ndarray = np.array([])
+        self.pid_to_embedding_idx: Dict[int, List[int]] = {}
         
         # Custom ontologies
         cpt4 = pd.read_csv('ehrshot/custom_ontologies/cpt4.csv')
@@ -125,9 +124,11 @@ class LLMFeaturizer(Featurizer):
                 
             text = '\n'.join(text_events)
             return text
+        
+        # Initialize mapping from pids to embedding indices based on number of labels
+        self.pid_to_embedding_idx[patient.patient_id] = [-1] * len(labels)
 
-        label_serializations: List[str] = []
-        for label in labels:
+        for label_idx, label in enumerate(labels):
             # According to existing feature processing, all events before or at the label time are included
             text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
         
@@ -141,14 +142,8 @@ class LLMFeaturizer(Featurizer):
             instruction = ""
             text = instruction + text
 
-            label_serializations.append(text)
-            
-            # TODO: Debug - only consider serialization for first label
-            break
+            self.pid_label_idx_serializations[(patient.patient_id, label_idx)] = text
         
-        self.pid_label_serializations[patient.patient_id] = label_serializations
-        # TODO: Debug - test out to use serialization before first and earliest label
-        self.pid_serializations[patient.patient_id] = label_serializations[0]
         return
                     
     @classmethod
@@ -161,17 +156,29 @@ class LLMFeaturizer(Featurizer):
         if len(featurizers) == 0:
             raise ValueError("You must pass in at least one featurizer to `aggregate_preprocessed_featurizers`")
 
-        # Combine all self.serialization of all featurizers
-        merged_serializations: dict[int, str] = {}
-        for featurizer in featurizers:
-            merged_serializations.update(featurizer.pid_serializations)
+        # Helper function to get all patient IDs from a dictionary
+        def get_pids(d: Dict[Tuple[int, int], int]) -> Set[int]:
+            return set(map(lambda d: d[0], d.keys()))
 
-        # Fix ordering of patients
-        pids = list(merged_serializations.keys())
-        pid_to_index: Dict[int, int] = {}
-        for i, pid in enumerate(pids):
-            pid_to_index[pid] = i
-        serializations = [merged_serializations[pid] for pid in pids]
+        # Combine all self.serialization of all featurizers
+        merged_pid_label_idx_serializations: dict[int, List[str]] = {}
+        merged_pid_to_embedding_idx: dict[int, List[int]] = {}
+        for featurizer in featurizers:
+            # Check that each featurizer considered disjoint set of patients
+            assert get_pids(merged_pid_label_idx_serializations).isdisjoint(get_pids(featurizer.pid_label_idx_serializations))
+            merged_pid_label_idx_serializations.update(featurizer.pid_label_idx_serializations)
+            assert merged_pid_to_embedding_idx.keys().isdisjoint(featurizer.pid_to_embedding_idx.keys())
+            merged_pid_to_embedding_idx.update(featurizer.pid_to_embedding_idx)
+            assert len(get_pids(merged_pid_label_idx_serializations)) == len(merged_pid_to_embedding_idx)
+
+        # Fix ordering of serializations
+        merged_pid_label_idx_serializations = dict(sorted(merged_pid_label_idx_serializations.items()))
+        serializations = []
+        for idx, ((pid, label_idx), serialization) in enumerate(merged_pid_label_idx_serializations.items()):
+            serializations.append(serialization)
+            merged_pid_to_embedding_idx[pid][label_idx] = idx
+        # Check that merged_pid_to_embedding_idx contains all indices from 0 to len(serializations) - 1
+        assert set([idx for indices in merged_pid_to_embedding_idx.values() for idx in indices]) == set(range(len(serializations)))
         
         ###########################################################################################
         # Qwen models
@@ -219,7 +226,7 @@ class LLMFeaturizer(Featurizer):
         #             all_embeddings.append(normalized_embeddings)
         #         return np.concatenate(all_embeddings, axis=0)
         
-        # merged_encodings = encode(serializations, batch_size=8)
+        # merged_embeddings = encode(serializations, batch_size=8)
         # del model
 
         ###########################################################################################
@@ -247,18 +254,18 @@ class LLMFeaturizer(Featurizer):
         )
         def encode_texts(texts: List[str]) -> np.ndarray:
             return np.array(model.encode(texts, batch_size=8))
-        merged_encodings = encode_texts(serializations)
+        merged_embeddings = encode_texts(serializations)
+        
         del model
 
         # Add serializations to template featurizer
         template_featurizer: LLMFeaturizer = featurizers[0]
-        template_featurizer.pids = pids
-        template_featurizer.pid_to_index = pid_to_index
-        template_featurizer.serializations = serializations
-        template_featurizer.encodings = merged_encodings
+        template_featurizer.pid_label_idx_serializations = merged_pid_label_idx_serializations
+        # Ensure same ordering of serializations as at the beginning to create the list of serializations using .items()
+        template_featurizer.embeddings = merged_embeddings
+        template_featurizer.pid_to_embedding_idx = merged_pid_to_embedding_idx
 
         return template_featurizer
-
 
     def featurize(
         self,
@@ -274,23 +281,17 @@ class LLMFeaturizer(Featurizer):
         # Inner list is the list of features for that label
         
         # Use the dictionary for fast lookups
-        patient_index = self.pid_to_index.get(patient.patient_id)
-        patient_encoding = self.encodings[patient_index]
-
-        # Precompute the common feature list for the patient
-        # common_features = [ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)]
-        # Do the same with map function
-        common_features = list(map(lambda i: ColumnValue(i, patient_encoding[i]), range(self.embedding_dim)))
-        # TODO: Currently duplicate the features for each label
-        all_columns = [common_features for _ in labels]
-
-        # patient_encoding = self.encodings[self.pids.index(patient.patient_id)]
+        # This is a numpy array with dimension (num_labels, embedding_dim)
+        patient_labels_embeddings = self.embeddings[self.pid_to_embedding_idx[patient.patient_id]]
         
-        # for _ in labels:
-        #     # Copy encoding for each label
-        #     # TODO: Add label specific encodings
-        #     all_columns.append([ColumnValue(i, patient_encoding[i]) for i in range(self.embedding_dim)])
-
+        # Create list of list of column values
+        # all_columns = []
+        # for label_idx, _ in enumerate(labels):
+        #     all_columns.append(list(map(lambda i: ColumnValue(i, patient_labels_embeddings[label_idx, i]), range(self.embedding_dim))))
+            
+        # Create list of list of column values using list comprehension
+        all_columns = [[ColumnValue(i, patient_labels_embeddings[label_idx, i]) for i in range(self.embedding_dim)] for label_idx, _ in enumerate(labels)]
+        
         return all_columns
 
     def is_needs_preprocessing(self) -> bool:
