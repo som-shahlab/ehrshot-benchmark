@@ -4,7 +4,7 @@ import os
 from loguru import logger
 from femr.featurizers import FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients
-from ehrshot.llm_featurizer import LLMFeaturizer
+from llm_featurizer import LLMFeaturizer
 from utils import check_file_existence_and_handle_force_refresh
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder
