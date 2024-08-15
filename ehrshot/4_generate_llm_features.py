@@ -7,6 +7,7 @@ from femr.labelers import LabeledPatients, load_labeled_patients
 from custom_featurizers import LLMFeaturizer
 from utils import check_file_existence_and_handle_force_refresh
 import numpy as np
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate text-based featurizations for LLM models (for all tasks at once)")
@@ -27,6 +28,11 @@ if __name__ == "__main__":
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     # TODO
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'llm_features_out.pkl')
+    
+    # LLM text encoder
+    # text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder())
+    text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder())
+    # text_encoder = TextEncoder(GTEQwen2_7B_InstructEncoder())
 
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
@@ -34,18 +40,21 @@ if __name__ == "__main__":
     # Load consolidated labels across all patients for all tasks
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELS_FILE)
-    # Debug: Only consider first 20 patients
-    # labeled_patients.patients_to_labels = {k: v for k, v in list(labeled_patients.patients_to_labels.items())[:20]}
+    # Debug: Only consider first 10 patients with at most 20 labels
+    # labeled_patients.patients_to_labels = {k: v[:20] for k, v in list(labeled_patients.patients_to_labels.items())[:10]}
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label
-    text = LLMFeaturizer()
-    featurizer_text = FeaturizerList([text])
+    llm_featurizer = LLMFeaturizer(text_encoder.encoder.embedding_size)
+    featurizer_text = FeaturizerList([llm_featurizer])
 
     # Preprocessing the featurizers -- this includes processes such as normalizing age
     logger.info("Start | Preprocess featurizers")
     featurizer_text.preprocess_featurizers(PATH_TO_PATIENT_DATABASE, labeled_patients, NUM_THREADS)
     logger.info("Finish | Preprocess featurizers")
+    
+    # Run text encoding on serializations of patients - must be done separately to prevent multiprocessing issue with CUDA
+    featurizer_text.featurizers[0].encode_serializations(text_encoder)
 
     # Run actual featurization for each patient
     logger.info("Start | Featurize patients")

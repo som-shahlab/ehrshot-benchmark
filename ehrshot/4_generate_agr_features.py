@@ -2,7 +2,6 @@ import argparse
 import pickle
 import os
 import datetime
-from typing import Any, Dict
 from loguru import logger
 from femr.featurizers import AgeFeaturizer, CountFeaturizer, FeaturizerList
 from femr.labelers import LabeledPatients, load_labeled_patients

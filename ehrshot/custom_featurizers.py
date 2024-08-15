@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Callable, Deque, Dict, Iterable, Iterator, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -16,18 +16,11 @@ from femr.featurizers.featurizers import get_patient_birthdate
 # TODO: Remove count featurizer
 from femr.featurizers.featurizers import CountFeaturizer
 
-import torch
-import torch.nn.functional as F
-from torch import Tensor
-from transformers import AutoTokenizer, AutoModel
 import re
 import pandas as pd
-from torch.utils.data import DataLoader, Dataset
-from llm2vec import LLM2Vec
-from tqdm import tqdm
-import random
 from serialization.ehr_serializer import EHRSerializer, ListUniqueEventsStrategy
 from femr import Event
+from serialization.text_encoder import TextEncoder
 
 
 class LLMFeaturizer(Featurizer):
@@ -35,11 +28,9 @@ class LLMFeaturizer(Featurizer):
     Produces LLM-encoded representation of patient.
     """
 
-    def __init__(self):
-        # Llama 3(.1)
-        self.embedding_dim = 4096
-        # Qwen 2
-        # self.embedding_dim = 3584
+    def __init__(self, embedding_size: int):
+
+        self.embedding_dim = embedding_size
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -47,6 +38,7 @@ class LLMFeaturizer(Featurizer):
         
         # Filled during aggregation
         # Numpy array of embeddings according to order of .items() of pid_label_idx_serializations
+        self.serializations: List[str] = []
         self.embeddings: np.ndarray = np.array([])
         self.pid_to_embedding_idx: Dict[int, List[int]] = {}
         
@@ -173,92 +165,21 @@ class LLMFeaturizer(Featurizer):
         # Check that merged_pid_to_embedding_idx contains all indices from 0 to len(serializations) - 1
         assert set([idx for indices in merged_pid_to_embedding_idx.values() for idx in indices]) == set(range(len(serializations)))
         
-        ###########################################################################################
-        # Qwen models
-        # def last_token_pool(last_hidden_states: Tensor,
-        #                     attention_mask: Tensor) -> Tensor:
-        #     left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
-        #     if left_padding:
-        #         return last_hidden_states[:, -1]
-        #     else:
-        #         sequence_lengths = attention_mask.sum(dim=1) - 1
-        #         batch_size = last_hidden_states.shape[0]
-        #         return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
-
-        # def get_detailed_instruct(task_description: str, query: str) -> str:
-        #     return f'Instruct: {task_description}\nQuery: {query}'
-
-        # # TODO: If want to use intructions, check format
-        # # Each query must come with a one-sentence instruction that describes the task
-        # # task = 'Given a web search query, retrieve relevant passages that answer the query'
-        # # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
-
-        # tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
-        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(device)
-        
-        # class TextsDataset(Dataset):
-        #     def __init__(self, texts):
-        #         self.texts = texts 
-
-        #     def __len__(self):
-        #         return len(self.texts)
-
-        #     def __getitem__(self, idx):
-        #         return self.texts[idx]
-
-        # def encode(texts: List[str], batch_size: int) -> np.ndarray:
-        #     with torch.no_grad():
-        #         dataloader = DataLoader(TextsDataset(serializations), batch_size=batch_size, shuffle=False)
-        #         all_embeddings = []
-        #         for batch in tqdm(dataloader, desc="Processing Batches"):
-        #             batch_dict = tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(device)
-        #             outputs = model(**batch_dict)
-        #             embeddings = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
-        #             normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
-        #             all_embeddings.append(normalized_embeddings)
-        #         return np.concatenate(all_embeddings, axis=0)
-        
-        # merged_embeddings = encode(serializations, batch_size=8)
-        # del model
-
-        ###########################################################################################
-        # LLM2Vec models
-        
-        # LLM2Vec-Llama3-supervised
-        # model = LLM2Vec.from_pretrained(
-        #     "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
-        #     peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
-        #     device_map="cuda" if torch.cuda.is_available() else "cpu",
-        #     torch_dtype=torch.bfloat16,
-        #     max_length=8192,
-        #     doc_max_length=8192,
-        # )
-
-        # LLM2Vec-Llama3.1-supervised
-        model_path = "/home/sthe14/llm2vec/output"
-        model = LLM2Vec.from_pretrained(
-            model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
-            peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.bfloat16,
-            max_length=8192,
-            doc_max_length=8192,
-        )
-        def encode_texts(texts: List[str], model) -> np.ndarray:
-            return np.array(model.encode(texts, batch_size=8))
-        merged_embeddings = encode_texts(serializations, model)
-        
-        del model
-
-        # Add serializations to template featurizer
+        # Set template featurizer
         template_featurizer: LLMFeaturizer = featurizers[0]
+        # Add serializations to template featurizer
         template_featurizer.pid_label_idx_serializations = merged_pid_label_idx_serializations
         # Ensure same ordering of serializations as at the beginning to create the list of serializations using .items()
-        template_featurizer.embeddings = merged_embeddings
+        template_featurizer.serializations = serializations
+        template_featurizer.embeddings = None
         template_featurizer.pid_to_embedding_idx = merged_pid_to_embedding_idx
 
         return template_featurizer
+    
+    def encode_serializations(self, text_encoder: TextEncoder) -> None:
+        """ Encode all serializations into embeddings. Outside of featurizer functions to prevent CUDA issues. """
+        assert self.embeddings is None, "Embeddings already exist"
+        self.embeddings = text_encoder.encoder.encode(self.serializations)
 
     def featurize(
         self,
@@ -292,7 +213,7 @@ class LLMFeaturizer(Featurizer):
 
     def __repr__(self) -> str:
         # return f"LLMFeaturizer(number of included codes={self.num_columns})"
-        return f"LLMFeaturizer()"
+        return "LLMFeaturizer()"
 
     def get_column_name(self, column_idx: int) -> str:
         return "Embedding"
