@@ -34,10 +34,11 @@ if __name__ == "__main__":
     # Load consolidated labels across all patients for all tasks
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELS_FILE)
+    # Debug: Only consider first 20 patients
+    # labeled_patients.patients_to_labels = {k: v for k, v in list(labeled_patients.patients_to_labels.items())[:20]}
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label
-    # age = AgeFeaturizer()
     text = LLMFeaturizer()
     featurizer_text = FeaturizerList([text])
 
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     logger.info("Finish | Featurize patients")
     
     # Ensure that all final features sum up to the same value as the generated embeddings
-    assert np.allclose(featurizer_text.featurizers[0].embeddings.sum(axis=0), feature_matrix.sum(axis=0))
+    assert np.allclose(featurizer_text.featurizers[0].embeddings, feature_matrix.toarray())
 
     # Save results
     logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
