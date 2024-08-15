@@ -106,23 +106,23 @@ Each patient consists of an ordered timeline of clinical events taken from the s
 
 Each task is a predictive classification task, and includes a canonical train/val/test split. The tasks are defined as follows:
 
-|         Task         | Type              | Prediction Time                       | Time Horizon           |
-|:--------------------:|-------------------|---------------------------------------|------------------------|
-| Long Length of Stay  | Binary            | 11:59pm on day of admission           | Admission duration     |
-| 30-day Readmission   | Binary            | 11:59pm on day of discharge           | 30-days post discharge |
-| ICU Transfer         | Binary            | 11:59pm on day of admission           | Admission duration     |
-| Thrombocytopenia     | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hyperkalemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hypoglycemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hyponatremia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Anemia               | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hypertension         | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Hyperlipidemia       | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Pancreatic Cancer    | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Celiac               | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Lupus                | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |
+|         Task         | Type              | Prediction Time                       | Time Horizon           | Possible Label Values in Dataset |
+|:--------------------:|-------------------|---------------------------------------|------------------------|--------|
+| Long Length of Stay  | Binary            | 11:59pm on day of admission           | Admission duration     |  {0,1} aka {<7 days, >=7 days} |
+| 30-day Readmission   | Binary            | 11:59pm on day of discharge           | 30-days post discharge |  {0,1} aka {no readmission, readmission} |
+| ICU Transfer         | Binary            | 11:59pm on day of admission           | Admission duration     |  {0,1} aka {no transfer, transfer} |
+| Thrombocytopenia     | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hyperkalemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hypoglycemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hyponatremia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Anemia               | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hypertension         | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Hyperlipidemia       | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Pancreatic Cancer    | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Celiac               | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Lupus                | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |  {0,1,...,8192} aka binary string where a 1 at location `idx` means that the label at `CHEXPERT_LABELS[idx]` is True, per [this array](https://github.com/som-shahlab/ehrshot-benchmark/blob/f23b83a2b487b6ae8da06cb08b23b3656c447307/ehrshot/utils.py#L107C1-L122C2) |
 
 
 

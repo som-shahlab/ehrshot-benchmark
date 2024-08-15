@@ -236,7 +236,7 @@ if __name__ == "__main__":
             df_ = df_.rename(columns={'-1' : 'All'})
             df_.to_csv(os.path.join(path_to_output_dir_, f'{sub_task}_pretty.csv'), index=False)
             # Create Markdown table with just `All`
-            df_all_ = df_[['model', 'head', 'All']]
+            df_all_ = df_[['model', 'head', 'All']].sort_values(['All'], ascending=False)
             df_all_.to_markdown(os.path.join(path_to_output_dir_, f'{sub_task}_pretty_all.md'), index=False)
             # Create HTML Table with multicolumn header
             df_['model'] = df_['model'] + ' - ' + df_['head']
@@ -286,7 +286,7 @@ if __name__ == "__main__":
             df_ = df_.rename(columns={'-1' : 'All'})
             df_.to_csv(os.path.join(path_to_output_dir_, f'{task_group}_pretty.csv'), index=False)
             # Create Markdown table with just `All`
-            df_all_ = df_[['model', 'head', 'All']]
+            df_all_ = df_[['model', 'head', 'All']].sort_values(['All'], ascending=False)
             df_all_.to_markdown(os.path.join(path_to_output_dir_, f'{task_group}_pretty_all.md'), index=False)
             # Create HTML Table with multicolumn header
             df_['model'] = df_['model'] + ' - ' + df_['head']
