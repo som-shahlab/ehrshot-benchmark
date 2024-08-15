@@ -26,6 +26,9 @@ from torch.utils.data import DataLoader, Dataset
 from llm2vec import LLM2Vec
 from tqdm import tqdm
 import random
+from serialization.ehr_serializer import EHRSerializer, ListUniqueEventsStrategy
+from femr import Event
+
 
 class LLMFeaturizer(Featurizer):
     """
@@ -65,72 +68,62 @@ class LLMFeaturizer(Featurizer):
         for name, ontology in custom_ontologies.items():
             custom_ontologies[name] = {str(k).strip().lower(): v for k, v in ontology.items()}
         self.custom_ontologies = custom_ontologies
+        self.re_custom_ontologies = re.compile(r"^(" + "|".join(custom_ontologies.keys()) + ")\/")
 
+        # Remove some non-informative semantic codes / descriptions
+        exclude_description_prefixes = ['Birth']
+        # exclude_description_prefixes = ['CARE\_SITE\/', 'Birth', 'Plan Stop Reason', 'Patient discharge']
+        self.re_exclude_description_prefixes = None if exclude_description_prefixes == [] else re.compile(r"^(" + "|".join(exclude_description_prefixes) + ")")
+    
     def get_num_columns(self) -> int:
         return self.embedding_dim
+    
+    def resolve_code_with_custom_ontologies(self, ontology: extension_datasets.Ontology, code: str) -> str:
+        # Resolve semantic code to its description with default and custom onotologies
+        description = ontology.get_text_description(code)
+        
+        # Exclude some custom ontologies / descriptions
+        if self.re_exclude_description_prefixes is not None and self.re_exclude_description_prefixes.match(description):
+            return None
+
+        # Check if custom ontology is applicable
+        if self.re_custom_ontologies.match(code):
+            ontology_name = code.split('/')[0]
+            code = code.split('/')[1].lower()
+            if code in self.custom_ontologies[ontology_name]:
+                description = self.custom_ontologies[ontology_name][code]
+
+        # TODO: Post-process the description
+        # # Remove some irrelevant artifacts
+        # # Remove all [*] - often correspond to units
+        # description = re.sub(r"\[.*\]", "", description)
+        # # Remove suffixes
+        # description = re_exclude_description_suffixes.sub("", description)
+        # # Remove repeated whitespaces
+        # description = re.sub(r"\s+", " ", description)
+        description = description.strip()
+
+        return description
 
     def preprocess(self, patient: Patient, labels: List[Label], ontology: extension_datasets.Ontology):
-            
-        def serialize_unique_codes(events):
-            # Serialization of all codes
-            text_events = []
-            text_set = set()
-            
-            # Exclude some non-informative codes
-            re_exlude_description_prefixes = re.compile(r"^(CARE\_SITE\/|Birth|Plan Stop Reason|Patient discharge)")
-            
-            # Custom onlogies
-            re_ontologies = re.compile(r"^(CPT4\/|ICD10PCS\/|CVX\/)")
-            
-            # Remove some suffixes:
-            # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
-            # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
-            # 'by Manual count'
-            re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
-            
-            for event in events:
-                description = ontology.get_text_description(event.code)
-                # if len(text_events) >= 40:
-                #     break
-                if re_exlude_description_prefixes.match(description):
-                    continue
-                if re_ontologies.match(event.code):
-                    ontology_name = event.code.split('/')[0]
-                    code = event.code.split('/')[1].lower()
-                    if code in self.custom_ontologies[ontology_name]:
-                        description = self.custom_ontologies[ontology_name][code]
-                    else:
-                        continue
-                    
-                # Remove some irrelevant artifacts
-                # Remove all [*] - often correspond to units
-                description = re.sub(r"\[.*\]", "", description)
-                # Remove suffixes
-                description = re_exclude_description_suffixes.sub("", description)
-                # Remove repeated whitespaces
-                description = re.sub(r"\s+", " ", description)
-                description = description.strip()
-                
-                # Each code only once
-                if description in text_set:
-                    continue
-                text_set.add(description)
-                
-                if type(event.value) is str:
-                    text_events.append(f"- {description}: {event.value}")
-                # TODO: Add handling of numeric values
-                else:
-                    text_events.append(f"- {description}")
-                
-            text = '\n'.join(text_events)
-            return text
         
         # Initialize mapping from pids to embedding indices based on number of labels
         self.pid_to_embedding_idx[patient.patient_id] = [-1] * len(labels)
-
+        
+        def is_visit_event(event: Event) -> bool:
+            return event.code.startswith('Visit/')
+        
+        def resolve_code(code: str) -> str:
+            return self.resolve_code_with_custom_ontologies(ontology, code)
+        
         for label_idx, label in enumerate(labels):
             # According to existing feature processing, all events before or at the label time are included
-            text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
+            events_until_label = [event for event in patient.events if event.start <= label.time]
+            serializer = EHRSerializer()
+            serializer.load_from_femr_events(events_until_label, resolve_code, is_visit_event)
+            
+            # text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
+            text = serializer.serialize(ListUniqueEventsStrategy())
         
             # Add age manually
             patient_birth_date: datetime = get_patient_birthdate(patient)
@@ -252,9 +245,9 @@ class LLMFeaturizer(Featurizer):
             max_length=8192,
             doc_max_length=8192,
         )
-        def encode_texts(texts: List[str]) -> np.ndarray:
+        def encode_texts(texts: List[str], model) -> np.ndarray:
             return np.array(model.encode(texts, batch_size=8))
-        merged_embeddings = encode_texts(serializations)
+        merged_embeddings = encode_texts(serializations, model)
         
         del model
 
