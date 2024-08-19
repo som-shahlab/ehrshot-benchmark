@@ -7,7 +7,8 @@ from femr.labelers import LabeledPatients, load_labeled_patients
 from llm_featurizer import LLMFeaturizer
 from utils import check_file_existence_and_handle_force_refresh
 import numpy as np
-from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
+from datetime import datetime
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate text-based featurizations for LLM models (for all tasks at once)")
@@ -16,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
+    parser.add_argument("--text_encoder", type=str, help="Text encoder to use")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -26,13 +28,31 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
-    # TODO
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, 'llm_features_out.pkl')
     
     # LLM text encoder
-    # text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder())
-    text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder())
-    # text_encoder = TextEncoder(GTEQwen2_7B_InstructEncoder())
+    # Debug
+    # args.text_encoder = 'llm2vec_llama3_1_7b_instruct_supervised'
+    if args.text_encoder == 'llm2vec_llama3_7b_instruct_supervised':
+        text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder())
+    elif args.text_encoder == 'llm2vec_llama3_1_7b_instruct_supervised':
+        text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder())
+    elif args.text_encoder == 'gteqwen2_7b_instruct':
+        text_encoder = TextEncoder(GTEQwen2_7B_InstructEncoder())
+    elif args.text_encoder == 'st_gte_large_en_v15':
+        text_encoder = TextEncoder(STGTELargeENv15Encoder())
+    elif args.text_encoder == 'bioclinicalbert-fl':
+        text_encoder = TextEncoder(BioClinicalBert())
+    elif args.text_encoder == 'bioclinicalbert-fl-average-chunks':
+        text_encoder = TextEncoder(BioClinicalBert(handle_long_texts='average_chunks'))
+    elif args.text_encoder == 'longformerlarge-fl':
+        text_encoder = TextEncoder(LongformerLargeEncoder())
+    elif args.text_encoder == 'biomedicallongformerlarge-fl':
+        text_encoder = TextEncoder(LongformerLargeEncoder(biomedical=True))
+    else:
+        raise ValueError(f"Text encoder `{args.text_encoder}` not recognized")
+    # Add date and time (hh-mm-ss) to name
+    output_file_name = f'llm_features_{args.text_encoder}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.pkl'
+    PATH_TO_OUTPUT_FILE = os.path.join(PATH_TO_FEATURES_DIR, output_file_name)
 
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
@@ -42,6 +62,7 @@ if __name__ == "__main__":
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELS_FILE)
     # Debug: Only consider first 10 patients with at most 20 labels
     # labeled_patients.patients_to_labels = {k: v[:20] for k, v in list(labeled_patients.patients_to_labels.items())[:10]}
+    logger.info(f"Loaded {len(labeled_patients.patients_to_labels)} patients with {sum([len(v) for v in labeled_patients.patients_to_labels.values()])} labels")
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label

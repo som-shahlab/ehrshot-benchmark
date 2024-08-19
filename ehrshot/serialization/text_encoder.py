@@ -6,8 +6,11 @@ from llm2vec import LLM2Vec
 import torch.nn.functional as F
 from torch import Tensor
 from transformers import AutoTokenizer, AutoModel
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
+from torch.utils.data import Dataset as TorchDataset
+from datasets import Dataset
 from tqdm import tqdm
+from typing import Tuple
 
 class LLMEncoder(ABC):
     def __init__(self, embedding_size: int):
@@ -16,6 +19,36 @@ class LLMEncoder(ABC):
     @abstractmethod
     def encode(self, serializations: List[str], batch_size: int, **kwargs) -> List[Any]:
         pass
+            
+    # Want to reproduce Jiang et al. Health system-scale language models are all-purpose prediction engines 2023.
+    # However, unclear what MLM classification head exactly means, so will use the cls token for now.
+    def get_cls_embedding(self, batch):
+        inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt').to(self.device)
+        outputs = self.model(**inputs, output_hidden_states=True)
+        # Get last layer of hidden states
+        last_hidden_states = outputs.hidden_states[-1]
+        cls_embedding = last_hidden_states[:,0,:]
+        return {'embedding': cls_embedding}
+    
+    # Get average of all hidden states in the first and laster hidden layer
+    # Shown to be superior to cls token or only last hidden state (http://arxiv.org/pdf/2103.15316)
+    # See: https://github.com/autoliuweijie/BERT-whitening-pytorch/blob/b5cfbd606bd19fc3b3adf9e074dc0bfd830ef597/all_utils.py#L33
+    def get_first_last_avg_embedding(self, batch):
+        inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt').to(self.device)
+        hidden_states = self.model(**inputs, output_hidden_states=True).hidden_states
+        # Average over all states in the first and the last layer (each layer return [batch_size, seq_len, hidden_size])
+        first_last_avg_embedding = (hidden_states[-1] + hidden_states[1]).mean(dim=1)
+        return {'embedding': first_last_avg_embedding}
+  
+class TextsDataset(TorchDataset):
+    def __init__(self, texts):
+        self.texts = texts 
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, idx):
+        return self.texts[idx]
 
 class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLMEncoder):
     
@@ -54,8 +87,8 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
     
     def __init__(self, **kwargs) -> None:
         super().__init__(embedding_size=3584)
-        self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
         self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)
                 
     @staticmethod
@@ -77,20 +110,9 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
     # task = 'Given a web search query, retrieve relevant passages that answer the query'
     # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
 
-    def encode(self, serializations: List[str], batch_size: int = 8) -> List[Any]:
-        
-        class TextsDataset(Dataset):
-            def __init__(self, texts):
-                self.texts = texts 
-
-            def __len__(self):
-                return len(self.texts)
-
-            def __getitem__(self, idx):
-                return self.texts[idx]
-        
+    def encode(self, texts: List[str], batch_size: int = 8) -> List[Any]:
         with torch.no_grad():
-            dataloader = DataLoader(TextsDataset(serializations), batch_size=batch_size, shuffle=False)
+            dataloader = DataLoader(TextsDataset(texts), batch_size=batch_size, shuffle=False)
             all_embeddings = []
             for batch in tqdm(dataloader, desc="Processing Batches"):
                 batch_dict = self.tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(self.device)
@@ -101,6 +123,96 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
             return np.concatenate(all_embeddings, axis=0)
         
 
+class STGTELargeENv15Encoder(LLMEncoder):
+    
+    def __init__(self):
+        super().__init__(embedding_size=1024)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.tokenizer = AutoTokenizer.from_pretrained("Alibaba-NLP/gte-large-en-v1.5", trust_remote_code=True)
+        self.model = AutoModel.from_pretrained("Alibaba-NLP/gte-large-en-v1.5", trust_remote_code=True).to(self.device)
+        self.max_length = 8192
+        
+    def encode(self, texts: List[str], batch_size: int = 16) -> List[Any]:
+        with torch.no_grad():
+            dataloader = DataLoader(TextsDataset(texts), batch_size=batch_size, shuffle=False)
+            all_embeddings = []
+            for batch in tqdm(dataloader, desc="Processing Batches"):
+                batch_dict = self.tokenizer(batch, max_length=self.max_length, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                outputs = self.model(**batch_dict)
+                embeddings = outputs.last_hidden_state[:, 0]
+                normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
+                all_embeddings.append(normalized_embeddings)
+            return np.concatenate(all_embeddings, axis=0)
+        
+class BioClinicalBert(LLMEncoder):
+    
+    def __init__(self, **kwargs) -> None:
+        super().__init__(embedding_size=768)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
+        self.model = AutoModel.from_pretrained("emilyalsentzer/Bio_ClinicalBERT").to(self.device)
+        self.handle_long_texts = kwargs.get('handle_long_texts', 'truncate')
+        self.max_length = 512        
+    
+    def chunk_texts(self, texts: List[str]) -> Tuple[List[str], List[int]]:
+        all_chunks = []
+        chunk_counts = []
+        for text in texts:
+            tokens = self.tokenizer.tokenize(text)
+            chunks = []
+            for i in range(0, len(tokens), self.max_length):
+                chunk = tokens[i:i + self.max_length]
+                chunks.append(self.tokenizer.convert_tokens_to_string(chunk))
+            all_chunks.extend(chunks)
+            chunk_counts.append(len(chunks))
+        return all_chunks, chunk_counts
+
+    def encode(self, texts: List[str], batch_size: int = 256) -> List[Any]:
+        
+        if self.handle_long_texts not in ['truncate', 'average_chunks']:
+            raise ValueError(f"handle_long_texts must be 'truncate' or 'average_chunks', but got {self.handle_long_texts}")
+        
+        if self.handle_long_texts == 'average_chunks':
+            texts, chunk_counts = self.chunk_texts(texts)
+             
+        dataset = Dataset.from_dict({"text": texts})
+        dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
+        all_embeddings = np.array(dataset['embedding'])
+        
+        if self.handle_long_texts == 'average_chunks':
+            # Average embeddings for each original text
+            final_embeddings = []
+            start_idx = 0
+            for count in chunk_counts:
+                text_embeddings = all_embeddings[start_idx:start_idx + count]
+                avg_embedding = np.mean(text_embeddings, axis=0)
+                final_embeddings.append(avg_embedding)
+                start_idx += count
+    
+            all_embeddings = np.array(final_embeddings)
+            
+        return all_embeddings
+    
+class LongformerLargeEncoder(LLMEncoder):
+        
+        def __init__(self, **kwargs) -> None:
+            super().__init__(embedding_size=1024)
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.biomedical = kwargs.get('biomedical', False)
+            if self.biomedical:
+                self.tokenizer = AutoTokenizer.from_pretrained("kiddothe2b/biomedical-longformer-large")
+                self.model = AutoModel.from_pretrained("kiddothe2b/biomedical-longformer-large").to(self.device)
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-large-4096")
+                self.model = AutoModel.from_pretrained("allenai/longformer-large-4096").to(self.device)
+            self.max_length = 4096
+    
+        def encode(self, texts: List[str], batch_size: int = 4) -> List[Any]:
+            dataset = Dataset.from_dict({"text": texts})
+            dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
+            all_embeddings = np.array(dataset['embedding'])
+            return all_embeddings
+    
 class TextEncoder:
     def __init__(self, encoder: LLMEncoder):
         self.encoder = encoder
