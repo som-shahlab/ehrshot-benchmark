@@ -24,16 +24,16 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
         # 'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
         'heads' : ['lr_lbfgs', ],
     },
-    'clmbr' : {
-        'label' : 'CLMBR',
-        'heads' : ['lr_lbfgs', ],
-    },
+    # 'clmbr' : {
+    #     'label' : 'CLMBR',
+    #     'heads' : ['lr_lbfgs', ],
+    # },
     'agr' : {
         'label' : 'Age, Gender, Race',
         'heads' : ['lr_lbfgs', ],
     },
     'llm' : {
-        'label' : 'Llama 3.1',
+        'label' : 'Llama 3',
         'heads' : ['lr_lbfgs', ],
     },
 }
@@ -266,7 +266,7 @@ def compute_feature_label_alignment(label_pids, label_dates, feature_pids, featu
         result[i] = j
     return result
 
-def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str]) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
+def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str], labeling_function: str = None) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
         the labels and features for each patient. Note that this function is more complex b/c we need to align
         the labels with their corresponding features based on their prediction times."""
@@ -290,7 +290,15 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
         
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
-            feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = pickle.load(f)
+            raw_feats = pickle.load(f)
+            features_contain_task = False
+            if len(raw_feats) == 4:
+                feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = raw_feats
+            elif len(raw_feats) == 5:
+                feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray] = raw_feats
+                features_contain_task = True
+            else:
+                raise ValueError(f"Error -- unexpected number of elements in features tuple: {len(raw_feats)}")
             
             if isinstance(feats, dict):
                 feature_matrix, feature_patient_ids, feature_times = (
@@ -304,6 +312,13 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
                     feats[1],
                     feats[3], # NOTE: skip label_values in [2]
                 )
+
+            # If features contains task (labeling function) information, filter by task
+            if features_contain_task:
+                task_idx = np.where(feats[4] == labeling_function)[0]
+                feature_matrix = feature_matrix[task_idx]
+                feature_patient_ids = feature_patient_ids[task_idx]
+                feature_times = feature_times[task_idx]
 
             feature_patient_ids = feature_patient_ids.astype(label_patient_ids.dtype)
             feature_times = feature_times.astype(label_times.dtype)

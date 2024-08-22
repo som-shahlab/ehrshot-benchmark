@@ -167,7 +167,7 @@ class BioClinicalBert(LLMEncoder):
             chunk_counts.append(len(chunks))
         return all_chunks, chunk_counts
 
-    def encode(self, texts: List[str], batch_size: int = 256) -> List[Any]:
+    def encode(self, texts: List[str], batch_size: int = 128) -> List[Any]:
         
         if self.handle_long_texts not in ['truncate', 'average_chunks']:
             raise ValueError(f"handle_long_texts must be 'truncate' or 'average_chunks', but got {self.handle_long_texts}")
