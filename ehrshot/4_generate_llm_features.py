@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     # LLM text encoder
     # Debug: Use specific text encoder
-    args.text_encoder = 'llm2vec_llama3_1_7b_instruct_supervised'
+    # args.text_encoder = 'llm2vec_llama3_1_7b_instruct_supervised'
     if args.text_encoder == 'llm2vec_llama3_7b_instruct_supervised':
         text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder())
     elif args.text_encoder == 'llm2vec_llama3_1_7b_instruct_supervised':
