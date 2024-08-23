@@ -24,6 +24,9 @@ Ontology = extension_datasets.Ontology
 
 logger = logging.getLogger(__name__)
 
+# Patient age not in the events. Use custom identifier and change the event manually
+age_identifier = "Patient age"
+
 """ Reimplemented FeaturizerList methods specificlly for LLM Featurizer to cater for task-specific labels """
 
 @dataclass
@@ -213,6 +216,10 @@ class LLMFeaturizer():
         ontology: extension_datasets.Ontology,
         code: str
     ) -> str:
+        # Handle special case age
+        if code.startswith(f"{age_identifier}: "):
+            return code
+        
         # Resolve semantic code to its description with default and custom onotologies
         description = ontology.get_text_description(code)
         
@@ -263,6 +270,14 @@ class LLMFeaturizer():
         for label_idx, label in enumerate(labels):
             # According to existing feature processing, all events before or at the label time are included
             events_until_label = [event for event in patient.events if event.start <= label.time]
+            # Manually change age event - according to featurizer.get_patient_birthdate always first event
+            patient_birth_date: datetime = get_patient_birthdate(patient)
+            age = int((label.time - patient_birth_date).days / 365)
+            if len(events_until_label) > 0:
+                birth_event = events_until_label[0]
+                custom_age_code = f"{age_identifier}: {age}"
+                events_until_label[0] = Event(birth_event.start, custom_age_code, birth_event.value)
+            
             serializer = EHRSerializer()
             serializer.load_from_femr_events(events_until_label, resolve_code, is_visit_event)
             
@@ -270,9 +285,9 @@ class LLMFeaturizer():
             text = serializer.serialize(ListUniqueEventsStrategy())
         
             # Add age manually
-            patient_birth_date: datetime = get_patient_birthdate(patient)
-            age = int((label.time - patient_birth_date).days / 365)
-            text = f"- Age: {age}\n" + text
+            # patient_birth_date: datetime = get_patient_birthdate(patient)
+            # age = int((label.time - patient_birth_date).days / 365)
+            # text = f"- Age: {age}\n" + text
         
             # Get instruction
             instruction = self.task_to_instructions.get(label.task, "")
