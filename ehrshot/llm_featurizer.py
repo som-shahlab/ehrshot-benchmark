@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import Dict, List, Optional, Set, Tuple, Any
 from datetime import datetime
 import numpy as np
@@ -21,6 +22,7 @@ from femr.extension import datasets as extension_datasets
 PatientDatabase = extension_datasets.PatientDatabase
 Ontology = extension_datasets.Ontology
 
+logger = logging.getLogger(__name__)
 
 """ Reimplemented FeaturizerList methods specificlly for LLM Featurizer to cater for task-specific labels """
 
@@ -59,9 +61,10 @@ def preprocess_llm_featurizer(
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]],
     embedding_size: int,
     num_threads: int = 1,
+    task_to_instructions: Optional[Dict[str, str]] = {}
 ):
     # Create an instance of the featurizer
-    featurizer = LLMFeaturizer(embedding_size)
+    featurizer = LLMFeaturizer(embedding_size, task_to_instructions)
 
     # Split patients across multiple threads
     patient_ids: List[int] = list(patients_to_labels.keys())
@@ -162,9 +165,10 @@ class LLMFeaturizer():
     Produces LLM-encoded representation of patient.
     """
 
-    def __init__(self, embedding_size: int):
+    def __init__(self, embedding_size: int, task_to_instructions: Optional[Dict[str, str]] = {}):
 
         self.embedding_dim = embedding_size
+        self.task_to_instructions = task_to_instructions
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -172,7 +176,7 @@ class LLMFeaturizer():
         
         # Filled during aggregation
         # Numpy array of embeddings according to order of .items() of pid_label_idx_serializations
-        self.serializations: List[str] = []
+        self.serializations_instructions: List[Tuple[str, str]] = []
         self.embeddings: np.ndarray = np.array([])
         self.pid_to_embedding_idx: Dict[int, List[int]] = {}
         
@@ -270,12 +274,11 @@ class LLMFeaturizer():
             age = int((label.time - patient_birth_date).days / 365)
             text = f"- Age: {age}\n" + text
         
-            # TODO: Get task specific labels for be able to add task specific instructions
-            # Add instruction
-            instruction = ""
-            text = instruction + text
+            # Get instruction
+            instruction = self.task_to_instructions.get(label.task, "")
+            assert isinstance(instruction, str), f"Instruction for task {label.task} must be a string"
 
-            self.pid_label_idx_serializations[(patient.patient_id, label_idx)] = text
+            self.pid_label_idx_serializations[(patient.patient_id, label_idx)] = (instruction, text)
         
         return
                     
@@ -294,7 +297,7 @@ class LLMFeaturizer():
         def get_pids(d: Dict[Tuple[int, int], int]) -> Set[int]:
             return set(map(lambda d: d[0], d.keys()))
 
-        # Combine all self.serialization of all featurizers
+        # Combine all self.serialization_instructions of all featurizers
         merged_pid_label_idx_serializations: dict[int, List[str]] = {}
         merged_pid_to_embedding_idx: dict[int, List[int]] = {}
         for featurizer in featurizers:
@@ -319,7 +322,7 @@ class LLMFeaturizer():
         # Add serializations to template featurizer
         template_featurizer.pid_label_idx_serializations = merged_pid_label_idx_serializations
         # Ensure same ordering of serializations as at the beginning to create the list of serializations using .items()
-        template_featurizer.serializations = serializations
+        template_featurizer.serializations_instructions = serializations
         template_featurizer.embeddings = None
         template_featurizer.pid_to_embedding_idx = merged_pid_to_embedding_idx
 
@@ -331,7 +334,12 @@ class LLMFeaturizer():
     ) -> None:
         """ Encode all serializations into embeddings. Outside of featurizer functions to prevent CUDA issues. """
         assert self.embeddings is None, "Embeddings already exist"
-        self.embeddings = text_encoder.encoder.encode(self.serializations)
+        serializations = [serialization for _, serialization in self.serializations_instructions]
+        instructions = [instruction for instruction, _ in self.serializations_instructions]
+        # Print first example encoded for the language model
+        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[0], serializations[0])}")
+        
+        self.embeddings = text_encoder.encode_texts(instructions, serializations)
 
     def featurize(
         self,

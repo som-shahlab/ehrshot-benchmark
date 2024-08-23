@@ -8,12 +8,15 @@ import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
 from datetime import datetime
 from llm_featurizer import preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
+import json
+from utils import LABELING_FUNCTION_2_PAPER_NAME
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate text-based featurizations for LLM models (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
+    parser.add_argument( "--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     parser.add_argument("--text_encoder", type=str, help="Text encoder to use")
@@ -27,10 +30,11 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels_tasks.csv')
+    PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
     
     # LLM text encoder
     # Debug: Use specific text encoder
-    # args.text_encoder = 'llm2vec_llama3_1_7b_instruct_supervised'
+    args.text_encoder = 'llm2vec_llama3_1_7b_instruct_supervised'
     if args.text_encoder == 'llm2vec_llama3_7b_instruct_supervised':
         text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder())
     elif args.text_encoder == 'llm2vec_llama3_1_7b_instruct_supervised':
@@ -52,6 +56,18 @@ if __name__ == "__main__":
     # Add date and time (hh-mm-ss) to name
     output_file_name = f'llm_features_{args.text_encoder}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.pkl'
     PATH_TO_OUTPUT_FILE = os.path.join(PATH_TO_FEATURES_DIR, output_file_name)
+        
+    # Load task to instructions json
+    if PATH_TO_TASK_TO_INSTRUCTIONS_FILE:
+        with open(PATH_TO_TASK_TO_INSTRUCTIONS_FILE, 'r') as f:
+            task_to_instructions = json.load(f)
+            assert all([isinstance(v, str) for v in task_to_instructions.values()]), "All values of task_to_instructions must be strings"
+            if set(task_to_instructions.keys()) != set(LABELING_FUNCTION_2_PAPER_NAME.keys()):
+                # Print differences
+                logger.error(f"Task to instructions file does not contain all tasks. Missing: {set(LABELING_FUNCTION_2_PAPER_NAME.keys()) - set(task_to_instructions.keys())}")
+    else:
+        task_to_instructions = {}
+    logger.info("Use no instructions." if task_to_instructions is None else f"Use instructions from: {PATH_TO_TASK_TO_INSTRUCTIONS_FILE}")
 
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
@@ -66,7 +82,7 @@ if __name__ == "__main__":
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label
     logger.info("Start | Preprocess featurizers")
-    llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, patients_to_labels, text_encoder.encoder.embedding_size, NUM_THREADS)
+    llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, patients_to_labels, text_encoder.encoder.embedding_size, NUM_THREADS, task_to_instructions)
 
     logger.info("Finish | Preprocess featurizers")
     

@@ -12,12 +12,22 @@ from datasets import Dataset
 from tqdm import tqdm
 from typing import Tuple
 
+def llm2vec_instruction(instruction):
+    if len(instruction) > 0 and instruction[-1] != ":":
+        instruction = instruction.strip(".") + ":"
+    return instruction
+    
+
 class LLMEncoder(ABC):
     def __init__(self, embedding_size: int):
         self.embedding_size = embedding_size
+
+    @abstractmethod
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        pass
         
     @abstractmethod
-    def encode(self, serializations: List[str], batch_size: int, **kwargs) -> List[Any]:
+    def _encode(self, instructions: List[str], serializations: List[str],  batch_size: int, **kwargs) -> List[Any]:
         pass
             
     # Want to reproduce Jiang et al. Health system-scale language models are all-purpose prediction engines 2023.
@@ -62,9 +72,12 @@ class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLMEncoder):
             max_length=8192,
             doc_max_length=8192,
         )
+        
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        return [llm2vec_instruction(instruction), text]
 
-    def encode(self, texts: List[str], batch_size: int = 8) -> List[Any]:
-        return np.array(self.model.encode(texts, batch_size=batch_size))
+    def _encode(self, inputs: List, batch_size: int = 8) -> List[Any]:
+        return np.array(self.model.encode(inputs, batch_size=batch_size))
         
 class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLMEncoder):
     
@@ -79,9 +92,12 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLMEncoder):
             max_length=8192,
             doc_max_length=8192,
         )
+        
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        return [llm2vec_instruction(instruction), text]
     
-    def encode(self, texts: List[str], batch_size: int = 8) -> List[Any]:
-        return np.array(self.model.encode(texts, batch_size=batch_size))
+    def _encode(self, inputs: List, batch_size: int = 8) -> List[Any]:
+        return np.array(self.model.encode(inputs, batch_size=batch_size))
     
 class GTEQwen2_7B_InstructEncoder(LLMEncoder):
     
@@ -89,8 +105,14 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
         super().__init__(embedding_size=3584)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
-        self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)
-                
+        self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)  
+            
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        # From https://huggingface.co/Alibaba-NLP/gte-Qwen1.5-7B-instruct
+        if instruction is not None and len(instruction) > 0:
+            return f'Instruct: {instruction}\nQuery: {text}'
+        return text
+    
     @staticmethod
     def last_token_pool(last_hidden_states: Tensor,
                         attention_mask: Tensor) -> Tensor:
@@ -102,17 +124,9 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
             batch_size = last_hidden_states.shape[0]
             return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
-    def get_detailed_instruct(task_description: str, query: str) -> str:
-        return f'Instruct: {task_description}\nQuery: {query}'
-
-    # TODO: If want to use intructions, check format
-    # Each query must come with a one-sentence instruction that describes the task
-    # task = 'Given a web search query, retrieve relevant passages that answer the query'
-    # queries = [get_detailed_instruct(task, 'how much protein should a female eat')]
-
-    def encode(self, texts: List[str], batch_size: int = 8) -> List[Any]:
+    def _encode(self, inputs: List, batch_size: int = 8) -> List[Any]:
         with torch.no_grad():
-            dataloader = DataLoader(TextsDataset(texts), batch_size=batch_size, shuffle=False)
+            dataloader = DataLoader(TextsDataset(inputs), batch_size=batch_size, shuffle=False)
             all_embeddings = []
             for batch in tqdm(dataloader, desc="Processing Batches"):
                 batch_dict = self.tokenizer(batch, max_length=8192, padding=True, truncation=True, return_tensors='pt').to(self.device)
@@ -122,7 +136,6 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
                 all_embeddings.append(normalized_embeddings)
             return np.concatenate(all_embeddings, axis=0)
         
-
 class STGTELargeENv15Encoder(LLMEncoder):
     
     def __init__(self):
@@ -132,9 +145,12 @@ class STGTELargeENv15Encoder(LLMEncoder):
         self.model = AutoModel.from_pretrained("Alibaba-NLP/gte-large-en-v1.5", trust_remote_code=True).to(self.device)
         self.max_length = 8192
         
-    def encode(self, texts: List[str], batch_size: int = 16) -> List[Any]:
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        return text
+        
+    def _encode(self, inputs: List, batch_size: int = 16) -> List[Any]:
         with torch.no_grad():
-            dataloader = DataLoader(TextsDataset(texts), batch_size=batch_size, shuffle=False)
+            dataloader = DataLoader(TextsDataset(inputs), batch_size=batch_size, shuffle=False)
             all_embeddings = []
             for batch in tqdm(dataloader, desc="Processing Batches"):
                 batch_dict = self.tokenizer(batch, max_length=self.max_length, padding=True, truncation=True, return_tensors='pt').to(self.device)
@@ -153,6 +169,9 @@ class BioClinicalBert(LLMEncoder):
         self.model = AutoModel.from_pretrained("emilyalsentzer/Bio_ClinicalBERT").to(self.device)
         self.handle_long_texts = kwargs.get('handle_long_texts', 'truncate')
         self.max_length = 512        
+       
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        return text
     
     def chunk_texts(self, texts: List[str]) -> Tuple[List[str], List[int]]:
         all_chunks = []
@@ -167,15 +186,15 @@ class BioClinicalBert(LLMEncoder):
             chunk_counts.append(len(chunks))
         return all_chunks, chunk_counts
 
-    def encode(self, texts: List[str], batch_size: int = 128) -> List[Any]:
+    def _encode(self, inputs: List, batch_size: int = 128) -> List[Any]:
         
         if self.handle_long_texts not in ['truncate', 'average_chunks']:
             raise ValueError(f"handle_long_texts must be 'truncate' or 'average_chunks', but got {self.handle_long_texts}")
         
         if self.handle_long_texts == 'average_chunks':
-            texts, chunk_counts = self.chunk_texts(texts)
+            inputs, chunk_counts = self.chunk_texts(inputs)
              
-        dataset = Dataset.from_dict({"text": texts})
+        dataset = Dataset.from_dict({"text": inputs})
         dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
         all_embeddings = np.array(dataset['embedding'])
         
@@ -206,9 +225,12 @@ class LongformerLargeEncoder(LLMEncoder):
                 self.tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-large-4096")
                 self.model = AutoModel.from_pretrained("allenai/longformer-large-4096").to(self.device)
             self.max_length = 4096
+                
+        def add_instruction(self, instruction: str, text: str) -> Any:
+            return text
     
-        def encode(self, texts: List[str], batch_size: int = 4) -> List[Any]:
-            dataset = Dataset.from_dict({"text": texts})
+        def _encode(self, inputs: List, batch_size: int = 4) -> List[Any]:
+            dataset = Dataset.from_dict({"text": inputs})
             dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
             all_embeddings = np.array(dataset['embedding'])
             return all_embeddings
@@ -217,5 +239,13 @@ class TextEncoder:
     def __init__(self, encoder: LLMEncoder):
         self.encoder = encoder
 
-    def encode_texts(self, texts: List[str], batch_size: int) -> List[Any]:
-        return self.encoder.encode(texts, batch_size)
+    def encode_texts(self, instructions: List[str], texts: List[str], batch_size = None) -> List[Any]:
+        if all([instruction is None or len(instruction) == 0 for instruction in instructions]):
+            inputs = texts
+        else:
+            inputs = [self.encoder.add_instruction(instruction, text) for instruction, text in zip(instructions, texts)]
+        
+        if batch_size is None:
+            return self.encoder._encode(inputs)
+        else:
+            return self.encoder._encode(input, batch_size)

@@ -57,6 +57,7 @@
                 "--num_threads", "64",
                 "--is_force_refresh",
                 "--text_encoder", "bioclinicalbert-fl",
+                "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json"
             ],
 
         },
