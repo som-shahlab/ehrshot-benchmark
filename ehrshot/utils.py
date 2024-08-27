@@ -285,6 +285,11 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
     # and align the label times with the featurization times
     featurizations: Dict[str, np.ndarray] = {}
     for model in MODEL_2_INFO.keys():
+        # TODO: Better way to do this than hardcoding path
+        # Check if in experimental LLM setting, then only consider LLM models
+        if '/experiments/' in path_to_features_dir and model != 'llm':
+            continue
+            
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
         

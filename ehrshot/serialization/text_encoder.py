@@ -19,8 +19,9 @@ def llm2vec_instruction(instruction):
     
 
 class LLMEncoder(ABC):
-    def __init__(self, embedding_size: int):
+    def __init__(self, embedding_size: int, model_max_input_length: int, max_input_length: int) -> None:
         self.embedding_size = embedding_size
+        self.input_length = min(model_max_input_length, max_input_length)
 
     @abstractmethod
     def add_instruction(self, instruction: str, text: str) -> Any:
@@ -62,8 +63,8 @@ class TextsDataset(TorchDataset):
 
 class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLMEncoder):
     
-    def __init__(self, **kwargs) -> None:
-        super().__init__(embedding_size=4096)
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=4096, model_max_input_length=8192, max_input_length=max_input_length)
         self.model = LLM2Vec.from_pretrained(
             "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
             peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
@@ -81,8 +82,8 @@ class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLMEncoder):
         
 class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLMEncoder):
     
-    def __init__(self, **kwargs) -> None:
-        super().__init__(embedding_size=4096)
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
         model_path = "/home/sthe14/llm2vec/output"
         self.model = LLM2Vec.from_pretrained(
             model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
@@ -97,12 +98,14 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLMEncoder):
         return [llm2vec_instruction(instruction), text]
     
     def _encode(self, inputs: List, batch_size: int = 8) -> List[Any]:
+        if self.input_length > 8192:
+            batch_size = 1
         return np.array(self.model.encode(inputs, batch_size=batch_size))
     
 class GTEQwen2_7B_InstructEncoder(LLMEncoder):
     
-    def __init__(self, **kwargs) -> None:
-        super().__init__(embedding_size=3584)
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=3584, model_max_input_length=128000, max_input_length=max_input_length) 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
         self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)  
@@ -125,6 +128,8 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
             return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
     def _encode(self, inputs: List, batch_size: int = 8) -> List[Any]:
+        if self.input_length > 8192:
+            batch_size = 1
         with torch.no_grad():
             dataloader = DataLoader(TextsDataset(inputs), batch_size=batch_size, shuffle=False)
             all_embeddings = []
@@ -138,8 +143,8 @@ class GTEQwen2_7B_InstructEncoder(LLMEncoder):
         
 class STGTELargeENv15Encoder(LLMEncoder):
     
-    def __init__(self):
-        super().__init__(embedding_size=1024)
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=1024, model_max_input_length=8192, max_input_length=max_input_length)  
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained("Alibaba-NLP/gte-large-en-v1.5", trust_remote_code=True)
         self.model = AutoModel.from_pretrained("Alibaba-NLP/gte-large-en-v1.5", trust_remote_code=True).to(self.device)
@@ -162,8 +167,8 @@ class STGTELargeENv15Encoder(LLMEncoder):
         
 class BioClinicalBert(LLMEncoder):
     
-    def __init__(self, **kwargs) -> None:
-        super().__init__(embedding_size=768)
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=768, model_max_input_length=512, max_input_length=max_input_length)  
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
         self.model = AutoModel.from_pretrained("emilyalsentzer/Bio_ClinicalBERT").to(self.device)
@@ -214,26 +219,26 @@ class BioClinicalBert(LLMEncoder):
     
 class LongformerLargeEncoder(LLMEncoder):
         
-        def __init__(self, **kwargs) -> None:
-            super().__init__(embedding_size=1024)
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            self.biomedical = kwargs.get('biomedical', False)
-            if self.biomedical:
-                self.tokenizer = AutoTokenizer.from_pretrained("kiddothe2b/biomedical-longformer-large")
-                self.model = AutoModel.from_pretrained("kiddothe2b/biomedical-longformer-large").to(self.device)
-            else:
-                self.tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-large-4096")
-                self.model = AutoModel.from_pretrained("allenai/longformer-large-4096").to(self.device)
-            self.max_length = 4096
-                
-        def add_instruction(self, instruction: str, text: str) -> Any:
-            return text
-    
-        def _encode(self, inputs: List, batch_size: int = 4) -> List[Any]:
-            dataset = Dataset.from_dict({"text": inputs})
-            dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
-            all_embeddings = np.array(dataset['embedding'])
-            return all_embeddings
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=1024, model_max_input_length=4096, max_input_length=max_input_length)  
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.biomedical = kwargs.get('biomedical', False)
+        if self.biomedical:
+            self.tokenizer = AutoTokenizer.from_pretrained("kiddothe2b/biomedical-longformer-large")
+            self.model = AutoModel.from_pretrained("kiddothe2b/biomedical-longformer-large").to(self.device)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-large-4096")
+            self.model = AutoModel.from_pretrained("allenai/longformer-large-4096").to(self.device)
+        self.max_length = 4096
+            
+    def add_instruction(self, instruction: str, text: str) -> Any:
+        return text
+
+    def _encode(self, inputs: List, batch_size: int = 4) -> List[Any]:
+        dataset = Dataset.from_dict({"text": inputs})
+        dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=batch_size)
+        all_embeddings = np.array(dataset['embedding'])
+        return all_embeddings
     
 class TextEncoder:
     def __init__(self, encoder: LLMEncoder):

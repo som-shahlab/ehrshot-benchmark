@@ -5,11 +5,10 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import re
-from serialization.ehr_serializer import EHRSerializer, ListUniqueEventsStrategy
+from serialization.ehr_serializer import EHRSerializer
 from femr import Event
 from serialization.text_encoder import TextEncoder
 from femr import Patient
-from femr.featurizers.core import ColumnValue
 from femr.featurizers.featurizers import get_patient_birthdate
 from nptyping import NDArray
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ import collections
 import multiprocessing
 from femr.labelers import Label
 from femr.extension import datasets as extension_datasets
+from serialization.ehr_serializer import SerializationStrategy
 
 PatientDatabase = extension_datasets.PatientDatabase
 Ontology = extension_datasets.Ontology
@@ -61,19 +61,15 @@ def _run_llm_preprocess_featurizer(task):
 
 def preprocess_llm_featurizer(
     database_path: str,
+    llm_featurizer: LLMFeaturizer,
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]],
-    embedding_size: int,
     num_threads: int = 1,
-    task_to_instructions: Optional[Dict[str, str]] = {}
 ):
-    # Create an instance of the featurizer
-    featurizer = LLMFeaturizer(embedding_size, task_to_instructions)
-
     # Split patients across multiple threads
     patient_ids: List[int] = list(patients_to_labels.keys())
     patient_ids_per_thread: List[NDArray] = np.array_split(patient_ids, num_threads * 10)
     tasks = [
-        (database_path, patient_ids, patients_to_labels, featurizer) for patient_ids in patient_ids_per_thread
+        (database_path, patient_ids, patients_to_labels, llm_featurizer) for patient_ids in patient_ids_per_thread
     ]
 
     # Preprocess in parallel using multiprocessing
@@ -168,9 +164,10 @@ class LLMFeaturizer():
     Produces LLM-encoded representation of patient.
     """
 
-    def __init__(self, embedding_size: int, task_to_instructions: Optional[Dict[str, str]] = {}):
+    def __init__(self, embedding_size: int, serialization_strategy: SerializationStrategy, task_to_instructions: Optional[Dict[str, str]] = {}):
 
         self.embedding_dim = embedding_size
+        self.serialization_strategy = serialization_strategy
         self.task_to_instructions = task_to_instructions
 
         # Filled during preprocessing
@@ -282,12 +279,7 @@ class LLMFeaturizer():
             serializer.load_from_femr_events(events_until_label, resolve_code, is_visit_event)
             
             # text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
-            text = serializer.serialize(ListUniqueEventsStrategy())
-        
-            # Add age manually
-            # patient_birth_date: datetime = get_patient_birthdate(patient)
-            # age = int((label.time - patient_birth_date).days / 365)
-            # text = f"- Age: {age}\n" + text
+            text = serializer.serialize(self.serialization_strategy, label_time=label.time)
         
             # Get instruction
             instruction = self.task_to_instructions.get(label.task, "")
@@ -353,6 +345,8 @@ class LLMFeaturizer():
         instructions = [instruction for instruction, _ in self.serializations_instructions]
         # Print first example encoded for the language model
         logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[0], serializations[0])}")
+        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[8], serializations[8])}")
+        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[20], serializations[20])}")
         
         self.embeddings = text_encoder.encode_texts(instructions, serializations)
 

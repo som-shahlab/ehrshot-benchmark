@@ -8,6 +8,7 @@ import pandas as pd
 def parse_args():
     parser = argparse.ArgumentParser(description="Make plots/tables of cohort stats")
     parser.add_argument("--path_to_results_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_output_file", required=False, type=str, help="Path to file to save performance results")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -15,13 +16,24 @@ if __name__ == "__main__":
     path_to_results_dir: str = args.path_to_results_dir
 
     model_heads = [
-        ('clmbr', 'lr_lbfgs'),
+        # ('clmbr', 'lr_lbfgs'),
         # ('count', 'gbm'),
         # ('count', 'rf'),
+        # Debug: Only count, agr, and llm models
         ('count', 'lr_lbfgs'),
         ('agr', 'lr_lbfgs'),
         ('llm', 'lr_lbfgs'),
     ]
+
+    # TODO: Better way to do this than hardcoding path
+    # Check if in experimental LLM setting, then only consider LLM models
+    if '/experiments/' in path_to_results_dir:
+        model_heads = [(m, h) for m, h in model_heads if m == 'llm']
+
+    # If output file is provided, create dataframe to save results that can later be written into csv
+    results_df = None
+    if args.path_to_output_file:
+        results_df = pd.DataFrame(columns=['subtask', 'model', 'head', 'score', 'est', 'lower', 'upper'])
 
     score_map = collections.defaultdict(dict)
     
@@ -62,6 +74,8 @@ if __name__ == "__main__":
                 lower = v['lower']
                 upper = v['upper']
                 print(f"{model}-{head} {est:0.3f} ({lower:0.3f} - {upper:0.3f})")
+                if results_df is not None:
+                    results_df = results_df._append({'subtask': subtask, 'model': model, 'head': head, 'score': score, 'est': est, 'lower': lower, 'upper': upper}, ignore_index=True)
             print('-' * 80)
 
     print("\n\nGrouped Tasks\n\n")
@@ -84,4 +98,10 @@ if __name__ == "__main__":
                 lower = est - std * 1.96
                 upper = est + std * 1.96
                 print(f"{model}-{head} {est:0.3f} ({lower:0.3f} - {upper:0.3f})")
+                if results_df is not None:
+                    results_df = results_df._append({'subtask': p, 'model': model, 'head': head, 'score': score, 'est': est, 'lower': lower, 'upper': upper}, ignore_index=True)
             print('-' * 80)
+            
+    if results_df is not None:
+        results_df.to_csv(args.path_to_output_file, index=False)
+        print(f"Results saved to {args.path_to_output_file}")

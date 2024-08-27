@@ -177,7 +177,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTION_2_PAPER_NAME.keys(), )
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
-    parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
+    # TODO: Force refresh for debugging
+    parser.add_argument("--is_force_refresh", action='store_true', default=True, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -207,7 +208,7 @@ if __name__ == "__main__":
 
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
-    patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR)
+    patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR, labeling_function=LABELING_FUNCTION)
     train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
     
     # Load shot assignments for this task
@@ -235,6 +236,10 @@ if __name__ == "__main__":
         model_heads: List[str] = MODEL_2_INFO[model]['heads']
         # For each head we can add to the top of this model...
         for head in model_heads:
+            # TODO: Better way to do this than hardcoding path
+            # Check if in experimental LLM setting, then only consider LLM models
+            if '/experiments/' in PATH_TO_FEATURES_DIR and model != 'llm':
+                continue
             # Unpack each individual featurization we want to test
             assert model in feature_matrixes, f"Feature matrix not found for `{model}`. Are you sure you have generated features for this model? If not, you'll need to rerun `generate_features.py` or `generate_clmbr_representations.py`."
             X_train: np.ndarray = feature_matrixes[model][train_pids_idx]

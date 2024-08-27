@@ -6,52 +6,77 @@ import re
         
 class SerializationStrategy(ABC):
     @abstractmethod
-    def serialize(self, ehr_serializer):
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
         pass
     
-class ListUniqueEventsStrategy(SerializationStrategy):
-    def serialize(self, ehr_serializer):
-        text_events = []
-        text_set = set()
+def serialize_event(event: Event, numeric_values=False) -> str:
+    """ Create dashed line of event with value """
+    if type(event.value) is float or type(event.value) is int:
+        if numeric_values:
+            numeric_str = f"{event.value:.2f}" if type(event.value) is float else f"{event.value}"
+            return f"- {event.description}: {numeric_str}"
+        else:
+            return f"- {event.description}"
+    elif type(event.value) is str:
+        return f"- {event.description}: {event.value}"
+    else:
+        return f"- {event.description}"
+    
+def serialize_event_list(events: List[Event], numeric_values=False) -> str:
+    """ Create dashed list of events with values """
+    return '\n'.join([serialize_event(event, numeric_values) for event in events])
+
+def list_visits_with_events(ehr_serializer, label_time, numeric_values=False):
+    # Implement the logic to list all visits and their respective events
+    visit_texts = []
+    for visit in sorted(ehr_serializer.visits):
+        days_before_label = (label_time - visit.start).days
+        visit_text = f"{days_before_label} days before: {visit.description}\n{serialize_event_list(visit.events, numeric_values=numeric_values)}"
+        visit_texts.append(visit_text)
+        
+    return '\n\n'.join(visit_texts)
+    
+class ListUniqueEventsWoNumericValuesStrategy(SerializationStrategy):
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        descriptions = set()
         
         events = ehr_serializer.static_events + [event for visit in ehr_serializer.visits for event in visit.events]
         events = sorted(events, key=lambda x: x.start)
+        unique_events = []
         for event in events:
+            if event.description not in descriptions:
+                descriptions.add(event.description)
+                unique_events.append(event)
+                
+        return serialize_event_list(unique_events, numeric_values=False)
+    
+        # TODO: Potential processing of decriptions
+        # # Remove some suffixes:
+        # # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
+        # # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
+        # # 'by Manual count'
+        # re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
+        
+        # # Remove some irrelevant artifacts
+        # # Remove all [*] - often correspond to units
+        # description = re.sub(r"\[.*\]", "", description)
+        # # Remove suffixes
+        # description = re_exclude_description_suffixes.sub("", description)
+        # # Remove repeated whitespaces
+        # description = re.sub(r"\s+", " ", description)
+        # description = description.strip()
 
-            # TODO: Potential processing of decriptions
-            # # Remove some suffixes:
-            # # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
-            # # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
-            # # 'by Manual count'
-            # re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
-            
-            # # Remove some irrelevant artifacts
-            # # Remove all [*] - often correspond to units
-            # description = re.sub(r"\[.*\]", "", description)
-            # # Remove suffixes
-            # description = re_exclude_description_suffixes.sub("", description)
-            # # Remove repeated whitespaces
-            # description = re.sub(r"\s+", " ", description)
-            # description = description.strip()
-            
-            # Each code only once
-            if event.description in text_set:
-                continue
-            text_set.add(event.description)
-            
-            if type(event.value) is str:
-                text_events.append(f"- {event.description}: {event.value}")
-            # TODO: Add handling of numeric values
-            else:
-                text_events.append(f"- {event.description}")
-            
-        text = '\n'.join(text_events)
-        return text
+class ListVisitsWithEventsWoNumericValuesStrategy(SerializationStrategy):   
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        static_text = serialize_event_list(ehr_serializer.static_events, numeric_values=False)
+        visits_text = list_visits_with_events(ehr_serializer, label_time, numeric_values=False)
+        return f"{static_text}\n\n{visits_text}"
 
 class ListVisitsWithEventsStrategy(SerializationStrategy):
-    def serialize(self, ehr_serializer):
-        # Implement the logic to list all visits and their respective events
-        return '\n'.join([f"{visit.description}: {', '.join([event.description for event in visit.events])}" for visit in ehr_serializer.visits])
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        static_text = serialize_event_list(ehr_serializer.static_events, numeric_values=True)
+        visits_text = list_visits_with_events(ehr_serializer, label_time, numeric_values=True)
+        return f"{static_text}\n\n{visits_text}"
 
 class EHRVisit:
     def __init__(
@@ -147,5 +172,5 @@ class EHRSerializer:
     def set_serialization_strategy(self, serialization_strategy: SerializationStrategy):
         self._serialization_strategy = serialization_strategy
 
-    def serialize(self, serialization_strategy: SerializationStrategy):
-        return serialization_strategy.serialize(self)
+    def serialize(self, serialization_strategy: SerializationStrategy, label_time: datetime) -> str:
+        return serialization_strategy.serialize(self, label_time)
