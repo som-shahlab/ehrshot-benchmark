@@ -15,6 +15,7 @@ import sklearn
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from torch.optim.lr_scheduler import LambdaLR
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
 from utils import (
@@ -42,6 +43,52 @@ from jaxtyping import Float
 from femr.labelers import load_labeled_patients, LabeledPatients
 from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path
 from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
+
+
+def fit_logreg_lbfgs(model: torch.nn.Module, 
+                     X: Float[torch.Tensor, 'B H'], 
+                     y: Float[torch.Tensor, 'B'],
+                     lr: float = 1.0,
+                     C: float = 1.0,
+                     penalty: Optional[str] = 'l2',
+                     max_iter: float = 1000) -> None:
+    """Train a logistic regression model with (optional) regularization using the LBFGS optimizer."""
+    model.weight.data.zero_()
+    model.bias.data.zero_()
+    
+    # LBFGS
+    opt = torch.optim.LBFGS(model.parameters(), lr=lr, max_iter=max_iter, tol=0.0001)
+    
+    # Forward/backward pass
+    def closure():
+        if torch.is_grad_enabled():
+            opt.zero_grad()
+        preds: Float[torch.Tensor, 'B C'] = model(X)
+        
+        # Compute CE loss v. true binary labels
+        ce_loss = C * torch.nn.functional.cross_entropy(preds, y)
+        
+        # Regularization (optional)
+        if penalty == 'l1':
+            reg_loss = 1/C * 1/(2*X.shape[0]) * (model.weight.abs()).sum()
+        elif penalty == 'l2':
+            reg_loss = 1/C * 1/(2*X.shape[0]) * (model.weight**2).sum()
+        else:
+            reg_loss = 0
+
+        loss = reg_loss + ce_loss
+        if loss.requires_grad:
+            loss.backward()
+        return loss
+
+    # Run LBFGS
+    opt.step(closure)
+
+    
+def lr_lambda(epoch: int, warmup_epochs: int = 0) -> float:
+    if epoch < warmup_epochs:
+        return float(epoch) / float(max(1, warmup_epochs))
+    return 1.0  # No further increase in learning rate after warmup
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
@@ -159,23 +206,33 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     return model, layers
 
-def finetune_pytorch_model(X_train: np.ndarray, 
+def finetune_pytorch_model(X_train_timelines: np.ndarray, 
+                           X_train: np.ndarray,
                            y_train: np.ndarray, 
                            model: torch.nn.Module, 
                            optimizer,
+                           scheduler,
                            criterion,
+                           logreg_C: float,
+                           logreg_penalty: Optional[str],
+                           is_finetune_logreg_first: bool,
                            pad_token_id: int,
                            model_name: str, 
-                           model_head: str, 
+                           model_head: str,
                            batch_size: int,
                            n_epochs: int,
                            device: str) -> torch.nn.Module:
-    torch.manual_seed(X_train.shape[0])
+    torch.manual_seed(X_train_timelines.shape[0])
     model.train()
+    
+    # First, finetune logreg head (if applicable)
+    if is_finetune_logreg_first:
+        fit_logreg_lbfgs(model.classifier, X_train, y_train, lr=1.0, C=logreg_C, penalty=logreg_penalty, max_iter=1000)
+
     for epoch in range(n_epochs):
-        for batch_start in tqdm(range(0, X_train.shape[0], batch_size), desc=f'Finetuning: epoch={epoch} | model={model_name[:15]} | head={model_head[:15]} | k={X_train.shape[0]}', total=X_train.shape[0] // batch_size):
+        for batch_start in tqdm(range(0, X_train_timelines.shape[0], batch_size), desc=f'Finetuning: epoch={epoch} | model={model_name[:15]} | head={model_head[:15]} | k={X_train_timelines.shape[0]}', total=X_train_timelines.shape[0] // batch_size):
             # Subset training batch
-            X_train_batch = X_train[batch_start:batch_start+batch_size]
+            X_train_batch = X_train_timelines[batch_start:batch_start+batch_size]
             y_train_batch = y_train[batch_start:batch_start+batch_size]
             
             # Tokenize batch
@@ -195,16 +252,29 @@ def finetune_pytorch_model(X_train: np.ndarray,
             # Compute CE loss v. true binary labels
             binary_labels: Float[torch.Tensor, 'B'] = torch.tensor(y_train_batch, device=device).long()
             loss = criterion(logits, binary_labels)
+            
+            # Regularization (optional)
+            if logreg_penalty == 'l1':
+                reg_loss = 1/logreg_C * 1/(2*X_train_batch.shape[0]) * (model.classifier.weight.abs()).sum()
+            elif logreg_penalty == 'l2':
+                reg_loss = 1/logreg_C * 1/(2*X_train_batch.shape[0]) * (model.classifier.weight**2).sum()
+            else:
+                reg_loss = 0
+            loss += reg_loss
 
             # Backprop
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            
+            # LR scheduler
+            if scheduler:
+                scheduler.step()
     return model
 
-def eval_pytorch_model(X_train: np.ndarray,
-                        X_val: np.ndarray,
-                        X_test: np.ndarray,
+def eval_pytorch_model(X_train_timelines: np.ndarray,
+                        X_val_timelines: np.ndarray,
+                        X_test_timelines: np.ndarray,
                         y_train: np.ndarray,
                         y_val: np.ndarray,
                         y_test: np.ndarray,
@@ -217,7 +287,7 @@ def eval_pytorch_model(X_train: np.ndarray,
     model.eval()
     y_train_proba, y_val_proba, y_test_proba = [], [], []
     with torch.no_grad():
-        for X, y, split in zip([X_train, X_val, X_test], [y_train_proba, y_val_proba, y_test_proba], ['train', 'val', 'test']):
+        for X, y, split in zip([X_train_timelines, X_val_timelines, X_test_timelines], [y_train_proba, y_val_proba, y_test_proba], ['train', 'val', 'test']):
             for batch_start in tqdm(range(0, X.shape[0], batch_size), desc=f'Inference: split={split} | model={model_name[:15]} | head={model_head[:15]}', total=X.shape[0] // batch_size):
                 X_batch = X[batch_start:batch_start+batch_size]
                 input_ids = torch.tensor(X_batch, device=device)
@@ -240,12 +310,18 @@ def run_finetune_evaluation(X_train: np.ndarray,
                             y_train: np.ndarray, 
                             y_val: np.ndarray, 
                             y_test: np.ndarray,
+                            X_train_timelines: np.ndarray,
+                            X_val_timelines: np.ndarray,
+                            X_test_timelines: np.ndarray,
                             model_name: str, 
                             model_head: str, 
                             path_to_ckpt: str,
                             batch_size: int = 4,
                             n_epochs: int = 2,
                             lr: float = 1e-5,
+                            logreg_C: float = 1.0,
+                            logreg_penalty: Optional[str] = 'l2',
+                            warmup_epochs: int = 0,
                             n_jobs: int = 1,
                             test_patient_ids: np.ndarray = None) -> Tuple[Any, Dict[str, float]]:
     logger.critical(f"Start | Training {model_head}")
@@ -261,6 +337,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
     np.random.seed(X_train.shape[0])
     train_shuffle_idx = np.arange(X_train.shape[0])
     np.random.shuffle(train_shuffle_idx)
+    X_train_timelines = X_train_timelines[train_shuffle_idx]
     X_train = X_train[train_shuffle_idx]
     y_train = y_train[train_shuffle_idx]
 
@@ -273,11 +350,11 @@ def run_finetune_evaluation(X_train: np.ndarray,
     model = CookbookModelWithClassificationHead(model, embed_strat, 2)
     model, layers = setup_finetuning(model, finetune_strat)
     ## Sanity checks
-    if finetune_strat == 'full':
+    if finetune_strat.startswith('full'):
         for l in layers:
             for param in l.parameters():
                 assert param.requires_grad, "All layers should be unfrozen"
-    elif finetune_strat == 'frozen':
+    elif finetune_strat.startswith('frozen'):
         for l in layers:
             for param in l.parameters():
                 assert not param.requires_grad, "All layers should be frozen"
@@ -292,27 +369,33 @@ def run_finetune_evaluation(X_train: np.ndarray,
     else:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     model.to(device)
+    is_finetune_logreg_first: bool = "logregfirst" in finetune_strat
 
     # Optimizer + Loss
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.functional.cross_entropy
 
+    # Initialize the warmup scheduler (if applicable)
+    scheduler = LambdaLR(optimizer, lr_lambda=lambda x: lr_lambda(x, warmup_epochs)) if warmup_epochs > 0 else None
+    
     # Finetune `model`
     pad_token_id: int = tokenizer.pad_token_id
     logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}`")
-    model = finetune_pytorch_model(X_train, y_train, model, optimizer, criterion, pad_token_id, model_name, model_head, batch_size, n_epochs, device)
+    model = finetune_pytorch_model(X_train_timelines, X_train, y_train, model, optimizer, scheduler, criterion, 
+                                   logreg_C, logreg_penalty, is_finetune_logreg_first,
+                                   pad_token_id, model_name, model_head, batch_size, n_epochs, device)
     logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}`")
     
     # Calculate probabilistic preds
     logger.critical(f"Start | Evaling model=`{model_name}` | head=`{model_head}`")
-    y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train, X_val, X_test, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
+    y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train_timelines, X_val_timelines, X_test_timelines, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
     logger.critical(f"Finish | Evaling model=`{model_name}` | head=`{model_head}`")
     model.to('cpu')
     
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
-    return model, scores
+    return model, scores, y_test_proba
 
 def run_frozen_feature_evaluation(X_train: np.ndarray, 
                                     X_val: np.ndarray, 
@@ -382,7 +465,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
-    return model, scores
+    return model, scores, y_test_proba
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
@@ -412,6 +495,8 @@ if __name__ == "__main__":
     NUM_THREADS: int = args.num_threads
     BATCH_SIZE: int = args.batch_size
     N_EPOCHS: int = args.n_epochs
+    logreg_C: float = 1.0
+    logreg_penalty: Optional[str] = 'l2'
     IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
@@ -492,11 +577,17 @@ if __name__ == "__main__":
             if head.startswith('finetune'):
                 # In this case, X_train, X_val, X_test are raw sequences of tokenized timelines
                 assert torch.cuda.is_available(), "CUDA must be available to run finetuning experiments."
-                X_train: np.ndarray = feature_matrixes[model]['timelines'][train_pids_idx]
-                X_val: np.ndarray = feature_matrixes[model]['timelines'][val_pids_idx]
-                X_test: np.ndarray = feature_matrixes[model]['timelines'][test_pids_idx]
+                X_train_timelines: np.ndarray = feature_matrixes[model]['timelines'][train_pids_idx]
+                X_val_timelines: np.ndarray = feature_matrixes[model]['timelines'][val_pids_idx]
+                X_test_timelines: np.ndarray = feature_matrixes[model]['timelines'][test_pids_idx]
+                X_train: np.ndarray = feature_matrixes[model]['frozen'][train_pids_idx]
+                X_val: np.ndarray = feature_matrixes[model]['frozen'][val_pids_idx]
+                X_test: np.ndarray = feature_matrixes[model]['frozen'][test_pids_idx]
             else:
                 # In this case, X_train, X_val, X_test are frozen feature representations from a previous model
+                X_train_timelines = None
+                X_val_timelines = None
+                X_test_timelines = None
                 X_train: np.ndarray = feature_matrixes[model]['frozen'][train_pids_idx]
                 X_val: np.ndarray = feature_matrixes[model]['frozen'][val_pids_idx]
                 X_test: np.ndarray = feature_matrixes[model]['frozen'][test_pids_idx]
@@ -568,6 +659,9 @@ if __name__ == "__main__":
                         X_val_k: np.ndarray = X_val[shot_dict["val_idxs"]]
                         y_train_k: np.ndarray = np.array(shot_dict['label_values_train_k'])
                         y_val_k: np.ndarray = np.array(shot_dict['label_values_val_k'])
+                        if X_train_timelines is not None:
+                            X_train_timelines_k: np.ndarray = X_train_timelines[shot_dict["train_idxs"]]
+                            X_val_timelines_k: np.ndarray = X_val_timelines[shot_dict["val_idxs"]]
                         
                         # Test labels
                         y_test_k: np.ndarray = np.array(y_test)
@@ -586,9 +680,13 @@ if __name__ == "__main__":
                             assert os.path.exists(path_to_model_dir), f"Path to .ckpt directory for model={model},head={head} does not exist: `{path_to_model_dir}`"
                             path_to_ckpt: str = os.path.join(path_to_model_dir, [ x for x in os.listdir(path_to_model_dir) if x.endswith('.ckpt') ][0])
                             logger.info(f"Loaded model `{model}` from .ckpt at: `{path_to_ckpt}`")
-                            best_model, scores = run_finetune_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, test_patient_ids=test_patient_ids)
+                            best_model, scores, y_test_proba = run_finetune_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, 
+                                                                                       X_train_timelines_k, X_val_timelines_k, X_test_timelines,
+                                                                                       model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, 
+                                                                                       logreg_C=logreg_C, logreg_penalty=logreg_penalty, 
+                                                                                       test_patient_ids=test_patient_ids)
                         else:
-                            best_model, scores = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
+                            best_model, scores, y_test_proba = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
 
                         # Save best model (according to val AUROC)
                         if scores['auroc']['score_val'] > best_model_val_auroc:
@@ -620,6 +718,10 @@ if __name__ == "__main__":
                                 'lower' : score_value['lower'],
                                 'mean' : score_value['mean'],
                                 'upper' : score_value['upper'],
+                                'model_hparams' : best_model.get_params() if hasattr(best_model, 'get_params') else None,
+                                'y_test' : list(y_test_k),
+                                'y_test_proba' : list(y_test_proba),
+                                'test_patient_ids' : list(test_patient_ids),
                             })
 
                         # Save results to CSV after each (model, head, sub_task, k, replicate) is calculated
