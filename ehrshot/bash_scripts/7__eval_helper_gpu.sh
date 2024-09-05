@@ -19,7 +19,7 @@ CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --num_threads 5 \
     --labeling_function $8 \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen &
+    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
 
 CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
@@ -30,7 +30,7 @@ CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --num_threads 5 \
     --labeling_function $9 \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen &
+    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
 
 CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
@@ -41,7 +41,7 @@ CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --num_threads 5 \
     --labeling_function ${10} \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen &
+    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
 
 wait
 
@@ -56,7 +56,7 @@ wait
 #     --shot_strat $6 \
 #     --num_threads 3 \
 #     --labeling_function $8 \
-#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen
+#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst
 
 
 # For debugging:
@@ -70,5 +70,5 @@ wait
 #     --labeling_function guo_los \
 #     --shot_strat all \
 #     --num_threads 3 \
-#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen
+#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst
 

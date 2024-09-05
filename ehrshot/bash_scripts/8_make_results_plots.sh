@@ -7,12 +7,26 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 
-mkdir -p ../../EHRSHOT_ASSETS/figures
+if [[ " $* " == *" --mimic4 "* ]]; then
+    path_to_labels_dir="../../EHRSHOT_ASSETS/mimic4_benchmark"
+    path_to_results_dir='../../EHRSHOT_ASSETS/mimic4_results'
+    path_to_figures_dir="../../EHRSHOT_ASSETS/mimic4_figures"
+elif [[ " $* " == *" --starr "* ]]; then
+    path_to_labels_dir="../../EHRSHOT_ASSETS/starr_benchmark"
+    path_to_results_dir='../../EHRSHOT_ASSETS/starr_results'
+    path_to_figures_dir="../../EHRSHOT_ASSETS/starr_figures"
+else
+    path_to_labels_dir="../../EHRSHOT_ASSETS/ehrshot_benchmark"
+    path_to_results_dir='../../EHRSHOT_ASSETS/ehrshot_results'
+    path_to_figures_dir="../../EHRSHOT_ASSETS/ehrshot_figures"
+fi
+
+mkdir -p $path_to_figures_dir
 
 python3 ../8_make_results_plots.py \
-    --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/benchmark \
-    --path_to_results_dir ../../EHRSHOT_ASSETS/results \
-    --path_to_output_dir ../../EHRSHOT_ASSETS/figures-60k-steps \
+    --path_to_labels_and_feats_dir $path_to_labels_dir \
+    --path_to_results_dir $path_to_results_dir \
+    --path_to_output_dir $path_to_figures_dir \
     --shot_strat all \
     --model_heads "[('clmbr', 'lr_lbfgs'), \
                     ('gpt2-base-1024--clmbr_train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
