@@ -73,7 +73,7 @@ def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split
 def compute_demographics(args):
     path_to_csv, path_to_database, path_to_splits_dir, patient_ids = args
     patient_database = femr.datasets.PatientDatabase(path_to_database)
-    splits = json.load(open(os.path.join(path_to_splits_dir, 'splits.json'), 'r'))
+    splits = json.load(open(os.path.join(path_to_splits_dir, 'person_id_map.csv'), 'r'))
     rows = []
     for idx, pid in enumerate(patient_ids):
         is_male: bool = False
@@ -160,6 +160,9 @@ if __name__ == "__main__":
         os.remove(PATH_TO_LATEX_TABLES_FILE)
 
     # Load splits
+    df_split = pd.read_csv(os.path.join(PATH_TO_SPLITS_DIR, 'person_id_map.csv'))
+    split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
+    
     splits: Dict[str, List[int]] = json.load(open(os.path.join(PATH_TO_SPLITS_DIR, 'splits.json'), 'r'))
 
     # Load all labels from CSVs

@@ -40,7 +40,7 @@ import femr.datasets
 import torch
 from jaxtyping import Float
 from femr.labelers import load_labeled_patients, LabeledPatients
-from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path
+from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
 from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
@@ -160,7 +160,9 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
     return model, layers
 
 def finetune_pytorch_model(X_train: np.ndarray, 
+                           X_val: np.ndarray,
                            y_train: np.ndarray, 
+                           y_val: np.ndarray, 
                            model: torch.nn.Module, 
                            optimizer,
                            criterion,
@@ -300,7 +302,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
     # Finetune `model`
     pad_token_id: int = tokenizer.pad_token_id
     logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}`")
-    model = finetune_pytorch_model(X_train, y_train, model, optimizer, criterion, pad_token_id, model_name, model_head, batch_size, n_epochs, device)
+    model = finetune_pytorch_model(X_train, X_val, y_train, y_val, model, optimizer, criterion, pad_token_id, model_name, model_head, batch_size, n_epochs, device)
     logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}`")
     
     # Calculate probabilistic preds
@@ -312,7 +314,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
-    return model, scores
+    return model, scores, { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
 
 def run_frozen_feature_evaluation(X_train: np.ndarray, 
                                     X_val: np.ndarray, 
@@ -382,7 +384,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
-    return model, scores
+    return model, scores, { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run EHRSHOT evaluation benchmark on a specific task.")
@@ -413,7 +415,6 @@ if __name__ == "__main__":
     BATCH_SIZE: int = args.batch_size
     N_EPOCHS: int = args.n_epochs
     IS_FORCE_REFRESH: bool = args.is_force_refresh
-    PATH_TO_DATABASE: str = args.path_to_database
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_SPLIT_CSV: str = args.path_to_split_csv
@@ -442,9 +443,6 @@ if __name__ == "__main__":
     ]
     logger.critical(f"Only running models: {models_to_keep}")
     logger.critical(f"Only running heads: {VALID_HEADS}")
-
-    # Load FEMR Patient Database
-    database = femr.datasets.PatientDatabase(PATH_TO_DATABASE)
 
     # Load all labeled patients
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
@@ -586,9 +584,9 @@ if __name__ == "__main__":
                             assert os.path.exists(path_to_model_dir), f"Path to .ckpt directory for model={model},head={head} does not exist: `{path_to_model_dir}`"
                             path_to_ckpt: str = os.path.join(path_to_model_dir, [ x for x in os.listdir(path_to_model_dir) if x.endswith('.ckpt') ][0])
                             logger.info(f"Loaded model `{model}` from .ckpt at: `{path_to_ckpt}`")
-                            best_model, scores = run_finetune_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, test_patient_ids=test_patient_ids)
+                            best_model, scores, preds_proba = run_finetune_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, test_patient_ids=test_patient_ids)
                         else:
-                            best_model, scores = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
+                            best_model, scores, preds_proba = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
 
                         # Save best model (according to val AUROC)
                         if scores['auroc']['score_val'] > best_model_val_auroc:
@@ -620,6 +618,9 @@ if __name__ == "__main__":
                                 'lower' : score_value['lower'],
                                 'mean' : score_value['mean'],
                                 'upper' : score_value['upper'],
+                                'train_preds_proba' : json.dumps(preds_proba['train']),
+                                'val_preds_proba' : json.dumps(preds_proba['val']),
+                                'test_preds_proba' : json.dumps(preds_proba['test']),
                             })
 
                         # Save results to CSV after each (model, head, sub_task, k, replicate) is calculated

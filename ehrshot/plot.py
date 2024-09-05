@@ -16,14 +16,14 @@ from utils import (
 PRIMARY_COLORS = [ 'darkblue', 'darkorange', 'darkgreen', 'darkred', 'darkviolet', 'saddlebrown', 'fuchsia', 'olive', 'cyan', 'black', ]
 def create_shades(color: str, num_shades: int) -> List[Tuple[float, float, float, float]]:
     """
-        Return a list of `n=num_shades + 2` rgba colors from `color` to white. 
-        We add `+2` to leave a bit of buffer with white.
+        Return a list of `n=num_shades + 1` rgba colors from `color` to white. 
+        We add `+1` to leave a bit of buffer with white.
     """
     return [
         LinearSegmentedColormap.from_list(f"{color}_shades", 
                                           [(1,1,1), to_rgba(color)], # type: ignore
-                                          N=num_shades + 2)(i) 
-        for i in np.linspace(0, 1, int(num_shades + 2))
+                                          N=num_shades + 1)(i) 
+        for i in np.linspace(0, 1, int(num_shades + 1))
     ][::-1]
 
 def map_model_head_to_color(model: str, head: str, model_heads: List[Tuple[str, str]]) -> str:
@@ -301,7 +301,8 @@ def plot_one_task_group_box_plot(df: pd.DataFrame,
         heads: List[str] = df_grouped[df_grouped['model'] == model]['head'].unique().tolist()
         for head in heads:
             df_ = df_grouped[(df_grouped['model'] == model) & (df_grouped['head'] == head)]
-            full_data_values: np.ndarray = np.array([ [x] * n_replicates for x in df_[df_['k'] == full_data_k]['value'].tolist() ]).flatten() # expand to match # of replicates, since only use 1 replicate for `all`
+            full_data_values: np.ndarray = np.array([ [x] * n_replicates for x in df_[df_['k'] == full_data_k]['value'].iloc[0] ]).flatten() # expand to match # of replicates, since only use 1 replicate for `all`
+            assert max([ len(x) for x in df_[df_['k'] != full_data_k]['value'].tolist() ]) == min([ len(x) for x in df_[df_['k'] != full_data_k]['value'].tolist() ]), f"ERROR - Some replicates haven't been done yet, so we get an array mismatch."
             values: np.ndarray = np.array(df_[df_['k'] != full_data_k]['value'].tolist())
 
             # Get relative difference between full data v. few-shot
