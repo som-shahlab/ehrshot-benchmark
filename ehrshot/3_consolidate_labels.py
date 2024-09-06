@@ -23,8 +23,12 @@ if __name__ == "__main__":
     # Force refresh
     check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
 
-    # Get all labels currently in `PATH_TO_LABELS_DIR`
-    labeling_functions: List[str] = os.listdir(PATH_TO_LABELS_DIR)
+    # Get all labels currently in `PATH_TO_LABELS_DIR`, filtering out non-labeling directories
+    labeling_functions: List[str] = [
+        lf for lf in os.listdir(PATH_TO_LABELS_DIR) 
+        if os.path.isdir(os.path.join(PATH_TO_LABELS_DIR, lf)) and 
+        os.path.exists(os.path.join(PATH_TO_LABELS_DIR, lf, 'labeled_patients.csv'))
+    ]
     logger.info(f"Found {len(labeling_functions)} labeling functions to merge: {labeling_functions}")
     
     # Merge all predictions times for all labels across all tasks into a single file,

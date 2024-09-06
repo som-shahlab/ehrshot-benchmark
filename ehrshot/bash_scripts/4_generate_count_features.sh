@@ -15,17 +15,17 @@
 #   EHRSHOT tasks on full STARR-OMOP: sbatch 4_generate_count_features.sh --starr
 
 if [[ " $* " == *" --mimic4 "* ]]; then
-    path_to_database="/share/pi/nigam/datasets/femr_mimic4_extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/mimic4_benchmark"
-    path_to_features_dir="../../EHRSHOT_ASSETS/mimic4_features"
+    path_to_database="/share/pi/nigam/datasets/femr_mimic_4_extract"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_mimic4"
+    path_to_features_dir="../../EHRSHOT_ASSETS/features_mimic4"
 elif [[ " $* " == *" --starr "* ]]; then
     path_to_database="/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/starr_benchmark"
-    path_to_features_dir="../../EHRSHOT_ASSETS/starr_features"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_starr"
+    path_to_features_dir="../../EHRSHOT_ASSETS/features_starr"
 else
     path_to_database="../../EHRSHOT_ASSETS/femr/extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/ehrshot_benchmark"
-    path_to_features_dir="../../EHRSHOT_ASSETS/ehrshot_features"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_ehrshot"
+    path_to_features_dir="../../EHRSHOT_ASSETS/features_ehrshot"
 fi
 
 mkdir -p $path_to_features_dir

@@ -16,11 +16,13 @@
 
 if [[ " $* " == *" --mimic4 "* ]]; then
     labeling_functions=(
-        # TODO -- Add MIMIC-IV labeling functions here
+        "mimic4_los" 
+        "mimic4_readmission"
+        "mimic4_mortality"
     )
-    path_to_database="/share/pi/nigam/datasets/femr_mimic4_extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/mimic4_benchmark"
-    path_to_split_csv="../../EHRSHOT_ASSETS/mimic4_splits/person_id_map.csv"
+    path_to_database="/share/pi/nigam/datasets/femr_mimic_4_extract"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_mimic4"
+    path_to_split_csv="../../EHRSHOT_ASSETS/splits_mimic4/person_id_map.csv"
 elif [[ " $* " == *" --starr "* ]]; then
     labeling_functions=(
         "guo_los" 
@@ -40,8 +42,8 @@ elif [[ " $* " == *" --starr "* ]]; then
         "chexpert"
     )
     path_to_database="/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/starr_benchmark"
-    path_to_split_csv="../../EHRSHOT_ASSETS/starr_splits/person_id_map.csv"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_starr"
+    path_to_split_csv="../../EHRSHOT_ASSETS/splits_starr/person_id_map.csv"
 else
     labeling_functions=(
         "guo_los" 
@@ -61,8 +63,8 @@ else
         "chexpert"
     )
     path_to_database="../../EHRSHOT_ASSETS/femr/extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/ehrshot_benchmark"
-    path_to_split_csv="../../EHRSHOT_ASSETS/ehrshot_splits/person_id_map.csv"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_ehrshot"
+    path_to_split_csv="../../EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv"
 fi
 
 shot_strats=("all")

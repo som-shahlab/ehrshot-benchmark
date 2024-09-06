@@ -480,9 +480,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     parser.add_argument("--models", default=None, help="Comma separated list. If specified, then only consider models in this list, e.g. `clmbr,count`")
     parser.add_argument("--heads", default=None, help="Comma separated list. If specified, then only consider heads in this list, e.g. `finetune_layers=1,finetune_layers=2`")
-    # Frozen
+    # Frozen model, finetuning Sklearn head
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
-    # Finetuning
+    # Finetuning model with PyTorch head
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning")
     parser.add_argument("--n_epochs", type=int, default=2, help="Number of epochs for finetuning")
     return parser.parse_args()
@@ -688,17 +688,40 @@ if __name__ == "__main__":
                         # Save best model (according to val AUROC)
                         if scores['auroc']['score_val'] > best_model_val_auroc:
                             # Create folder
-                            path_to_model_head_dir: str = os.path.join(path_to_model_dir, 'heads', head, LABELING_FUNCTION)
-                            os.makedirs(path_to_model_head_dir, exist_ok=True) 
-                            path_to_best_model_cpkt: str = os.path.join(path_to_model_head_dir, f"subtask={sub_task}--k={k}")
-                            logger.warning(f"Achieved best val AUROC: {scores['auroc']['score_val']} > {best_model_val_auroc} with most recent model. Saving to `{path_to_best_model_cpkt}`")
+                            path_to_best_model_dir: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, 'models', model, head, f"subtask={sub_task}", f"k={k}")
+                            os.makedirs(path_to_best_model_dir, exist_ok=True)
+                            logger.warning(f"Achieved best val AUROC: {scores['auroc']['score_val']} > {best_model_val_auroc} with most recent model. Saving ckpt + preds to `{path_to_best_model_dir}`")
                             best_model_val_auroc = scores['auroc']['score_val']
                             if head.startswith('finetune'):
                                 # Save Pytorch model
-                                torch.save(best_model, path_to_best_model_cpkt + '.pt')
+                                torch.save(best_model, os.path.join(path_to_best_model_dir,  'ckpt.pt'))
                             else:
                                 # Save SKLearn model
-                                pickle.dump(best_model, open(path_to_best_model_cpkt + '.pkl', 'wb'))
+                                pickle.dump(best_model, open(os.path.join(path_to_best_model_dir,  'ckpt.pkl'), 'wb'))
+                            # Save preds
+                            df_preds = pd.DataFrame({ 
+                                'labeling_function' : LABELING_FUNCTION,
+                                'sub_task' : sub_task,
+                                'model' : model,
+                                'head' : head,
+                                'replicate' : replicate,
+                                'k' : k,
+                                'y' : np.hstack([ y_train_k, y_val_k, y_test_k ]), 
+                                'pred_proba' : np.hstack([ preds_proba['train'], preds_proba['val'], preds_proba['test'] ]), 
+                                'split' : [ 'train' ] * preds_proba['train'].shape[0] + [ 'val' ] * preds_proba['val'].shape[0] + [ 'test' ] * preds_proba['test'].shape[0]
+                            })
+                            df_preds.to_csv(os.path.join(path_to_best_model_dir, "preds.csv"), index=False)
+                            if hasattr(best_model, 'get_params'):
+                                json.dump({
+                                    'labeling_function' : LABELING_FUNCTION,
+                                    'sub_task' : sub_task,
+                                    'model' : model,
+                                    'head' : head,
+                                    'replicate' : replicate,
+                                    'k' : k,
+                                    'scores' : scores,
+                                    'model_hparams' : best_model.get_params()
+                                }, open(os.path.join(path_to_best_model_dir, 'model_hparams.json'), 'w'), indent=2)
 
                         # Save results
                         for score_name, score_value in scores.items():
@@ -715,11 +738,6 @@ if __name__ == "__main__":
                                 'lower' : score_value['lower'],
                                 'mean' : score_value['mean'],
                                 'upper' : score_value['upper'],
-                                'y_train_preds_proba' : json.dumps(preds_proba['train']),
-                                'y_val_preds_proba' : json.dumps(preds_proba['val']),
-                                'y_test_preds_proba' : json.dumps(preds_proba['test']),
-                                'y_test' : list(y_test_k),
-                                'test_patient_ids' : list(test_patient_ids),
                                 'model_hparams' : best_model.get_params() if hasattr(best_model, 'get_params') else None,
                             })
 

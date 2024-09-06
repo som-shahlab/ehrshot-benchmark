@@ -17,4 +17,20 @@ python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --num_threads $7 \
     --labeling_function $8 \
-    --heads lr_lbfgs,rf,glm
+    --models count,clmbr \
+    --heads lr_lbfgs,rf,gbm
+
+# For debugging:
+#
+# python3 ../7_eval_finetune.py \
+#     --path_to_database '../../EHRSHOT_ASSETS/femr/extract' \
+#     --path_to_labels_dir '../../EHRSHOT_ASSETS/benchmark' \
+#     --path_to_features_dir '../../EHRSHOT_ASSETS/features' \
+#     --path_to_split_csv '../../EHRSHOT_ASSETS/splits/person_id_map.csv' \
+#     --path_to_output_dir '../../EHRSHOT_ASSETS/results_test' \
+#     --labeling_function guo_los \
+#     --shot_strat all \
+#     --num_threads 5 \
+#     --heads gbm,lr_lbfgs,rf \
+#     --models count,clmbr
+

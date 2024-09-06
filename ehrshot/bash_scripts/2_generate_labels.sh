@@ -16,10 +16,12 @@
 
 if [[ " $* " == *" --mimic4 "* ]]; then
     labeling_functions=(
-        # TODO: Add MIMIC-IV labeling functions here
+        "mimic4_los"
+        "mimic4_readmission"
+        "mimic4_mortality"
     )
-    path_to_database="/share/pi/nigam/datasets/femr_mimic4_extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/mimic4_benchmark"
+    path_to_database="/share/pi/nigam/datasets/femr_mimic_4_extract"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_mimic4"
 elif [[ " $* " == *" --starr "* ]]; then
     labeling_functions=(
         "guo_los" 
@@ -38,7 +40,7 @@ elif [[ " $* " == *" --starr "* ]]; then
         "lab_anemia"
     )
     path_to_database="/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/starr_benchmark"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_starr"
 else
     labeling_functions=(
         "guo_los" 
@@ -58,7 +60,7 @@ else
         # "chexpert" -- This depends on having access to NOTES, which we can't redistribute. Use the labels in the Redivis data release instead.
     )
     path_to_database="../../EHRSHOT_ASSETS/femr/extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/ehrshot_benchmark"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_ehrshot"
 fi
 
 mkdir -p $path_to_labels_dir
@@ -70,3 +72,10 @@ do
         --labeling_function ${labeling_function} \
         --num_threads 20
 done
+
+# For debugging
+# python3 ../2_generate_labels.py \
+#     --path_to_database "/share/pi/nigam/datasets/femr_mimic_4_extract" \
+#     --path_to_labels_dir "../../EHRSHOT_ASSETS/benchmark_mimic4" \
+#     --labeling_function mimic4_los \
+#     --num_threads 1

@@ -205,6 +205,9 @@ LABELING_FUNCTION_2_PAPER_NAME = {
     # Custom tasks
     "chexpert": "Chest X-ray Findings",
     # MIMIC-IV tasks
+    "mimic4_los" : "Long LOS (MIMIC-IV)",
+    "mimic4_readmission" : "30-day Readmission (MIMIC-IV)",
+    "mimic4_mortality" : "Inpatient Mortality (MIMIC-IV)",
 }
 
 TASK_GROUP_2_PAPER_NAME = {
