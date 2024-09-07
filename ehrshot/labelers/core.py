@@ -158,7 +158,9 @@ class LabeledPatients(MutableMapping[int, List[Label]]):
             if self.labeler_type == "survival":
                 header.append("is_censored")
             writer.writerow(header)
-            for patient, labels in self.patients_to_labels.items():
+            pids = sorted(list(self.patients_to_labels.keys()))
+            for pid in pids:
+                labels = sorted(self.patients_to_labels[pid], key=lambda x: (x.time, x.value))
                 for label in labels:
                     if self.labeler_type == "survival":
                         assert isinstance(label.value, SurvivalValue)

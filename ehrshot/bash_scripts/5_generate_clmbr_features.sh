@@ -3,10 +3,11 @@
 #SBATCH --output=logs/5_generate_clmbr_features_%A.out
 #SBATCH --error=logs/5_generate_clmbr_features_%A.err
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=gpu
+#SBATCH --partition=nigam-a100
 #SBATCH --gres=gpu:1
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=10
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 # Time to run: 20 mins
 

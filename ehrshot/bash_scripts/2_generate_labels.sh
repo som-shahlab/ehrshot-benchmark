@@ -64,14 +64,37 @@ else
 fi
 
 mkdir -p $path_to_labels_dir
-for labeling_function in "${labeling_functions[@]}"
-do
-    python3 ../2_generate_labels.py \
-        --path_to_database $path_to_database \
-        --path_to_labels_dir $path_to_labels_dir \
-        --labeling_function ${labeling_function} \
-        --num_threads 20
-done
+
+if [[ " $* " == *" --mimic4 "* ]]; then
+    for labeling_function in "${labeling_functions[@]}"
+    do
+        python3 ../2_generate_labels.py \
+            --path_to_database $path_to_database \
+            --path_to_labels_dir $path_to_labels_dir \
+            --labeling_function ${labeling_function} \
+            --num_threads 1 \
+            --is_sample_one_label_per_patient
+    done
+elif [[ " $* " == *" --starr "* ]]; then
+    for labeling_function in "${labeling_functions[@]}"
+    do
+        python3 ../2_generate_labels.py \
+            --path_to_database $path_to_database \
+            --path_to_labels_dir $path_to_labels_dir \
+            --labeling_function ${labeling_function} \
+            --num_threads 20 \
+            --is_sample_one_label_per_patient
+    done
+else
+    for labeling_function in "${labeling_functions[@]}"
+    do
+        python3 ../2_generate_labels.py \
+            --path_to_database $path_to_database \
+            --path_to_labels_dir $path_to_labels_dir \
+            --labeling_function ${labeling_function} \
+            --num_threads 20
+    done
+fi
 
 # For debugging
 # python3 ../2_generate_labels.py \

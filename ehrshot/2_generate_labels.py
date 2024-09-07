@@ -48,7 +48,7 @@ def save_labeled_patients_to_csv(labeled_patients: LabeledPatients, path_to_csv:
         omop_patient_id = patient # for some reason the pipeline uses the OMOP ID for labelers as the patient ID
         for l in labels:
             rows.append((omop_patient_id, l.time, l.value, labeled_patients.labeler_type))
-    df = pd.DataFrame(rows, columns = ['patient_id', 'prediction_time', 'value', 'label_type', ])
+    df = pd.DataFrame(rows, columns = ['patient_id', 'prediction_time', 'value', 'label_type', ]).sort_values(['patient_id', 'prediction_time', 'value'])
     df.to_csv(path_to_csv, index=False)
     return df
 
