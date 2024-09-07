@@ -39,7 +39,7 @@ Note that this currently only works on Linux machines.
 
 ```bash
 pip install femr-cuda==0.0.20 dm-haiku==0.0.9 optax==0.1.4
-pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 **3)**: **Download dataset + model** from [Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
