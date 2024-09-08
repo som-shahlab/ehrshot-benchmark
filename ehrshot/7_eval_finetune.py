@@ -55,9 +55,11 @@ def fit_logreg_lbfgs(model: torch.nn.Module,
     """Train a logistic regression model with (optional) regularization using the LBFGS optimizer."""
     model.weight.data.zero_()
     model.bias.data.zero_()
+    X = X.to(model.weight.device)
+    y = y.to(model.weight.device)
     
     # LBFGS
-    opt = torch.optim.LBFGS(model.parameters(), lr=lr, max_iter=max_iter, tol=0.0001)
+    opt = torch.optim.LBFGS(model.parameters(), lr=lr, max_iter=max_iter)
     
     # Forward/backward pass
     def closure():
@@ -85,10 +87,16 @@ def fit_logreg_lbfgs(model: torch.nn.Module,
     opt.step(closure)
 
     
-def lr_lambda(epoch: int, warmup_epochs: int = 0) -> float:
-    if epoch < warmup_epochs:
-        return float(epoch) / float(max(1, warmup_epochs))
-    return 1.0  # No further increase in learning rate after warmup
+def lr_lambda(current_step: int, total_steps: int) -> float:
+    # Linearly scale the learning rate from 0 to 1 over the total steps
+    if current_step >= total_steps:
+        return 1.0
+    return current_step / float(max(1, total_steps))
+
+# def lr_lambda(epoch: int, warmup_epochs: int = 0) -> float:
+#     if epoch < warmup_epochs:
+#         return float(epoch) / float(max(1, warmup_epochs))
+#     return 1.0  # No further increase in learning rate after warmup
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
@@ -196,17 +204,17 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         for layer in layers[-n_layers:]:
             for param in layer.parameters():
                 param.requires_grad = True
-    elif finetune_strat == "full":
+    elif finetune_strat.startswith("full"):
         for layer in layers:
             for param in layer.parameters():
                 param.requires_grad = True
-    elif finetune_strat == 'frozen':
+    elif finetune_strat.startswith('frozen'):
         pass
     else:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     return model, layers
 
-def finetune_pytorch_model(X_train_timelines: np.ndarray, 
+def finetune_pytorch_model(X_train_timelines: torch.Tensor, 
                            X_train: np.ndarray,
                            y_train: np.ndarray, 
                            y_val: np.ndarray, 
@@ -228,7 +236,7 @@ def finetune_pytorch_model(X_train_timelines: np.ndarray,
     
     # First, finetune logreg head (if applicable)
     if is_finetune_logreg_first:
-        fit_logreg_lbfgs(model.classifier, X_train, y_train, lr=1.0, C=logreg_C, penalty=logreg_penalty, max_iter=1000)
+        fit_logreg_lbfgs(model.classifier, torch.from_numpy(X_train), torch.from_numpy(y_train), lr=1.0, C=logreg_C, penalty=logreg_penalty, max_iter=1000)
 
     for epoch in range(n_epochs):
         for batch_start in tqdm(range(0, X_train_timelines.shape[0], batch_size), desc=f'Finetuning: epoch={epoch} | model={model_name[:15]} | head={model_head[:15]} | k={X_train_timelines.shape[0]}', total=X_train_timelines.shape[0] // batch_size):
@@ -320,7 +328,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
                             batch_size: int = 4,
                             n_epochs: int = 2,
                             lr: float = 1e-5,
-                            logreg_C: float = 1.0,
+                            logreg_C: Union[float, List[float]] = [1.0],
                             logreg_penalty: Optional[str] = 'l2',
                             warmup_epochs: int = 0,
                             n_jobs: int = 1,
@@ -350,6 +358,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
     model = load_model_from_path(path_to_ckpt)
     model = CookbookModelWithClassificationHead(model, embed_strat, 2)
     model, layers = setup_finetuning(model, finetune_strat)
+    pad_token_id: int = tokenizer.pad_token_id
     ## Sanity checks
     if finetune_strat.startswith('full'):
         for l in layers:
@@ -377,26 +386,46 @@ def run_finetune_evaluation(X_train: np.ndarray,
     criterion = torch.nn.functional.cross_entropy
 
     # Initialize the warmup scheduler (if applicable)
-    scheduler = LambdaLR(optimizer, lr_lambda=lambda x: lr_lambda(x, warmup_epochs)) if warmup_epochs > 0 else None
+    steps_per_epoch = X_train_timelines.shape[0] // batch_size
+    scheduler = LambdaLR(optimizer, lr_lambda=lambda x: lr_lambda(x, steps_per_epoch)) if warmup_epochs > 0 else None
     
     # Finetune `model`
-    pad_token_id: int = tokenizer.pad_token_id
-    logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}`")
-    model = finetune_pytorch_model(X_train_timelines, X_train, y_train, model, optimizer, scheduler, criterion, 
-                                   logreg_C, logreg_penalty, is_finetune_logreg_first,
-                                   pad_token_id, model_name, model_head, batch_size, n_epochs, device)
-    logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}`")
-    
-    # Calculate probabilistic preds
-    logger.critical(f"Start | Evaling model=`{model_name}` | head=`{model_head}`")
-    y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train_timelines, X_val_timelines, X_test_timelines, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
-    logger.critical(f"Finish | Evaling model=`{model_name}` | head=`{model_head}`")
-    model.to('cpu')
-    
-    # Calculate AUROC, AUPRC, and Brier scores
-    scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
+    best_model, best_scores, best_metrics = None, None, None
+    if isinstance(logreg_C, float):
+        logreg_C = [ logreg_C ]
+    for C in logreg_C:
+        logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        model = finetune_pytorch_model(X_train_timelines, X_train, y_train, y_val, model, optimizer, scheduler, criterion, 
+                                        C, logreg_penalty, is_finetune_logreg_first,
+                                        pad_token_id, model_name, model_head, batch_size, n_epochs, device)
+        logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        
+        # Calculate probabilistic preds
+        logger.critical(f"Start | Evaling model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train_timelines, X_val_timelines, X_test_timelines, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
+        logger.critical(f"Finish | Evaling model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        
+        # Calculate AUROC, AUPRC, and Brier scores
+        scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
-    return model, scores, { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
+        # Save best model (based on val AUROC)
+        if best_scores is None or scores['auroc']['score_val'] > best_scores['auroc']['score_val']:
+            logger.success(f"New best model found with val AUROC {scores['auroc']['score_val']} > {best_scores['auroc']['score_val'] if best_scores is not None else -1} | logreg_C={C}")
+            best_model = model
+            best_scores = scores
+            best_metrics = { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
+            best_model.get_params = lambda: { 
+                'logreg_C' : C, 
+                'logreg_penalty' : logreg_penalty, 
+                'finetune_strat' : finetune_strat, 
+                'warmup_epochs' : warmup_epochs,
+                'n_epochs' : n_epochs,
+                'batch_size' : batch_size,
+                'lr' : lr,
+            }
+ 
+    best_model.to('cpu')
+    return best_model, best_scores, best_metrics
 
 def run_frozen_feature_evaluation(X_train: np.ndarray, 
                                     X_val: np.ndarray, 
@@ -483,8 +512,10 @@ def parse_args() -> argparse.Namespace:
     # Frozen model, finetuning Sklearn head
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     # Finetuning model with PyTorch head
+    parser.add_argument("--logreg_C", type=str, default="1e-1,1e-2,1e-8", help="Command separated list of regularization strengths for logistic regression head")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning")
     parser.add_argument("--n_epochs", type=int, default=2, help="Number of epochs for finetuning")
+    parser.add_argument("--warmup_epochs", type=int, default=1, help="Number of epochs for lr warmup")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -496,7 +527,8 @@ if __name__ == "__main__":
     NUM_THREADS: int = args.num_threads
     BATCH_SIZE: int = args.batch_size
     N_EPOCHS: int = args.n_epochs
-    logreg_C: float = 1.0
+    warmup_epochs: int = args.warmup_epochs
+    logreg_C: List[float] = [ float(x) for x in args.logreg_C.split(',') ]
     logreg_penalty: Optional[str] = 'l2'
     IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
@@ -681,6 +713,7 @@ if __name__ == "__main__":
                                                                                        X_train_timelines_k, X_val_timelines_k, X_test_timelines,
                                                                                        model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, 
                                                                                        logreg_C=logreg_C, logreg_penalty=logreg_penalty, 
+                                                                                       warmup_epochs=warmup_epochs,
                                                                                        test_patient_ids=test_patient_ids)
                         else:
                             best_model, scores, preds_proba = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
@@ -692,8 +725,11 @@ if __name__ == "__main__":
                             os.makedirs(path_to_best_model_dir, exist_ok=True)
                             logger.warning(f"Achieved best val AUROC: {scores['auroc']['score_val']} > {best_model_val_auroc} with most recent model. Saving ckpt + preds to `{path_to_best_model_dir}`")
                             best_model_val_auroc = scores['auroc']['score_val']
+                            model_hparams = best_model.get_params() if hasattr(best_model, 'get_params') else None
                             if head.startswith('finetune'):
                                 # Save Pytorch model
+                                if hasattr(best_model, 'get_params'):
+                                    del best_model.get_params
                                 torch.save(best_model, os.path.join(path_to_best_model_dir,  'ckpt.pt'))
                             else:
                                 # Save SKLearn model
@@ -711,7 +747,7 @@ if __name__ == "__main__":
                                 'split' : [ 'train' ] * preds_proba['train'].shape[0] + [ 'val' ] * preds_proba['val'].shape[0] + [ 'test' ] * preds_proba['test'].shape[0]
                             })
                             df_preds.to_csv(os.path.join(path_to_best_model_dir, "preds.csv"), index=False)
-                            if hasattr(best_model, 'get_params'):
+                            if model_hparams is not None:
                                 json.dump({
                                     'labeling_function' : LABELING_FUNCTION,
                                     'sub_task' : sub_task,
@@ -720,7 +756,7 @@ if __name__ == "__main__":
                                     'replicate' : replicate,
                                     'k' : k,
                                     'scores' : scores,
-                                    'model_hparams' : best_model.get_params()
+                                    'model_hparams' : model_hparams
                                 }, open(os.path.join(path_to_best_model_dir, 'model_hparams.json'), 'w'), indent=2)
 
                         # Save results

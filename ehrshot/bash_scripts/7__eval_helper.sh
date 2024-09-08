@@ -18,7 +18,9 @@ python3 ../7_eval_finetune.py \
     --num_threads $7 \
     --labeling_function $8 \
     --models count,clmbr \
-    --heads lr_lbfgs,rf,gbm
+    --heads lr_lbfgs \
+    --is_force_refresh
+    # --heads lr_lbfgs,rf,gbm
 
 # For debugging:
 #

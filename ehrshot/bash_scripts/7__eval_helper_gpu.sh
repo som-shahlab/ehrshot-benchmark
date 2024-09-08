@@ -69,6 +69,20 @@ wait
 #     --path_to_output_dir '../../EHRSHOT_ASSETS/results' \
 #     --labeling_function guo_los \
 #     --shot_strat all \
-#     --num_threads 3 \
+#     --num_threads 1 \
 #     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst
+
+
+# For debugging:
+#
+# python3 ../7_eval_finetune.py \
+#     --path_to_database '../../EHRSHOT_ASSETS/femr/extract' \
+#     --path_to_labels_dir '../../EHRSHOT_ASSETS/benchmark' \
+#     --path_to_features_dir '../../EHRSHOT_ASSETS/features' \
+#     --path_to_split_csv '../../EHRSHOT_ASSETS/splits/person_id_map.csv' \
+#     --path_to_output_dir '../../EHRSHOT_ASSETS/results' \
+#     --labeling_function guo_los \
+#     --shot_strat all \
+#     --num_threads 1 \
+#     --heads finetune_frozen-logregfirst
 

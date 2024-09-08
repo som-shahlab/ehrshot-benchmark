@@ -32,8 +32,8 @@ elif [[ " $* " == *" --starr "* ]]; then
         "new_hyperlipidemia"
         "new_pancan"
         "new_acutemi"
-        # "new_celiac" # TODO -- ignore for now b/c noisy
-        # "new_lupus" # TODO -- ignore for now b/c noisy
+        "new_celiac"
+        "new_lupus"
         "lab_thrombocytopenia"
         "lab_hyperkalemia"
         "lab_hyponatremia"
@@ -55,8 +55,8 @@ else
         "new_hyperlipidemia"
         "new_pancan"
         "new_acutemi"
-        # "new_celiac" # TODO -- ignore for now b/c noisy
-        # "new_lupus" # TODO -- ignore for now b/c noisy
+        "new_celiac"
+        "new_lupus"
         "lab_thrombocytopenia"
         "lab_hyperkalemia"
         "lab_hyponatremia"

@@ -49,7 +49,7 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
     # },
     'gpt2-base-512--clmbr_train-tokens-total_nonPAD-true_val=600000896-ckpt_val=600000000-persist_chunk:last_embed:last': {
         'label' : 'gpt2-base-512-clmbr',
-        'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
+        'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', 'finetune_frozen-logregfirst'],
         'batch_size' : 32,
     },
     'gpt2-base-1024--clmbr_train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist_chunk:last_embed:last': {
@@ -268,7 +268,7 @@ XGB_PARAMS = {
     'num_leaves' : [10, 25, 100],
 }
 LR_PARAMS = {
-    "C": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, ], 
+    "C": [1e-8, 1e-6, 1e-4, 1e-2, 1e-1, 1, 1e2, 1e4, ],
     "penalty": ['l2']
 }
 RF_PARAMS = {
