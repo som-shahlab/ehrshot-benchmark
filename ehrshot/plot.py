@@ -126,7 +126,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
     for m_idx, model in enumerate(models):
         heads: List[str] = df[df['model'] == model]['head'].unique().tolist()
         for h_idx, head in enumerate(heads):
-            model_name: str = MODEL_2_INFO[model]['label']
+            model_name: str = model
             head_name: str = HEAD_2_INFO[head]['label']
 
             df_means_ = df_means[(df_means['model'] == model) & (df_means['head'] == head)].sort_values(by='k')
@@ -217,7 +217,7 @@ def plot_one_task_group(df: pd.DataFrame,
     for m_idx, model in enumerate(models):
         heads: List[str] = df[df['model'] == model]['head'].unique().tolist()
         for h_idx, head in enumerate(heads):
-            model_name: str = MODEL_2_INFO[model]['label']
+            model_name: str = model
             head_name: str = HEAD_2_INFO[head]['label']
 
             df_means_ = df_means[(df_means['model'] == model) & (df_means['head'] == head)].sort_values(by='k')

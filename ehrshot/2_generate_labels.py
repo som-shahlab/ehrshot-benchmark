@@ -1,6 +1,7 @@
 import argparse
 import os
 import json
+from tqdm import tqdm
 from typing import List
 from loguru import logger
 from utils import LABELING_FUNCTION_2_PAPER_NAME
@@ -162,13 +163,25 @@ if __name__ == "__main__":
     if is_sample_one_label_per_patient:
         pids: List[int] = labeled_patients.get_all_patient_ids()
         labels_to_keep: List[Label] = []
-        for pid in pids:
+        for pid in tqdm(pids, desc="Randomly sampling patients..."):
+            random.seed(int(pid))
             labels: List[Label] = labeled_patients.get_labels_from_patient_idx(pid)
             # Filter out labels that occur <= 18 yrs of age
-            labels = [ l for l in labels if (l.time.year - database[pid].events[0].start.year) > 18 ]
+            birthdate = database[pid].events[0].start.year
+            keep_label_start_idx = 0
+            for l in labels:
+                if l.time.year - birthdate < 18:
+                    keep_label_start_idx += 1
+                else:
+                    break
+            labels = labels[keep_label_start_idx:]
             # Randomly sample one label
-            random.seed(int(pid))
-            labeled_patients.patients_to_labels[pid] = [ random.choice(labels) ] if len(labels) > 0 else []
+            if len(labels) == 0:
+                labeled_patients.patients_to_labels[pid] = []
+            elif len(labels) == 1:
+                labeled_patients.patients_to_labels[pid] = labels
+            else:
+                labeled_patients.patients_to_labels[pid] = [ random.choice(labels) ]
         assert all([ len(labeled_patients.get_labels_from_patient_idx(x)) <= 1 for x in pids ]), f"Found a patient with != 1 label"
 
     # Force labels to be minute-level resolution for FEMR compatibility

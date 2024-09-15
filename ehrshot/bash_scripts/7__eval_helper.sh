@@ -15,12 +15,12 @@ python3 ../7_eval_finetune.py \
     --path_to_split_csv $4 \
     --path_to_output_dir $5 \
     --shot_strat $6 \
-    --num_threads $7 \
-    --labeling_function $8 \
-    --models count,clmbr \
-    --heads lr_lbfgs \
+    --ks $7 \
+    --models $8 \
+    --heads lr_lbfgs,rf,gbm \
+    --num_threads $9 \
+    --labeling_function ${10} \
     --is_force_refresh
-    # --heads lr_lbfgs,rf,gbm
 
 # For debugging:
 #
@@ -32,7 +32,8 @@ python3 ../7_eval_finetune.py \
 #     --path_to_output_dir '../../EHRSHOT_ASSETS/results_test' \
 #     --labeling_function guo_los \
 #     --shot_strat all \
-#     --num_threads 5 \
+#     --ks -1 \
+#     --models count,clmbr \
 #     --heads gbm,lr_lbfgs,rf \
-#     --models count,clmbr
+#     --num_threads 5
 

@@ -6,7 +6,7 @@
 #SBATCH --partition=gpu,nigam-v100,nigam-a100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
-#SBATCH --gres=gpu:3
+#SBATCH --gres=gpu:4
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 # For running multiple labeling functions in parallel per node:
@@ -17,9 +17,11 @@ CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --path_to_split_csv $4 \
     --path_to_output_dir $5 \
     --shot_strat $6 \
-    --num_threads 5 \
-    --labeling_function $8 \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
+    --ks $7 \
+    --models $8 \
+    --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
+    --labeling_function ${10} \
+    --num_threads 5 &
 
 CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
@@ -28,9 +30,11 @@ CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --path_to_split_csv $4 \
     --path_to_output_dir $5 \
     --shot_strat $6 \
-    --num_threads 5 \
-    --labeling_function $9 \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
+    --ks $7 \
+    --models $8 \
+    --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
+    --labeling_function ${11} \
+    --num_threads 5 &
 
 CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
@@ -39,9 +43,11 @@ CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
     --path_to_split_csv $4 \
     --path_to_output_dir $5 \
     --shot_strat $6 \
-    --num_threads 5 \
-    --labeling_function ${10} \
-    --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst &
+    --ks $7 \
+    --models $8 \
+    --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
+    --labeling_function ${12} \
+    --num_threads 5 &
 
 wait
 
@@ -54,9 +60,10 @@ wait
 #     --path_to_split_csv $4 \
 #     --path_to_output_dir $5 \
 #     --shot_strat $6 \
+#     --ks $7 \
+#     --labeling_function $9 \
 #     --num_threads 3 \
-#     --labeling_function $8 \
-#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst
+#     --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst
 
 
 # For debugging:
@@ -69,8 +76,9 @@ wait
 #     --path_to_output_dir '../../EHRSHOT_ASSETS/results' \
 #     --labeling_function guo_los \
 #     --shot_strat all \
+#     --ks -1 \
 #     --num_threads 1 \
-#     --heads finetune_layers=1,finetune_layers=2,finetune_full,finetune_frozen,finetune_frozen-logregfirst
+#     --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst
 
 
 # For debugging:
@@ -83,6 +91,7 @@ wait
 #     --path_to_output_dir '../../EHRSHOT_ASSETS/results' \
 #     --labeling_function guo_los \
 #     --shot_strat all \
+#     --ks -1 \
 #     --num_threads 1 \
 #     --heads finetune_frozen-logregfirst
 

@@ -44,6 +44,9 @@ from femr.labelers import load_labeled_patients, LabeledPatients
 from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
 from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
 
+import torch._dynamo
+torch.set_float32_matmul_precision('high')
+torch._dynamo.config.suppress_errors = True
 
 def fit_logreg_lbfgs(model: torch.nn.Module, 
                      X: Float[torch.Tensor, 'B H'], 
@@ -56,7 +59,7 @@ def fit_logreg_lbfgs(model: torch.nn.Module,
     model.weight.data.zero_()
     model.bias.data.zero_()
     X = X.to(model.weight.device)
-    y = y.to(model.weight.device)
+    y = y.long().to(model.weight.device)
     
     # LBFGS
     opt = torch.optim.LBFGS(model.parameters(), lr=lr, max_iter=max_iter)
@@ -68,7 +71,7 @@ def fit_logreg_lbfgs(model: torch.nn.Module,
         preds: Float[torch.Tensor, 'B C'] = model(X)
         
         # Compute CE loss v. true binary labels
-        ce_loss = C * torch.nn.functional.cross_entropy(preds, y)
+        ce_loss = torch.nn.functional.cross_entropy(preds, y)
         
         # Regularization (optional)
         if penalty == 'l1':
@@ -92,11 +95,6 @@ def lr_lambda(current_step: int, total_steps: int) -> float:
     if current_step >= total_steps:
         return 1.0
     return current_step / float(max(1, total_steps))
-
-# def lr_lambda(epoch: int, warmup_epochs: int = 0) -> float:
-#     if epoch < warmup_epochs:
-#         return float(epoch) / float(max(1, warmup_epochs))
-#     return 1.0  # No further increase in learning rate after warmup
 
 def tune_hyperparams(X_train: np.ndarray, X_val: np.ndarray, y_train: np.ndarray, y_val: np.ndarray, model, param_grid: Dict[str, List], n_jobs: int = 1):
     """Use GridSearchCV to do hyperparam tuning, but we want to explicitly specify the train/val split.
@@ -131,8 +129,16 @@ def compare_models(model1, model2):
         print(f'Found {len(differences)} differences between the models.')
     return differences
 
-def calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids) -> Dict[str, Dict[str, float]]:
-    """Calculates AUROC, AUPRC, and Brier scores for train, val, and test sets."""
+def calc_metrics(y_train: Float[np.ndarray, 'N'], 
+                 y_train_proba: Float[np.ndarray, 'N'], 
+                 y_val: Float[np.ndarray, 'N'], 
+                 y_val_proba: Float[np.ndarray, 'N'], 
+                 y_test: Float[np.ndarray, 'N'], 
+                 y_test_proba: Float[np.ndarray, 'N'], 
+                 test_patient_ids: List[int]) -> Dict[str, Dict[str, float]]:
+    """Calculates AUROC, AUPRC, and Brier scores for train, val, and test sets.
+        NOTE: Expects `y_train_proba`, `y_val_proba`, and `y_test_proba` to be the probability of the positive class.
+    """
 
     metric_dict = {
         'auroc': metrics.roc_auc_score,
@@ -193,6 +199,8 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         layers = model.base_model.layers
     elif model.base_model_name == 'gpt2':
         layers = model.base_model.h
+    elif model.base_model_name == 'llama':
+        layers = model.base_model.layers
     elif model.base_model_name == 'bert':
         layers = model.base_model.encoder.layer
     else:
@@ -214,8 +222,32 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     return model, layers
 
+def sanity_check_finetuning_model(model: CookbookModelWithClassificationHead, layers, finetune_strat):
+    """For sanity checking that the output of `setup_finetuning` has correctly unfrozen the proper layers.
+        NOTE: This takes ~10 seconds, so don't use if trying to be fast.
+    """
+    if finetune_strat.startswith('full'):
+        for l in layers:
+            for param in l.parameters():
+                assert param.requires_grad, "All layers should be unfrozen"
+    elif finetune_strat.startswith('frozen'):
+        for l in layers:
+            for param in l.parameters():
+                assert not param.requires_grad, "All layers should be frozen"
+    elif finetune_strat.startswith('layers'):
+        n_layers: int = int(finetune_strat.split('=')[-1])
+        for l in layers[-n_layers:]:
+            for param in l.parameters():
+                assert param.requires_grad, f"Last {n_layers} layers should be frozen"
+        for l in layers[:-n_layers]:
+            for param in l.parameters():
+                assert not param.requires_grad, f"First {len(layers) - n_layers} layers should be frozen"
+    else:
+        raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
+
 def finetune_pytorch_model(X_train_timelines: torch.Tensor, 
                            X_train: np.ndarray,
+                           X_val: np.ndarray,
                            y_train: np.ndarray, 
                            y_val: np.ndarray, 
                            model: torch.nn.Module, 
@@ -230,19 +262,31 @@ def finetune_pytorch_model(X_train_timelines: torch.Tensor,
                            model_head: str,
                            batch_size: int,
                            n_epochs: int,
+                           replicate: int,
                            device: str) -> torch.nn.Module:
-    torch.manual_seed(X_train_timelines.shape[0])
+    torch.manual_seed(X_train_timelines.shape[0] + replicate)
     model.train()
     
     # First, finetune logreg head (if applicable)
     if is_finetune_logreg_first:
+        logger.info(f"Start | Finetuning 'logreg_first'")
         fit_logreg_lbfgs(model.classifier, torch.from_numpy(X_train), torch.from_numpy(y_train), lr=1.0, C=logreg_C, penalty=logreg_penalty, max_iter=1000)
+        y_train_proba: Float[np.ndarray, 'N 2'] = torch.nn.functional.softmax(model.classifier(torch.from_numpy(X_train).to(device)), dim=-1).detach().cpu().numpy()
+        y_val_proba: Float[np.ndarray, 'N 2'] = torch.nn.functional.softmax(model.classifier(torch.from_numpy(X_val).to(device)), dim=-1).detach().cpu().numpy()
+        logger.warning(f"Train AUROC from logreg_first: {metrics.roc_auc_score(y_train, y_train_proba[:,1])}")
+        logger.warning(f"Val AUROC from logreg_first: {metrics.roc_auc_score(y_val, y_val_proba[:,1])}")
+        logger.info(f"Finish | Finetuning 'logreg_first'")
 
     for epoch in range(n_epochs):
         for batch_start in tqdm(range(0, X_train_timelines.shape[0], batch_size), desc=f'Finetuning: epoch={epoch} | model={model_name[:15]} | head={model_head[:15]} | k={X_train_timelines.shape[0]}', total=X_train_timelines.shape[0] // batch_size):
             # Subset training batch
             X_train_batch = X_train_timelines[batch_start:batch_start+batch_size]
             y_train_batch = y_train[batch_start:batch_start+batch_size]
+
+            # Drop last batch if it's too small (otherwise torch.compile complains about non-static shaped inputs)
+            # Ignore case where batch_size > X_train_timelines.shape[0] (i.e. we have fewer samples than batch_size so there's just one batch)
+            if X_train_batch.shape[0] != batch_size and batch_size < X_train_timelines.shape[0]:
+                continue
             
             # Tokenize batch
             input_ids = torch.tensor(X_train_batch, device=device)
@@ -307,10 +351,10 @@ def eval_pytorch_model(X_train_timelines: np.ndarray,
                 }
                 if "hyena" in model_name:
                     batch.pop('attention_mask')
-                y.append(model.predict_proba(**batch)[::, 1].detach().cpu().numpy())
-    y_train_proba = np.concatenate(y_train_proba)
-    y_val_proba = np.concatenate(y_val_proba)
-    y_test_proba = np.concatenate(y_test_proba)
+                y.append(model.predict_proba(**batch)[:, 1].detach().cpu().numpy())
+    y_train_proba = np.concatenate(y_train_proba) if len(y_train_proba) > 0 else np.array([])
+    y_val_proba = np.concatenate(y_val_proba) if len(y_val_proba) > 0 else np.array([])
+    y_test_proba = np.concatenate(y_test_proba) if len(y_test_proba) > 0 else np.array([])
     return y_train_proba, y_val_proba, y_test_proba
 
 def run_finetune_evaluation(X_train: np.ndarray,
@@ -331,9 +375,10 @@ def run_finetune_evaluation(X_train: np.ndarray,
                             logreg_C: Union[float, List[float]] = [1.0],
                             logreg_penalty: Optional[str] = 'l2',
                             warmup_epochs: int = 0,
+                            replicate: int = 0,
                             n_jobs: int = 1,
-                            test_patient_ids: np.ndarray = None) -> Tuple[Any, Dict[str, float]]:
-    logger.critical(f"Start | Training {model_head}")
+                            test_patient_ids: List[int] = None) -> Tuple[Any, Dict[str, Dict[str, float]], Dict[str, np.ndarray]]:
+    logger.debug(f"Start | Training {model_head} | replicate={replicate}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
     logger.info(f"Test shape: X = {X_test.shape}, Y = {y_test.shape}")
@@ -350,71 +395,68 @@ def run_finetune_evaluation(X_train: np.ndarray,
     X_train = X_train[train_shuffle_idx]
     y_train = y_train[train_shuffle_idx]
 
-    # Load model
+    # Load tokenizer
     device: str = 'cuda'
+    tokenizer = load_tokenizer_from_path(path_to_ckpt)
+    pad_token_id: int = tokenizer.pad_token_id
     finetune_strat = model_head.split("_")[1] # "layers=n" or "full"
     embed_strat: str = [ x for x in model_name.split("_") if x.split(":")[0] == 'embed' ][0].split(":")[1] # "mean" or "last"
-    tokenizer = load_tokenizer_from_path(path_to_ckpt)
+
+    # Load original model -- weights won't change
+    orig_model = load_model_from_path(path_to_ckpt)
+    orig_model = CookbookModelWithClassificationHead(orig_model, embed_strat, 2)
+    # Load model that will get finetuned for each logreg_C -- weights will change
     model = load_model_from_path(path_to_ckpt)
     model = CookbookModelWithClassificationHead(model, embed_strat, 2)
     model, layers = setup_finetuning(model, finetune_strat)
-    pad_token_id: int = tokenizer.pad_token_id
-    ## Sanity checks
-    if finetune_strat.startswith('full'):
-        for l in layers:
-            for param in l.parameters():
-                assert param.requires_grad, "All layers should be unfrozen"
-    elif finetune_strat.startswith('frozen'):
-        for l in layers:
-            for param in l.parameters():
-                assert not param.requires_grad, "All layers should be frozen"
-    elif finetune_strat.startswith('layers'):
-        n_layers: int = int(finetune_strat.split('=')[-1])
-        for l in layers[-n_layers:]:
-            for param in l.parameters():
-                assert param.requires_grad, f"Last {n_layers} layers should be frozen"
-        for l in layers[:-n_layers]:
-            for param in l.parameters():
-                assert not param.requires_grad, f"First {len(layers) - n_layers} layers should be frozen"
-    else:
-        raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
-    model.to(device)
-    is_finetune_logreg_first: bool = "logregfirst" in finetune_strat
+    model: torch.nn.Module = torch.compile(model)  # type: ignore
+    # Sanity checks
+    # sanity_check_finetuning_model(model, layers, finetune_strat)
 
-    # Optimizer + Loss
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = torch.nn.functional.cross_entropy
-
-    # Initialize the warmup scheduler (if applicable)
-    steps_per_epoch = X_train_timelines.shape[0] // batch_size
-    scheduler = LambdaLR(optimizer, lr_lambda=lambda x: lr_lambda(x, steps_per_epoch)) if warmup_epochs > 0 else None
-    
-    # Finetune `model`
-    best_model, best_scores, best_metrics = None, None, None
     if isinstance(logreg_C, float):
         logreg_C = [ logreg_C ]
+
+    best_model_state_dict, best_val_auroc, best_hparams = None, None, None
     for C in logreg_C:
-        logger.critical(f"Start | Finetuning model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
-        model = finetune_pytorch_model(X_train_timelines, X_train, y_train, y_val, model, optimizer, scheduler, criterion, 
-                                        C, logreg_penalty, is_finetune_logreg_first,
-                                        pad_token_id, model_name, model_head, batch_size, n_epochs, device)
-        logger.critical(f"Finish | Finetuning model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        logger.info(f"Start | Finetuning logreg_C=`{C}` | model=`{model_name}` | head=`{model_head}`")
+        # Reload original weights into model
+        # ! NOTE: This needs to be done inside the loop, since we need to reset the model each time 
+        #         (otherwise we'll be finetuning the same model multiple times)
+        model._orig_mod.load_state_dict(orig_model.state_dict())
+        ## Sanity check
+        for key in orig_model.state_dict().keys():
+            assert torch.equal(model._orig_mod.state_dict()[key], orig_model.state_dict()[key]), f"Model weights not equal for key={key}"
+        model.to(device)
+
+        # Optimizer + Loss
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        criterion = torch.nn.functional.cross_entropy
+
+        # Initialize the warmup scheduler (if applicable)
+        steps_per_epoch = X_train_timelines.shape[0] // batch_size
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda x: lr_lambda(x, steps_per_epoch)) if warmup_epochs > 0 else None
         
-        # Calculate probabilistic preds
-        logger.critical(f"Start | Evaling model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
-        y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train_timelines, X_val_timelines, X_test_timelines, y_train, y_val, y_test, model, pad_token_id, model_name, model_head, batch_size, device)
-        logger.critical(f"Finish | Evaling model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        # Finetune `model`
+        is_finetune_logreg_first: bool = "logregfirst" in finetune_strat
+        model = finetune_pytorch_model(X_train_timelines, X_train, X_val, y_train, y_val, model, optimizer, scheduler, criterion, 
+                                        C, logreg_penalty, is_finetune_logreg_first,
+                                        pad_token_id, model_name, model_head, batch_size, n_epochs, replicate, device)
+        logger.info(f"Finish | Finetuning logreg_C=`{C}` | model=`{model_name}` | head=`{model_head}`")
+        
+        # Eval model on val set
+        logger.info(f"Start | Evaling only VAL for model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        __, y_val_proba, __ = eval_pytorch_model(np.array([]), X_val_timelines, np.array([]), np.array([]), y_val, np.array([]), model, pad_token_id, model_name, model_head, batch_size, device)
+        logger.info(f"Finish | Evaling only VAL for model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
         
         # Calculate AUROC, AUPRC, and Brier scores
-        scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
+        val_auroc = metrics.roc_auc_score(y_val, y_val_proba)
 
         # Save best model (based on val AUROC)
-        if best_scores is None or scores['auroc']['score_val'] > best_scores['auroc']['score_val']:
-            logger.success(f"New best model found with val AUROC {scores['auroc']['score_val']} > {best_scores['auroc']['score_val'] if best_scores is not None else -1} | logreg_C={C}")
-            best_model = model
-            best_scores = scores
-            best_metrics = { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
-            best_model.get_params = lambda: { 
+        if best_val_auroc is None or val_auroc > best_val_auroc:
+            logger.debug(f"New best model found with val AUROC {val_auroc} > {best_val_auroc if best_val_auroc is not None else -1} | logreg_C={C}")
+            best_model_state_dict = model._orig_mod.state_dict()
+            best_val_auroc = val_auroc
+            best_hparams = { 
                 'logreg_C' : C, 
                 'logreg_penalty' : logreg_penalty, 
                 'finetune_strat' : finetune_strat, 
@@ -423,9 +465,27 @@ def run_finetune_evaluation(X_train: np.ndarray,
                 'batch_size' : batch_size,
                 'lr' : lr,
             }
+    
+    # Load best model
+    model._orig_mod.load_state_dict(best_model_state_dict)
+    model._orig_mod.get_params = lambda : best_hparams
  
-    best_model.to('cpu')
-    return best_model, best_scores, best_metrics
+    # Eval best model on train/val/test sets
+    logger.info(f"Start | Evaling best model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+    y_train_proba, y_val_proba, y_test_proba = eval_pytorch_model(X_train_timelines, X_val_timelines, X_test_timelines, 
+                                                                  y_train, y_val, y_test, 
+                                                                  model, pad_token_id, 
+                                                                  model_name, model_head, batch_size, device)
+    logger.info(f"Finish | Evaling best model=`{model_name}` | head=`{model_head}` | logreg_C=`{C}`")
+        
+    # Calculate AUROC, AUPRC, and Brier scores
+    best_scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
+    best_metrics: Dict[str, np.ndarray] = { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
+
+    # Return best model -- if torch.compile() is used, then we need to unwrap it to return the original model
+    logger.debug(f"Finish | Training {model_head} | replicate={replicate}")
+    model.to('cpu')
+    return model._orig_mod, best_scores, best_metrics
 
 def run_frozen_feature_evaluation(X_train: np.ndarray, 
                                     X_val: np.ndarray, 
@@ -434,9 +494,10 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
                                     y_val: np.ndarray, 
                                     y_test: np.ndarray, 
                                     model_head: str, 
+                                    replicate: int = 0,
                                     n_jobs: int = 1,
-                                    test_patient_ids: np.ndarray = None) -> Tuple[Any, Dict[str, float]]:
-    logger.critical(f"Start | Training {model_head}")
+                                    test_patient_ids: List[int] = None) -> Tuple[Any, Dict[str, float]]:
+    logger.debug(f"Start | Training {model_head} | replicate={replicate}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
     logger.info(f"Test shape: X = {X_test.shape}, Y = {y_test.shape}")
@@ -452,7 +513,6 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     X_train = X_train[train_shuffle_idx]
     y_train = y_train[train_shuffle_idx]
 
-    logger.critical(f"Start | Fitting {model_head}...")
     if model_head == "gbm":
         # XGBoost
         model = lgb.LGBMClassifier(random_state=0)
@@ -485,16 +545,16 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
         model.fit(X_train, y_train)
     else:
         raise ValueError(f"Model head `{model_head}` not supported.")
-    logger.critical(f"Finish | Fitting {model_head}...")
     
     # Calculate probabilistic preds
-    y_train_proba = model.predict_proba(X_train)[::, 1]
-    y_val_proba = model.predict_proba(X_val)[::, 1]
-    y_test_proba = model.predict_proba(X_test)[::, 1]
+    y_train_proba: Float[np.ndarray, 'N'] = model.predict_proba(X_train)[:, 1]
+    y_val_proba: Float[np.ndarray, 'N'] = model.predict_proba(X_val)[:, 1]
+    y_test_proba: Float[np.ndarray, 'N'] = model.predict_proba(X_test)[:, 1]
     
     # Calculate AUROC, AUPRC, and Brier scores
     scores = calc_metrics(y_train, y_train_proba, y_val, y_val_proba, y_test, y_test_proba, test_patient_ids)
 
+    logger.debug(f"Finish | Training {model_head} | replicate={replicate}")
     return model, scores, { 'train' : y_train_proba, 'val' : y_val_proba, 'test' : y_test_proba }
 
 def parse_args() -> argparse.Namespace:
@@ -504,16 +564,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory containing saved features")
     parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory where results will be saved")
     parser.add_argument("--path_to_split_csv", required=True, type=str, help="Path to CSV of splits")
+    parser.add_argument("--path_to_tokenized_timelines_dir", required=False, type=str, default=None, help="Path to directory containing tokenized timelines (if applicable)")
     parser.add_argument("--shot_strat", type=str, choices=SHOT_STRATS.keys(), help="What type of X-shot evaluation we are interested in.", required=True )
     parser.add_argument("--labeling_function", required=True, type=str, help="Labeling function for which we will create k-shot samples.", choices=LABELING_FUNCTION_2_PAPER_NAME.keys(), )
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
-    parser.add_argument("--models", default=None, help="Comma separated list. If specified, then only consider models in this list, e.g. `clmbr,count`")
+    parser.add_argument("--models", required=True, help="Comma separated list. If specified, then only consider models in this list, e.g. `clmbr,count`")
     parser.add_argument("--heads", default=None, help="Comma separated list. If specified, then only consider heads in this list, e.g. `finetune_layers=1,finetune_layers=2`")
+    parser.add_argument("--ks", type=str, default=None, help="Comma separated list. If specified, then only use these k-shot values to evaluate")
     # Frozen model, finetuning Sklearn head
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     # Finetuning model with PyTorch head
-    parser.add_argument("--logreg_C", type=str, default="1e-1,1e-2,1e-8", help="Command separated list of regularization strengths for logistic regression head")
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning")
+    parser.add_argument("--logreg_C", type=str, default="1e-8,1e-2,1e-1", help="Command separated list of regularization strengths for logistic regression head")
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning. NOTE: This must be a small value (e.g. 4) for torch.compile() to correctly work")
     parser.add_argument("--n_epochs", type=int, default=2, help="Number of epochs for finetuning")
     parser.add_argument("--warmup_epochs", type=int, default=1, help="Number of epochs for lr warmup")
     return parser.parse_args()
@@ -522,14 +584,16 @@ if __name__ == "__main__":
     args = parse_args()
     LABELING_FUNCTION: str = args.labeling_function
     VALID_HEADS: Optional[List[str]] = None if args.heads is None else args.heads.split(',')
-    VALID_MODELS: Optional[List[str]] = None if args.models is None else args.models.split(',')
+    VALID_MODELS: List[str] = args.models.split(',')
     SHOT_STRAT: str = args.shot_strat
+    KS: Optional[str] = args.ks
     NUM_THREADS: int = args.num_threads
     BATCH_SIZE: int = args.batch_size
     N_EPOCHS: int = args.n_epochs
     warmup_epochs: int = args.warmup_epochs
     logreg_C: List[float] = [ float(x) for x in args.logreg_C.split(',') ]
     logreg_penalty: Optional[str] = 'l2'
+    PATH_TO_TOKENIZED_TIMELINES_DIR: Optional[str] = args.path_to_tokenized_timelines_dir
     IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
@@ -539,26 +603,17 @@ if __name__ == "__main__":
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
-    
+    assert BATCH_SIZE == 4, f"You should only use a --batch_size of 4 for optimal use of torch.compile()"
+
     # Determine which models to load
-    # Useful for saving memory by only loading featurizations for models we need
-    models_to_keep: List[str] = [ 
-        model for model in MODEL_2_INFO.keys() 
-        if (
-            (
-                # If --heads specified, only keep models with those heads; otherwise keep all models
-                VALID_HEADS is None
-                or len(set(MODEL_2_INFO[model]['heads']).intersection(set(VALID_HEADS))) > 0 
-            )
-            and (
-                # If --models specified, only keep those models; otherwise keep all models
-                VALID_MODELS is None
-                or model in VALID_MODELS
-            )
-        )
-    ]
-    logger.critical(f"Only running models: {models_to_keep}")
+    logger.critical(f"Only running models: {VALID_MODELS}")
     logger.critical(f"Only running heads: {VALID_HEADS}")
+
+    # Determine which ks to load
+    VALID_KS = None
+    if KS is not None and KS != "":
+        VALID_KS = [ int(x) for x in KS.split(',') ]
+        logger.critical(f"Only running ks: {VALID_KS}")
 
     # Load all labeled patients
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
@@ -569,15 +624,10 @@ if __name__ == "__main__":
         few_shots_dict: Dict[str, Dict] = json.load(f)
     
     # For each base model we are evaluating...
-    for model in MODEL_2_INFO.keys():
-            
-        model_heads: List[str] = MODEL_2_INFO[model]['heads']
-        BATCH_SIZE = MODEL_2_INFO[model]['batch_size'] if 'batch_size' in MODEL_2_INFO[model] else BATCH_SIZE
+    for model in VALID_MODELS:
+        model_base_name: str = model.split("-")[0] # count -> count; gpt-base-1024 -> gpt
+        model_heads: List[str] = MODEL_2_INFO[model_base_name]['heads']
 
-        # TODO -- hack; batch sizes are scaled to V100, so double if A100 / H100
-        if 'a100' in os.environ['SLURM_JOB_PARTITION'] or 'h100' in os.environ['SLURM_JOB_PARTITION']:
-            BATCH_SIZE *= 2
-        
         # For each head we can add to the top of this model...
         for head in model_heads:
             if VALID_HEADS is not None and head not in VALID_HEADS:
@@ -585,7 +635,10 @@ if __name__ == "__main__":
                 continue
 
             # Load labels/features for this task + model_head
-            patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, PATH_TO_FEATURES_DIR, models_to_keep=[ model ])
+            patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, 
+                                                                                               PATH_TO_FEATURES_DIR, 
+                                                                                               PATH_TO_TOKENIZED_TIMELINES_DIR,
+                                                                                               models_to_keep=[ model ])
             train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
 
             # Preprocess certain non-binary labels
@@ -629,42 +682,11 @@ if __name__ == "__main__":
             # NOTE: The "subtask" is just the same thing as LABELING_FUNCTION for all binary tasks.
             # But for Chexpert, there are multiple subtasks, which of each represents a binary subtask
             for sub_task_idx, sub_task in enumerate(sub_tasks):
-                
-                ############################
-                # ! Do loading of previous results here so that we reload any results that
-                # ! were generated in a concurrently running SLURM job
-                # If results already exist, then append new results to existing file
-                df_existing: Optional[pd.DataFrame] = None
-                if os.path.exists(PATH_TO_OUTPUT_FILE):
-                    logger.warning(f"Results already exist @ `{PATH_TO_OUTPUT_FILE}`.")
-                    df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
-                # Results will be stored as a CSV with columns:
-                #   sub_task, model, head, replicate, score_name, score_value, k
-                results: List[Dict[str, Any]] = []
-                if df_existing is not None:
-                    results += df_existing.to_dict(orient='records')
-                ############################
-                
-                # Check if results already exist for this model/head/shot_strat in `results.csv`
-                if df_existing is not None:
-                    existing_rows: pd.DataFrame = df_existing[
-                        (df_existing['labeling_function'] == LABELING_FUNCTION) 
-                        & (df_existing['sub_task'] == sub_task) 
-                        & (df_existing['model'] == model) 
-                        & (df_existing['head'] == head)
-                    ]
-                    if existing_rows.shape[0] > 0:
-                        # Overwrite
-                        if IS_FORCE_REFRESH:
-                            logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Overwriting these rows because `is_force_refresh` is TRUE.")
-                        else:
-                            logger.warning(f"Results ALREADY exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Skipping this combination because `is_force_refresh` is FALSE.")
-                            continue
-                    else:
-                        # Append
-                        logger.warning(f"Results DO NOT exist for {model}/{head}:{LABELING_FUNCTION}/{sub_task} in `results.csv`. Appending to this CSV.")
-        
                 ks: List[int] = sorted([ int(x) for x in few_shots_dict[sub_task].keys() ])
+
+                # Filter out k-shot values (if specified)
+                if VALID_KS is not None:
+                    ks = [ k for k in ks if k in VALID_KS ]
                 
                 # For each k-shot sample we are evaluating...
                 for k in ks:
@@ -675,11 +697,46 @@ if __name__ == "__main__":
 
                     # If k = -1, then we use all data points. So each replicate is the exact same thing, just repeat 5 times so we can get a std
                     if k == -1:
-                        replicates = [ replicates[0] ] * 5
+                        replicates = [0, 1, 2, 3, 4, ]
+                        for replicate in replicates:
+                            few_shots_dict[sub_task][str(k)][str(replicate)] = few_shots_dict[sub_task][str(k)][str(0)]
                         assert len(replicates) == 5
 
                     # For each replicate of this k-shot sample...
                     for replicate in replicates:
+                
+                        ############################
+                        # ! Do loading of previous results here so that we reload any results that
+                        # ! were generated in a concurrently running SLURM job
+                        # If results already exist, then append new results to existing file
+                        df_existing: Optional[pd.DataFrame] = None
+                        if os.path.exists(PATH_TO_OUTPUT_FILE):
+                            logger.warning(f"Results already exist @ `{PATH_TO_OUTPUT_FILE}`.")
+                            df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
+                        ############################
+                        
+                        # Check if results already exist for this model/head/shot_strat in `results.csv`
+                        if df_existing is not None:
+                            existing_rows: pd.DataFrame = df_existing[
+                                (df_existing['labeling_function'] == LABELING_FUNCTION) 
+                                & (df_existing['sub_task'] == sub_task) 
+                                & (df_existing['model'] == model) 
+                                & (df_existing['head'] == head)
+                                & (df_existing['k'] == k)
+                                & (df_existing['replicate'] == replicate)
+                            ]
+                            if existing_rows.shape[0] > 0:
+                                # Overwrite
+                                if IS_FORCE_REFRESH:
+                                    logger.warning(f"Results ALREADY exist for {model}/{head}/{LABELING_FUNCTION}/{sub_task}/k={k}/r={replicate} in `results.csv`.\nOVERWRITING these rows because `is_force_refresh` is TRUE.")
+                                else:
+                                    logger.warning(f"Results ALREADY exist for {model}/{head}/{LABELING_FUNCTION}/{sub_task}/k={k}/r={replicate} in `results.csv`.\nSKIPPING this combination because `is_force_refresh` is FALSE.")
+                                    continue
+                            else:
+                                # Append
+                                logger.warning(f"Results DO NOT exist for {model}/{head}/{LABELING_FUNCTION}/{sub_task}/k={k}/r={replicate} in `results.csv`. Appending to this CSV.")
+                
+                
                         logger.success(f"Model: {model} | Head: {head} | Task: {sub_task} | k: {k} | replicate: {replicate}")
                         shot_dict: Dict[str, List[int]] = few_shots_dict[sub_task][str(k)][str(replicate)]               
 
@@ -714,9 +771,15 @@ if __name__ == "__main__":
                                                                                        model_name=model, model_head=head, path_to_ckpt=path_to_ckpt, batch_size=BATCH_SIZE, n_epochs=N_EPOCHS, 
                                                                                        logreg_C=logreg_C, logreg_penalty=logreg_penalty, 
                                                                                        warmup_epochs=warmup_epochs,
+                                                                                       replicate=replicate,
                                                                                        test_patient_ids=test_patient_ids)
                         else:
-                            best_model, scores, preds_proba = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, y_train_k, y_val_k, y_test_k, model_head=head, n_jobs=NUM_THREADS, test_patient_ids=test_patient_ids)
+                            best_model, scores, preds_proba = run_frozen_feature_evaluation(X_train_k, X_val_k, X_test, 
+                                                                                            y_train_k, y_val_k, y_test_k, 
+                                                                                            model_head=head, 
+                                                                                            replicate=replicate,
+                                                                                            n_jobs=NUM_THREADS, 
+                                                                                            test_patient_ids=test_patient_ids)
 
                         # Save best model (according to val AUROC)
                         if scores['auroc']['score_val'] > best_model_val_auroc:
@@ -760,6 +823,7 @@ if __name__ == "__main__":
                                 }, open(os.path.join(path_to_best_model_dir, 'model_hparams.json'), 'w'), indent=2)
 
                         # Save results
+                        results: List[Dict[str, Any]] = []
                         for score_name, score_value in scores.items():
                             results.append({
                                 'labeling_function' : LABELING_FUNCTION,
@@ -777,8 +841,15 @@ if __name__ == "__main__":
                                 'model_hparams' : best_model.get_params() if hasattr(best_model, 'get_params') else None,
                             })
 
+                        ############################
+                        # Reload to ensure we have most updated version of file
+                        if os.path.exists(PATH_TO_OUTPUT_FILE):
+                            df_existing = pd.read_csv(PATH_TO_OUTPUT_FILE)
+                            results += df_existing.to_dict(orient='records')
+                        ############################
+
                         # Save results to CSV after each (model, head, sub_task, k, replicate) is calculated
-                        logger.critical(f"Saving results for {model} + {head} + {k} (replicate={replicate}) to: {PATH_TO_OUTPUT_FILE}")
+                        logger.critical(f"Saving results for {model} + {head} + k={k} + replicate={replicate} to: {PATH_TO_OUTPUT_FILE}")
                         df: pd.DataFrame = pd.DataFrame(results)
                         logger.critical(f"Added {df.shape[0] - (df_existing.shape[0] if df_existing is not None else 0)} rows")
                         df.to_csv(PATH_TO_OUTPUT_FILE, index=False)

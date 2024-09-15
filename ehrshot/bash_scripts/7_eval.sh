@@ -7,9 +7,9 @@
 # CheXPert will be the bottleneck, so total run time should be ~4 hrs
 
 # Usage: 
-#   EHRSHOT: bash 7_eval.sh --ehrshot
-#   MIMIC-IV: bash 7_eval.sh --mimic4
-#   EHRSHOT tasks on full STARR-OMOP: bash 7_eval.sh --starr
+#   EHRSHOT: bash 7_eval.sh model1,model2 --ehrshot --is_use_slurm
+#   MIMIC-IV: bash 7_eval.sh model1,model2 --mimic4 --is_use_slurm
+#   EHRSHOT tasks on full STARR-OMOP: bash 7_eval.sh model1,model2 --starr --is_use_slurm
 
 if [[ " $* " == *" --mimic4 "* ]]; then
     labeling_functions=(
@@ -68,8 +68,11 @@ else
     path_to_features_dir="../../EHRSHOT_ASSETS/features_ehrshot"
     path_to_output_dir='../../EHRSHOT_ASSETS/results_ehrshot'
     path_to_split_csv="../../EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv"
+    path_to_tokenized_timelines='../../EHRSHOT_ASSETS/tokenized_timelines_ehrshot'
 fi
 
+models=$1
+ks="32,128,-1"
 shot_strats=("all")
 num_threads=20
 
@@ -77,21 +80,21 @@ num_threads=20
 for labeling_function in "${labeling_functions[@]}"; do
     for shot_strat in "${shot_strats[@]}"; do
         if [[ " $* " == *" --is_use_slurm "* ]]; then
-            sbatch 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $num_threads ${labeling_function}
+            sbatch 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads ${labeling_function}
         else
-            bash 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $num_threads ${labeling_function}
+            bash 7__eval_helper.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads ${labeling_function}
         fi
     done
 done
 
 # GPU-bound jobs (loop in chunks of 3 to fit multiple jobs on same GPU node)
-# for (( i=0; i<${#labeling_functions[@]}; i+=3 )); do
-#     chunk=("${labeling_functions[@]:i:3}")
-#     for shot_strat in "${shot_strats[@]}"; do
-#         if [[ " $* " == *" --is_use_slurm "* ]]; then
-#             sbatch 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
-#         else
-#             bash 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
-#         fi
-#     done
-# done
+for (( i=0; i<${#labeling_functions[@]}; i+=3 )); do
+    chunk=("${labeling_functions[@]:i:3}")
+    for shot_strat in "${shot_strats[@]}"; do
+        if [[ " $* " == *" --is_use_slurm "* ]]; then
+            sbatch 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
+        else
+            bash 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
+        fi
+    done
+done

@@ -26,7 +26,7 @@ conda activate EHRSHOT_ENV
 
 git clone https://github.com/som-shahlab/ehrshot-benchmark.git
 cd ehrshot-benchmark
-pip install -r requirements.txt
+pip install -r requirements.txt --no-cache-dir
 ```
 
 **2)**: Install **FEMR**

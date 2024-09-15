@@ -85,6 +85,8 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         layers = model.base_model.layers
     elif model.base_model_name == 'gpt2':
         layers = model.base_model.h
+    elif model.base_model_name == 'llama':
+        layers = model.base_model.layers
     elif model.base_model_name == 'bert':
         layers = model.base_model.encoder.layer
     else:

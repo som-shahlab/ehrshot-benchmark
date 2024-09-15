@@ -34,7 +34,7 @@ elif [[ " $* " == *" --starr "* ]]; then
         # "new_celiac"
         # "new_lupus"
         # "new_acutemi"
-        "lab_thrombocytopenia"
+        # "lab_thrombocytopenia"
         "lab_hyperkalemia"
         "lab_hypoglycemia"
         "lab_hyponatremia"

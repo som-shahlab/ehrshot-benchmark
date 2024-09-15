@@ -16,3 +16,4 @@ transformers==4.42.4
 lightning==2.2.1
 calflops==0.3.2
 wandb==0.17.4
+polars==0.19.5

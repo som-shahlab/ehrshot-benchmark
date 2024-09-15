@@ -26,135 +26,26 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
         'label' : 'CLMBR',
         'heads' : ['lr_lbfgs', ],
     },
-    # v8
-    # 'bert-base-512--clmbr_train-tokens-total_nonPAD-true_val=600002304-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'bert-base-512-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 64,
-    # },
-    # 'bert-base-1024--clmbr_train-tokens-total_nonPAD-true_val=600004480-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'bert-base-1024-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 32,
-    # },
-    # 'bert-base-2048--clmbr_train-tokens-total_nonPAD-true_val=600003136-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'bert-base-2048-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 16,
-    # },
-    # 'bert-base-4096--clmbr_train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'bert-base-4096-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 8,
-    # },
-    'gpt2-base-512--clmbr_train-tokens-total_nonPAD-true_val=600000896-ckpt_val=600000000-persist_chunk:last_embed:last': {
-        'label' : 'gpt2-base-512-clmbr',
-        'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', 'finetune_frozen-logregfirst'],
-        'batch_size' : 32,
+    'gpt' : {
+        'label' : 'gpt',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
-    'gpt2-base-1024--clmbr_train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist_chunk:last_embed:last': {
-        'label' : 'gpt2-base-1024-clmbr',
-        'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen'],
-        'batch_size' : 24,
+    'bert' : {
+        'label' : 'bert',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
-    # 'gpt2-base-2048--clmbr_train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'gpt2-base-2048-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 12,
-    # },
-    # 'gpt2-base-4096--clmbr_train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'gpt2-base-4096-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 4,
-    # },
-    # 'mamba-tiny-4096--clmbr_train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'mamba-tiny-4096-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 8,
-    # },
-    # 'mamba-tiny-8192--clmbr_train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'mamba-tiny-8192-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 4,
-    # },
-    'mamba-tiny-16384--clmbr_train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist_chunk:last_embed:last': {
-        'label' : 'mamba-tiny-16384-clmbr',
-        'heads' : ['lr_lbfgs', 'finetune_full', 'finetune_layers=1', ],
-        'batch_size' : 2, # ! Should only run on H100 (too slow on V100)
+    'hyena' : {
+        'label' : 'hyena',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
-    # 'hyena-medium-1024--clmbr_train-tokens-total_nonPAD-true_val=600012096-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'hyena-medium-1024-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 64,
-    # },
-    # 'hyena-medium-8192--clmbr_train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'hyena-medium-8192-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 16,
-    # },
-    # 'hyena-medium-16384--clmbr_train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist_chunk:last_embed:last': {
-    #     'label' : 'hyena-medium-16384-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 8,
-    # },
-    
-    # TODO - remove these
-    # 'gpt2-base-1024--clmbr-h100_epoch=0-step=120000-persist_chunk:last_embed:last': {
-    #     'label' : 'gpt2-base-1k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 16,
-    # },
-    # 'hyena-medium-1024--clmbr_epoch=1-step=100000-recent_chunk:last_embed:last' : {
-    #     'label' : 'hyena-medium-1k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 16,
-    # },
-    # 'hyena-medium-16k--clmbr_epoch=1-step=60000-persist_chunk:last_embed:last' : {
-    #     'label' : 'hyena-tiny-16k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 4,
-    # },
-    # 'mamba-tiny-1024--clmbr_epoch=1-step=180000-persist_chunk:last_embed:last' : {
-    #     'label' : 'mamba-tiny-1k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 16,
-    # },
-    # 'mamba-tiny-8192--clmbr_epoch=1-step=90000-persist_chunk:last_embed:last' : {
-    #     'label' : 'mamba-tiny-8k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', ],
-    #     'batch_size' : 8,
-    # },
-    # 'mamba-tiny-16k--clmbr_epoch=1-step=60000-persist_chunk:last_embed:last' : {
-    #     'label' : 'mamba-tiny-16k-clmbr',
-    #     'heads' : ['lr_lbfgs','finetune_full', 'finetune_layers=1', 'finetune_layers=2', ],
-    #     'batch_size' : 4,
-    # },
-    # 'mamba-tiny-16384--clmbr_epoch=1-step=60000-persist_chunk:last_embed:last' : {
-    #     'label' : 'mamba-tiny-16k-clmbr',
-    #     'heads' : ['lr_lbfgs'],
-    # },
-
-    # v9
-    # 'gpt2-base-lr-1e-4_chunk:epoch=1-epoch.ckpt_embed:last': {
-    #     'label' : 'gpt2-base (v9)',
-    #     'heads' : ['lr_lbfgs'],
-    # },
-    # 'hyena-medium-lr-1e-4_chunk:epoch=1-epoch.ckpt_embed:last': {
-    #     'label' : 'Hyena-medium (v9)',
-    #     'heads' : ['lr_lbfgs'],
-    # },
-    # 'mamba_tiny_1_1e4_chunk:last_embed:last': {
-    #     'label' : 'Mamba-tiny-1k (v9)',
-    #     'heads' : ['lr_lbfgs'],
-    # },
-    # 'mamba_tiny_4_1e4_chunk:last_embed:last': {
-    #     'label' : 'Mamba-tiny-4k (v9)',
-    #     'heads' : ['lr_lbfgs'],
-    # },
-    # 'mamba_tiny_8_1e4_chunk:last_embed:last': {
-    #     'label' : 'Mamba-tiny-8k (v9)',
-    #     'heads' : ['lr_lbfgs'],
-    # },
+    'mamba' : {
+        'label' : 'mamba',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'llama' : {
+        'label' : 'llama',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
 }
 
 HEAD_2_INFO: Dict[str, Dict[str, str]] = {
@@ -359,7 +250,10 @@ def compute_feature_label_alignment(label_pids, label_dates, feature_pids, featu
         result[i] = j
     return result
 
-def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str], models_to_keep: Optional[List[str]] = None) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, Dict[str, np.ndarray]]]:
+def get_labels_and_features(labeled_patients: LabeledPatients, 
+                            path_to_features_dir: Optional[str], 
+                            path_to_tokenized_timelines_dir: Optional[str],
+                            models_to_keep: List[str] = []) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, Dict[str, np.ndarray]]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
         the labels and features for each patient. Note that this function is more complex b/c we need to align
         the labels with their corresponding features based on their prediction times."""
@@ -377,11 +271,7 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
     featurizations: Dict[str, Dict[str, np.ndarray]] = {}
-    for model in MODEL_2_INFO.keys():
-        # Skip models (if applicable)
-        if models_to_keep is not None and model not in models_to_keep:
-            continue
-
+    for model in models_to_keep:
         print(f"Processing features for model: {model}")
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
@@ -392,14 +282,18 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
             
             feature_tokenized_timelines = None
             if isinstance(feats, dict):
-                if 'tokenized_timelines' in feats:
+                if path_to_tokenized_timelines_dir is not None:
                     # HF_EHR format
+                    path_to_tokenized_timelines_file: str = os.path.join(path_to_tokenized_timelines_dir, f'{model}_tokenized_timelines.npz')
+                    assert os.path.exists(path_to_tokenized_timelines_file), f'Path to file containing `{model}` tokenized timelines does not exist at this path: {path_to_tokenized_timelines_file}. Maybe you forgot to run `generate_features.py` first?'
+                    tokenized_timelines: np.ndarray = np.load(path_to_tokenized_timelines_file)['tokenized_timelines']
                     feature_matrix, feature_patient_ids, feature_times, feature_tokenized_timelines = (
                         feats['data_matrix'],
                         feats['patient_ids'],
                         feats['labeling_time'],
-                        feats['tokenized_timelines'],
+                        tokenized_timelines,
                     )
+                    assert feature_tokenized_timelines.shape[0] == feature_matrix.shape[0], f'Error -- mismatched number of entries between feature_matrix={feature_matrix.shape[0]} and feature_tokenized_timelines={feature_tokenized_timelines.shape[0]}'
                 else:
                     # CLMBR format
                     feature_matrix, feature_patient_ids, feature_times = (
