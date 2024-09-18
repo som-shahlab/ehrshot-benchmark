@@ -147,7 +147,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
 
             # Plot average line across all subtasks
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)
-            ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
+            ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name.split("--")[0]}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
 
     # Plot aesthetics
     if is_x_scale_log:
@@ -232,7 +232,7 @@ def plot_one_task_group(df: pd.DataFrame,
     
             # Plot average line per model
             df_ = df_means_.groupby(['k']).agg({ 'value' : 'mean', 'k': 'first', }).reset_index(drop = True)
-            ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
+            ax.plot(df_['k'], df_['value'], color=color, label=f'{model_name.split("--")[0]}+{head_name}', linestyle='-', marker='o', linewidth=3, markersize=7)
 
     # Plot aesthetics
     if is_x_scale_log:

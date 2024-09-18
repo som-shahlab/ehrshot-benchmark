@@ -404,9 +404,7 @@ def filter_df(df: pd.DataFrame,
     if sub_tasks:
         df = df[df['sub_task'].isin(sub_tasks)]
     if model_heads:
-        mask = [ False ] * df.shape[0]
-        for model_head in model_heads:
-            mask = mask | ((df['model'] == model_head[0]) & (df['head'] == model_head[1]))
+        mask = df.apply(lambda row: (row['model'], row['head']) in model_heads, axis=1)
         df = df[mask]
     return df
 

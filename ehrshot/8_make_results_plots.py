@@ -207,7 +207,7 @@ if __name__ == "__main__":
             for m in missing_combinations:
                 print("\t", m)
         print("==========================")
-    breakpoint()
+    # breakpoint()
 
     ####################################
     ####################################
@@ -249,12 +249,14 @@ if __name__ == "__main__":
             'head' : 'first',
             'score' : 'first',
         }).reset_index(drop = True).fillna(0)
+        df_means['k'] = df_means['k'].astype(int)
+        df_stds['k'] = df_stds['k'].astype(int)
         
         # Table for each (labeling function, score)
         #   Rows = model + head
         #   Columns = k
         #   Cells = mean ± std of score
-        for score in df_means['score'].unique():
+        for score in tqdm(df_means['score'].unique(), desc='tables_individual_tasks()'):
             path_to_output_dir_: str = os.path.join(PATH_TO_OUTPUT_DIR, 'individual_tasks', score)
             for sub_task in df_means['sub_task'].unique():
                 os.makedirs(path_to_output_dir_, exist_ok=True)
@@ -276,7 +278,7 @@ if __name__ == "__main__":
                 df_ = df_.drop(columns=['mean', 'std'])
                 df_ = df_.pivot(index=['model', 'head'], columns='k', values='value').reset_index()
                 df_.columns = [ str(x) for x in df_.columns ]
-                df_ = df_.rename(columns={'-1' : 'All'})
+                df_ = df_.rename(columns={'-1' : 'All', '-1.0' : 'All'})
                 df_.to_csv(os.path.join(path_to_output_dir_, f'{sub_task}_pretty.csv'), index=False)
                 # Create Markdown table with just `All`
                 df_all_ = df_[['model', 'head', 'All']].sort_values(['All'], ascending=False)
@@ -298,7 +300,7 @@ if __name__ == "__main__":
         #   Columns = k
         #   Cells = mean ± std of score
         task_groups: List[str] = list(TASK_GROUP_2_LABELING_FUNCTION.keys())
-        for score in df_means['score'].unique():
+        for score in tqdm(df_means['score'].unique(), desc='tables_task_groups()'):
             path_to_output_dir_: str = os.path.join(PATH_TO_OUTPUT_DIR, 'task_groups', score)
             for task_group in task_groups:
                 os.makedirs(path_to_output_dir_, exist_ok=True)
@@ -370,8 +372,8 @@ if __name__ == "__main__":
                                         model_heads=MODEL_HEADS, is_x_scale_log=True, is_std_bars=True)
 
         # plotting aggregated auroc and auprc box plots by task groups
-        for score in tqdm(df_results['score'].unique(), desc='plot_taskgroups_box_plots()'):
-            if score == 'brier': continue
-            plot_taskgroups_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
-                                        model_heads=MODEL_HEADS)
+        # for score in tqdm(df_results['score'].unique(), desc='plot_taskgroups_box_plots()'):
+        #     if score == 'brier': continue
+        #     plot_taskgroups_box_plots(df_results, score, path_to_output_dir=PATH_TO_OUTPUT_DIR,
+        #                                 model_heads=MODEL_HEADS)
             
