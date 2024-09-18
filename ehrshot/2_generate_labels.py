@@ -32,6 +32,59 @@ from labelers.mimic import (
     Mimic_ReadmissionLabeler
 )
 
+import random
+from multiprocessing import Pool, Manager
+from tqdm import tqdm
+from typing import List
+
+# Function to handle label generation for a subset of patient IDs
+def process_patient_ids(pid_subset, labeled_patients, path_to_database, results_dict):
+    local_results = {}
+    database = PatientDatabase(path_to_database)
+    
+    for pid in pid_subset:
+        random.seed(int(pid))
+        labels = labeled_patients.get_labels_from_patient_idx(pid)
+
+        # Filter out labels that occur <= 18 yrs of age
+        birthdate = database[pid].events[0].start.year
+        keep_label_start_idx = 0
+        for l in labels:
+            if l.time.year - birthdate < 18:
+                keep_label_start_idx += 1
+            else:
+                break
+        labels = labels[keep_label_start_idx:]
+
+        # Randomly sample one label
+        if len(labels) == 0:
+            local_results[pid] = []
+        elif len(labels) == 1:
+            local_results[pid] = labels
+        else:
+            local_results[pid] = [random.choice(labels)]
+
+    # Save local results to the shared dictionary
+    results_dict.update(local_results)
+
+# Main function to parallelize the task
+def parallel_label_generation(labeled_patients, path_to_database, num_processes: int = 4):
+    manager = Manager()
+    results_dict = manager.dict()
+
+    # Get all patient IDs and split into subsets for each process
+    pids: List[int] = labeled_patients.get_all_patient_ids()
+    pid_subsets = [pids[i::num_processes] for i in range(num_processes)]
+
+    with Pool(num_processes) as pool:
+        pool.starmap(
+            process_patient_ids, 
+            [(pid_subset, labeled_patients, path_to_database, results_dict) for pid_subset in pid_subsets]
+        )
+
+    results = dict(results_dict)
+    return results
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate labels for a specific task")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
@@ -162,26 +215,9 @@ if __name__ == "__main__":
     # Randomly sample (if applicable)
     if is_sample_one_label_per_patient:
         pids: List[int] = labeled_patients.get_all_patient_ids()
-        labels_to_keep: List[Label] = []
-        for pid in tqdm(pids, desc="Randomly sampling patients..."):
-            random.seed(int(pid))
-            labels: List[Label] = labeled_patients.get_labels_from_patient_idx(pid)
-            # Filter out labels that occur <= 18 yrs of age
-            birthdate = database[pid].events[0].start.year
-            keep_label_start_idx = 0
-            for l in labels:
-                if l.time.year - birthdate < 18:
-                    keep_label_start_idx += 1
-                else:
-                    break
-            labels = labels[keep_label_start_idx:]
-            # Randomly sample one label
-            if len(labels) == 0:
-                labeled_patients.patients_to_labels[pid] = []
-            elif len(labels) == 1:
-                labeled_patients.patients_to_labels[pid] = labels
-            else:
-                labeled_patients.patients_to_labels[pid] = [ random.choice(labels) ]
+        results = parallel_label_generation(labeled_patients, PATH_TO_PATIENT_DATABASE, num_processes=20)
+        for pid, labels in results.items():
+            labeled_patients.patients_to_labels[pid] = labels
         assert all([ len(labeled_patients.get_labels_from_patient_idx(x)) <= 1 for x in pids ]), f"Found a patient with != 1 label"
 
     # Force labels to be minute-level resolution for FEMR compatibility

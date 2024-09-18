@@ -633,6 +633,9 @@ if __name__ == "__main__":
             if VALID_HEADS is not None and head not in VALID_HEADS:
                 # Skip heads (if specified)
                 continue
+            
+            if 'finetune' in head:
+                assert PATH_TO_TOKENIZED_TIMELINES_DIR is not None, "Must specify `--path_to_tokenized_timelines_dir` for finetuning experiments"
 
             # Load labels/features for this task + model_head
             patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, 

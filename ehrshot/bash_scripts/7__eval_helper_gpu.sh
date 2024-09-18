@@ -19,8 +19,9 @@ CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --ks $7 \
     --models $8 \
+    --path_to_tokenized_timelines ${10} \
     --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
-    --labeling_function ${10} \
+    --labeling_function ${11} \
     --num_threads 5 &
 
 CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
@@ -32,8 +33,9 @@ CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --ks $7 \
     --models $8 \
+    --path_to_tokenized_timelines ${10} \
     --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
-    --labeling_function ${11} \
+    --labeling_function ${12} \
     --num_threads 5 &
 
 CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
@@ -45,8 +47,9 @@ CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
     --shot_strat $6 \
     --ks $7 \
     --models $8 \
+    --path_to_tokenized_timelines ${10} \
     --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
-    --labeling_function ${12} \
+    --labeling_function ${13} \
     --num_threads 5 &
 
 wait

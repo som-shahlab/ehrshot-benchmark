@@ -15,6 +15,7 @@
 #   EHRSHOT tasks on full STARR-OMOP: sbatch 6_generate_shots.sh --starr
 
 if [[ " $* " == *" --mimic4 "* ]]; then
+    echo "MIMIC4" >&2
     labeling_functions=(
         "mimic4_los" 
         "mimic4_readmission"

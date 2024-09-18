@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
     # Load labels for this task
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
-    patient_ids, label_values, label_times = get_labels_and_features(labeled_patients, None)
+    patient_ids, label_values, label_times = get_labels_and_features(labeled_patients, None, None)
 
     if LABELING_FUNCTION == "chexpert":
         # CheXpert is multilabel, convert to binary for EHRSHOT

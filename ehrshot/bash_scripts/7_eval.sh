@@ -92,9 +92,9 @@ for (( i=0; i<${#labeling_functions[@]}; i+=3 )); do
     chunk=("${labeling_functions[@]:i:3}")
     for shot_strat in "${shot_strats[@]}"; do
         if [[ " $* " == *" --is_use_slurm "* ]]; then
-            sbatch 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
+            sbatch 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads $path_to_tokenized_timelines "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
         else
-            bash 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
+            bash 7__eval_helper_gpu.sh $path_to_database $path_to_labels_dir $path_to_features_dir $path_to_split_csv $path_to_output_dir ${shot_strat} $ks $models $num_threads $path_to_tokenized_timelines "${chunk[0]}" "${chunk[1]}" "${chunk[2]}"
         fi
     done
 done
