@@ -28,6 +28,7 @@ python3 ../8_make_results_plots.py \
     --path_to_results_dir /share/pi/nigam/migufuen/ehrshot-benchmark/ehrshot/bash_scripts/$path_to_results_dir \
     --path_to_output_dir $path_to_figures_dir \
     --shot_strat all \
+    --is_skip_tables \
     --model_heads "[('clmbr', 'lr_lbfgs'), \
                     ('gpt2-base-512--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('gpt2-base-1024--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
@@ -35,7 +36,7 @@ python3 ../8_make_results_plots.py \
                     ('gpt2-base-4096--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('mamba-tiny-1024--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('mamba-tiny-4096--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
-                    ('mamba-tiny-8129--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
+                    ('mamba-tiny-8192--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                 ]"
 
 # Everything

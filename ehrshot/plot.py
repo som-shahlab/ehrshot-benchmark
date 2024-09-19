@@ -128,6 +128,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
         for h_idx, head in enumerate(heads):
             model_name: str = model
             head_name: str = HEAD_2_INFO[head]['label']
+            breakpoint()
 
             df_means_ = df_means[(df_means['model'] == model) & (df_means['head'] == head)].sort_values(by='k')
             df_stds_ = df_stds[(df_stds['model'] == model) & (df_stds['head'] == head)].sort_values(by='k')
