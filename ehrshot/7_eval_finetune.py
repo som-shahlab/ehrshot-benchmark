@@ -264,7 +264,7 @@ def finetune_pytorch_model(X_train_timelines: torch.Tensor,
                            n_epochs: int,
                            replicate: int,
                            device: str) -> torch.nn.Module:
-    torch.manual_seed(X_train_timelines.shape[0] + replicate)
+    torch.manual_seed(replicate)
     model.train()
     
     # First, finetune logreg head (if applicable)
@@ -388,7 +388,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
     logger.info(f"Test pids:  {len(test_patient_ids)} | {len(y_test)} | {len(set(test_patient_ids))}")
 
     # Shuffle training set
-    np.random.seed(X_train.shape[0])
+    np.random.seed(replicate)
     train_shuffle_idx = np.arange(X_train.shape[0])
     np.random.shuffle(train_shuffle_idx)
     X_train_timelines = X_train_timelines[train_shuffle_idx]
@@ -507,7 +507,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     logger.info(f"Test pids:  {len(test_patient_ids)} | {len(y_test)} | {len(set(test_patient_ids))}")
 
     # Shuffle training set
-    np.random.seed(X_train.shape[0])
+    np.random.seed(replicate)
     train_shuffle_idx = np.arange(X_train.shape[0])
     np.random.shuffle(train_shuffle_idx)
     X_train = X_train[train_shuffle_idx]
@@ -515,7 +515,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
 
     if model_head == "gbm":
         # XGBoost
-        model = lgb.LGBMClassifier(random_state=0)
+        model = lgb.LGBMClassifier(random_state=replicate)
         # NOTE: Need to set `min_child_samples = 1`, which specifies the minimum number of samples required in a leaf (terminal node).
         # This is necessary for few-shot learning, since we may have very few samples in a leaf node.
         # Otherwise the GBM model will refuse to learn anything
@@ -525,7 +525,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     elif model_head == "rf":
         RF_PARAMS['min_samples_leaf'] = [ 1 ]
         RF_PARAMS['min_samples_split'] = [ 2 ]
-        model = RandomForestClassifier(random_state=0)
+        model = RandomForestClassifier(random_state=replicate)
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, RF_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head.startswith("lr"):
@@ -536,7 +536,7 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
-        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000, random_state=0)
+        model = LogisticRegression(n_jobs=1, penalty="l2", tol=0.0001, solver=solver, max_iter=1000, random_state=replicate)
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, LR_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head == "protonet":
