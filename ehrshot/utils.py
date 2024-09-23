@@ -30,6 +30,10 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
         'label' : 'gpt',
         'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
+    'gpt2' : {
+        'label' : 'gpt2',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
     'bert' : {
         'label' : 'bert',
         'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
@@ -130,7 +134,10 @@ TASK_GROUP_2_LABELING_FUNCTION = {
     "operational_outcomes": [
         "guo_los",
         "guo_readmission",
-        "guo_icu"
+        "guo_icu",
+        "mimic4_los",
+        "mimic4_mortality",
+        "mimic4_readmission",
     ],
     "lab_values": [
         "lab_thrombocytopenia",
@@ -149,7 +156,7 @@ TASK_GROUP_2_LABELING_FUNCTION = {
     ],
     "chexpert": [
         "chexpert"
-    ]
+    ],
 }
 
 # Hyperparameter search

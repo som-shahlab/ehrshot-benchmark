@@ -22,6 +22,7 @@ if [[ " $* " == *" --mimic4 "* ]]; then
     path_to_features_dir="../../EHRSHOT_ASSETS/features_mimic4"
     path_to_output_dir='../../EHRSHOT_ASSETS/results_mimic4'
     path_to_split_csv="../../EHRSHOT_ASSETS/splits_mimic4/person_id_map.csv"
+    path_to_tokenized_timelines='../../EHRSHOT_ASSETS/tokenized_timelines_mimic4'
 elif [[ " $* " == *" --starr "* ]]; then
     labeling_functions=(
         "chexpert" # CheXpert first b/c slowest

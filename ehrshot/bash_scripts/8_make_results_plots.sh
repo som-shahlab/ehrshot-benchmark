@@ -8,9 +8,9 @@
 #SBATCH --cpus-per-task=20
 
 if [[ " $* " == *" --mimic4 "* ]]; then
-    path_to_labels_dir="../../EHRSHOT_ASSETS/mimic4_benchmark"
-    path_to_results_dir='../../EHRSHOT_ASSETS/mimic4_results'
-    path_to_figures_dir="../../EHRSHOT_ASSETS/mimic4_figures"
+    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_mimic4"
+    path_to_results_dir='../../EHRSHOT_ASSETS/results_mimic4'
+    path_to_figures_dir="../../EHRSHOT_ASSETS/figures_mimic4"
 elif [[ " $* " == *" --starr "* ]]; then
     path_to_labels_dir="../../EHRSHOT_ASSETS/starr_benchmark"
     path_to_results_dir='../../EHRSHOT_ASSETS/starr_results'
@@ -24,19 +24,16 @@ fi
 mkdir -p $path_to_figures_dir
 
 python3 ../8_make_results_plots.py \
-    --path_to_labels_and_feats_dir /share/pi/nigam/migufuen/ehrshot-benchmark/ehrshot/bash_scripts/$path_to_labels_dir \
-    --path_to_results_dir /share/pi/nigam/migufuen/ehrshot-benchmark/ehrshot/bash_scripts/$path_to_results_dir \
+    --path_to_labels_and_feats_dir /share/pi/nigam/$USER/ehrshot-benchmark/ehrshot/bash_scripts/$path_to_labels_dir \
+    --path_to_results_dir /share/pi/nigam/$USER/ehrshot-benchmark/ehrshot/bash_scripts/$path_to_results_dir \
     --path_to_output_dir $path_to_figures_dir \
     --shot_strat all \
     --is_skip_tables \
     --model_heads "[('clmbr', 'lr_lbfgs'), \
-                    ('gpt2-base-512--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
-                    ('gpt2-base-1024--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
-                    ('gpt2-base-2048--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
-                    ('gpt2-base-4096--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('mamba-tiny-1024--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('mamba-tiny-4096--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                     ('mamba-tiny-8192--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
+                    ('mamba-tiny-16384--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last', 'lr_lbfgs'), \
                 ]"
 
 # Everything

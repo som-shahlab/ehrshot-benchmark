@@ -425,7 +425,7 @@ def run_finetune_evaluation(X_train: np.ndarray,
         model._orig_mod.load_state_dict(orig_model.state_dict())
         ## Sanity check
         for key in orig_model.state_dict().keys():
-            assert torch.equal(model._orig_mod.state_dict()[key], orig_model.state_dict()[key]), f"Model weights not equal for key={key}"
+            assert torch.equal(model._orig_mod.state_dict()[key].to('cpu'), orig_model.state_dict()[key].to('cpu')), f"Model weights not equal for key={key}"
         model.to(device)
 
         # Optimizer + Loss
@@ -575,7 +575,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     # Finetuning model with PyTorch head
     parser.add_argument("--logreg_C", type=str, default="1e-8,1e-2,1e-1", help="Command separated list of regularization strengths for logistic regression head")
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for finetuning. NOTE: This must be a small value (e.g. 4) for torch.compile() to correctly work")
+    parser.add_argument("--batch_size", type=int, default=1, help="Batch size for finetuning. NOTE: This must be a small value (e.g. 4) for torch.compile() to correctly work")
     parser.add_argument("--n_epochs", type=int, default=2, help="Number of epochs for finetuning")
     parser.add_argument("--warmup_epochs", type=int, default=1, help="Number of epochs for lr warmup")
     return parser.parse_args()
@@ -603,7 +603,7 @@ if __name__ == "__main__":
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
-    assert BATCH_SIZE == 4, f"You should only use a --batch_size of 4 for optimal use of torch.compile()"
+    assert BATCH_SIZE <= 4, f"You should only use a --batch_size <= 4 for optimal use of torch.compile()"
 
     # Determine which models to load
     logger.critical(f"Only running models: {VALID_MODELS}")

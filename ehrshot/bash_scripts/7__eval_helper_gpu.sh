@@ -10,6 +10,10 @@
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 # For running multiple labeling functions in parallel per node:
+echo "11: ${11}"
+echo "12: ${12}"
+echo "13: ${13}"
+
 CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
     --path_to_labels_dir $2 \
