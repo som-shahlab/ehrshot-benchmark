@@ -101,7 +101,11 @@ def calc_n_gram_count(femr_db, pids, label_times: Optional[List[datetime.datetim
             df = pd.DataFrame(results)
             df.to_parquet(f'df_n_gram_counts_{n}.parquet')
 
-    df = pd.DataFrame(results, dtype={'pid' : int, 'pid_idx' : int, 'label_time' : 'datetime64[ns]', 'ngram' : str, 'count' : int, 'n' : int})
+    df = pd.DataFrame(results)
+    df['pid'] = df['pid'].astype(int)
+    df['pid_idx'] = df['pid_idx'].astype(int)
+    df['count'] = df['count'].astype(int)
+    df['n'] = df['n'].astype(int)
     return df
 
 def calc_inter_event_times(femr_db, pids: List[int], label_times: Optional[List[datetime.datetime]] = None) -> pd.DataFrame:
@@ -135,7 +139,11 @@ def calc_inter_event_times(femr_db, pids: List[int], label_times: Optional[List[
             df.to_parquet(f'df_inter_event_times_{pid_idx // 100_000}.parquet')
             print(f'Saved {df.shape[0]} rows')
 
-    df = pd.DataFrame(results, dtype={'pid' : int, 'pid_idx' : int, 'label_time' : 'datetime64[ns]', 'event_code' : str, 'time' : float, 'event_idx' : int})
+    df = pd.DataFrame(results)
+    df['pid'] = df['pid'].astype(int)
+    df['pid_idx'] = df['pid_idx'].astype(int)
+    df['time'] = df['time'].astype(float)
+    df['event_idx'] = df['event_idx'].astype(int)
     return df
 
 if __name__ == '__main__':

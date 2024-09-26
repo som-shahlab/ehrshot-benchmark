@@ -28,8 +28,17 @@ from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
 from starr_eda import calc_n_gram_count, calc_inter_event_times
 
 if __name__ == '__main__':
+    
+    # 1. You need to load the stratify.py outputs for this TASK
+    # 2. You need to load the EHRSHOT results for this TASK
+    # 3. You need to load the labeled patients for this TASK
+    # 4. You need to split the patients into 4 buckets based on their df_stratify metrics
+        # i.e. 0-25, 25-50, 50-75, 75-100th percentiles
+    # 5. Recalculate AUROC within each bucket
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--task', type=str, help='Type of task to perform', default='guo_los')
+    parser.add_argument('--model', type=str, help='Model whose results we stratify', default='clmbr')
     args = parser.parse_args()
 
     # Constants
@@ -69,92 +78,12 @@ if __name__ == '__main__':
     head: str = 'lr_lbfgs'
     path_to_results_dir: str = os.path.join(PATH_TO_RESULTS_DIR, LABELING_FUNCTION, 'models')
     for model in os.listdir(path_to_results_dir):
+        if model != args.model:
+            continue
         path_to_results_file: str = os.path.join(path_to_results_dir, model, head, f'subtask={LABELING_FUNCTION}', 'k=-1', 'preds.csv')
         df_preds = pd.read_csv(path_to_results_file)
         df_preds['pid'] = patient_ids[train_pids_idx + val_pids_idx + test_pids_idx]
         df_preds['pid_idx'] = train_pids_idx + val_pids_idx + test_pids_idx
         df_preds['label_time'] = label_times
 
-    ########################################################
-    ########################################################
-    #
-    # Irregularity
-    #
-    ########################################################
-    ########################################################
-    path_to_input_file: str = os.path.join(path_to_output_dir, f'df_stratify__{LABELING_FUNCTION}__inter_event_times__metrics.parquet')
-    if not os.path.exists(path_to_input_file):
-        raise FileNotFoundError(f'File not found: {path_to_input_file}. Please run `python3 stratify.py --task {LABELING_FUNCTION}` to generate this file.')
-    df = pd.read_parquet(path_to_input_file)
-    print(f'Loaded {df.shape[0]} rows')
-    
-    # Save all metrics
-    df_std['metric'] = 'std'
-    df_mean['metric'] = 'mean'
-    df_iqr['metric'] = 'iqr'
-    df_save = pd.concat([df_std, df_mean, df_iqr], axis=0)
-    df_save['sub_task'] = LABELING_FUNCTION
-    df_save.to_parquet(path_to_output_file.replace('.parquet', '__metrics.parquet'))
-    
-    ########################################################
-    ########################################################
-    #
-    # Map each label to metrics for "repetitiveness of timeline"
-    #
-    ########################################################
-    ########################################################
-    path_to_output_file: str = os.path.join(path_to_output_dir, f'df_stratify__{LABELING_FUNCTION}__n_gram_count.parquet')
-    if not os.path.exists(path_to_output_file):
-        print(f'Calculating n-grams for {LABELING_FUNCTION}...')
-        df = calc_n_gram_count(femr_db, pids, label_times)
-        df.to_parquet(path_to_output_file)
-        print(f'Loaded {df.shape[0]} rows')
-    else:
-        print(f'Loading n-grams for {LABELING_FUNCTION}...')
-        df = pd.read_parquet(path_to_output_file)
-        print(f'Loaded {df.shape[0]} rows')
-    
-    # Metric 1: Repetition Rate
-    # RR = (# of repeated n-grams) / (# of n-grams)
-    for n in df['n'].unique():
-        df_n = df[df['n'] == n]
-        df_n['repetition_rate'] = df_n['count'] / df_n['count'].sum()
-    
-    # Metric 2: Type-Token Ratio
-    # TTR = (# of unique tokens) / (# of tokens)
-    
-
-    ########################################################
-    ########################################################
-    #
-    # Map each label to metrics for "length of timeline"
-    #
-    ########################################################
-    ########################################################
-    path_to_output_file: str = os.path.join(path_to_output_dir, f'df_stratify__{LABELING_FUNCTION}__timeline_lengths.parquet')
-    
-    # Metric 1: number of tokens
-    PAD_TOKEN_ID: int = 4
-    n_tokens = (timelines != PAD_TOKEN_ID).sum(axis=1)
-    
-    # Metric 2: number of raw clinical events
-    n_events = []
-    for pid_idx, pid in enumerate(pids):
-        n_event: int = 0
-        for e in femr_db[pid].events:
-            if label_times is not None and e.start > label_times[pid_idx]:
-                # If label_times is provided, then calculate inter-event times only for events that occur before the label_times
-                break
-            n_event += 1
-        n_events.append(n_event)
-
-    df_save = pd.DataFrame({
-        'pid' : pids,
-        'pid_idx' : pids_idx,
-        'label_time' : label_times,
-        'n_events' : n_events,
-        'n_tokens' : n_tokens,
-    })
-    df_save.to_parquet(path_to_output_file.replace('.parquet', '__metrics.parquet'))
-    
-    breakpoint()
+        # TODO -- finish
