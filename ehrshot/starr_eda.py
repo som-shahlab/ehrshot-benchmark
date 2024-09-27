@@ -15,7 +15,7 @@ Usage:
 Add --is_ehrshot flag to use EHRSHOT_ASSETS instead of SOM-RIT-PHI-STARR-PROD
 
 Outputs:
-    df_inter_event_times_{label}.parquet : DataFrame with columns ['pid', 'code', 'time' (seconds), 'idx']
+    df_inter_event_times.parquet : DataFrame with columns ['pid', 'code', 'time' (seconds), 'idx']
 """
 import pandas as pd
 import numpy as np
@@ -91,7 +91,7 @@ def calc_n_gram_count(femr_db, pids, label_times: Optional[List[datetime.datetim
                     'pid' : pid,
                     'pid_idx' : pid_idx,
                     'label_time' : label_times[pid_idx] if label_times is not None else None,
-                    'ngram' : ngram,
+                    # 'ngram' : ngram,
                     'count' : count,
                     'n' : n,
                 })
