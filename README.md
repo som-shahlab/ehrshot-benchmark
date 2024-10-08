@@ -178,6 +178,16 @@ After downloading the Athena OHDSI Ontology, you will have to separately downloa
 
 Your ontology will then be ready to go!
 
+## Scripts
+
+We've included a number of helper scripts in `ehrshot/scripts`. None of these are needed to run the EHRSHOT benchmark, but they provide useful functionality as follows:
+
+* [confirm_labeled_patients_are_equal](ehrshot/scripts/confirm_labeled_patients_are_equal.py) - confirms that two `EHRSHOT_ASSETS/benchmark/` folders contain identical labels in their `labeled_patients.csv` files
+* [convert_clmbr_dictionary_to_json](ehrshot/scripts/convert_clmbr_dictionary_to_json.py) - converts the [CLMBR vocabulary file](/EHRSHOT_ASSETS/models/clmbr/dictionary) into a human readable `.json` file.
+* [convert_to_meds](ehrshot/scripts/convert_to_meds.py) - converts EHRSHOT into the [MEDS dataset format](https://github.com/Medical-Event-Data-Standard/meds/tree/main)
+* [create_splits](ehrshot/scripts/create_splits.py) - creates splits for other FEMR extracts into the EHRSHOT format
+* [generate_benchmark_starr](ehrshot/scripts/generate_benchmark_starr.py) - runs EHRSHOT labelers on entire Stanford STARR-OMOP dataset
+
 <a name="citation"/>
 
 # Citation

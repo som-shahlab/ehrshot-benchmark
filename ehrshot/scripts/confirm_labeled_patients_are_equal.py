@@ -1,8 +1,8 @@
 import os
 import pandas as pd
 
-path1 = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot'
-path2 = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark'
+path1 = '../../EHRSHOT_ASSETS/benchmark_ehrshot'
+path2 = '../../EHRSHOT_ASSETS/benchmark'
 
 for task in os.listdir(path1):
     if task.endswith('.csv'): continue

@@ -13,7 +13,7 @@ from utils import (
 )
 
 # Helper functions for coloring plots
-PRIMARY_COLORS = [ 'darkblue', 'darkorange', 'darkgreen', 'darkred', 'darkviolet', 'saddlebrown', 'fuchsia', 'olive', 'cyan', 'black', ]
+PRIMARY_COLORS = [ 'darkblue', 'darkorange', 'darkgreen', 'darkred', 'darkviolet', 'fuchsia', 'olive', 'cyan', 'black', ]
 def create_shades(color: str, num_shades: int) -> List[Tuple[float, float, float, float]]:
     """
         Return a list of `n=num_shades + 1` rgba colors from `color` to white. 
@@ -84,7 +84,7 @@ def plot_one_labeling_function(df: pd.DataFrame,
     x_tick_labels: List[str] = ks
     if -1 in ks:
         ks.remove(-1)
-        full_data_k: int = 2 * max(ks)
+        full_data_k: int = 2 * max(ks) if len(ks) > 0 else 1
         ks.append(full_data_k)
         df.loc[df['k'] == -1, 'k'] = full_data_k
         x_tick_labels = [ str(k) if k != full_data_k else 'All' for k in ks ]
@@ -190,7 +190,7 @@ def plot_one_task_group(df: pd.DataFrame,
     x_tick_labels: List[str] = ks
     if -1 in ks:
         ks.remove(-1)
-        full_data_k: int = 2 * max(ks)
+        full_data_k: int = 2 * (max(ks) if len(ks) > 0 else 1)
         ks.append(full_data_k)
         df.loc[df['k'] == -1, 'k'] = full_data_k
         x_tick_labels = [ str(k) if k != full_data_k else 'All' for k in ks ]
