@@ -12,6 +12,9 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 5. [Other](#other)
 6. [Citation](#citation)
 
+> [!NOTE]  
+> EHRSHOT can now be downloaded as a [MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard). Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
+
 <a name="quick_start"/>
 
 # 🚀 Quick Start
@@ -94,7 +97,10 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** [The EHRSHOT dataset is on Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
+**Access:** We provide two versions of EHRSHOT (each version contains identical data, just different formats). Access requires signing a research usage agreement.
+
+1. **Original:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The original EHRSHOT dataset from the paper (and version compatible with this repo) is stored in `EHRSHOT_ASSETS.zip` at this link.
+2. **MEDS:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The EHRSHOT dataset in a [MEDS](https://github.com/Medical-Event-Data-Standard) compatible version is stored in `EHRSHOT_MEDS.zip` at this link.
 
 EHRSHOT contains:
 * **6,739 patients**
