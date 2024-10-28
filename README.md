@@ -4,6 +4,9 @@ A benchmark/dataset for few-shot evaluation of foundation models for electronic 
 
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
+> [!NOTE]  
+> EHRSHOT can now be downloaded as a [MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard). Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
+
 # 📖 Table of Contents
 1. [Quick Start](#quick_start)
 2. [Pre-trained Foundation Model](#models)
@@ -11,9 +14,6 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 4. [Comparison to Prior Work](#prior_work)
 5. [Other](#other)
 6. [Citation](#citation)
-
-> [!NOTE]  
-> EHRSHOT can now be downloaded as a [MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard). Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
 
 <a name="quick_start"/>
 
