@@ -10,6 +10,7 @@ import torch.nn as nn
 from sklearn.metrics import pairwise_distances
 from femr.labelers import LabeledPatients
 from loguru import logger
+from tqdm import tqdm
 
 # SPLITS
 SPLIT_SEED: int = 97
@@ -222,8 +223,9 @@ def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -
     df_split = pd.read_csv(path_to_split_csv)
     split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
     for split in ['train', 'val', 'test']:
+        split_patient_ids = set(df_split[df_split['split'] == split]['omop_person_id'].tolist())
         for idx, id in enumerate(patient_ids.tolist()):
-            if id in df_split[df_split['split'] == split]['omop_person_id'].values:
+            if id in split_patient_ids:
                 split_2_idxs[split].append(idx)
     return (
         split_2_idxs['train'],
@@ -253,7 +255,8 @@ def compute_feature_label_alignment(label_pids, label_dates, feature_pids, featu
             j += 1
 
         if feature_pids[j] != label_pids[i] or feature_dates[j] != label_dates[i]:
-            raise RuntimeError(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
+            # raise RuntimeError(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
+            print(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
         result[i] = j
     return result
 

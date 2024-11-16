@@ -512,14 +512,16 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
     np.random.shuffle(train_shuffle_idx)
     X_train = X_train[train_shuffle_idx]
     y_train = y_train[train_shuffle_idx]
-
+    
     if model_head == "gbm":
         # XGBoost
+        logger.info(f"XGBoost")
         model = lgb.LGBMClassifier(random_state=replicate)
         # NOTE: Need to set `min_child_samples = 1`, which specifies the minimum number of samples required in a leaf (terminal node).
         # This is necessary for few-shot learning, since we may have very few samples in a leaf node.
         # Otherwise the GBM model will refuse to learn anything
         XGB_PARAMS['min_child_samples'] = [ 1 ]
+        breakpoint()
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, XGB_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head == "rf":

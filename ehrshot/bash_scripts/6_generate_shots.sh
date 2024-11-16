@@ -35,12 +35,12 @@ elif [[ " $* " == *" --starr "* ]]; then
         "new_celiac"
         "new_lupus"
         "new_acutemi"
-        "lab_thrombocytopenia"
-        "lab_hyperkalemia"
-        "lab_hypoglycemia"
-        "lab_hyponatremia"
-        "lab_anemia"
-        "chexpert"
+        # "lab_thrombocytopenia"
+        # "lab_hyperkalemia"
+        # "lab_hypoglycemia"
+        # "lab_hyponatremia"
+        # "lab_anemia"
+        # "chexpert"
     )
     path_to_database="/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes"
     path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_starr"
@@ -84,3 +84,13 @@ for labeling_function in "${labeling_functions[@]}"; do
 done
 
 echo "Done!" >&2
+
+
+
+# python3 ../6_generate_shots.py \
+#         --path_to_database "/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes" \
+#         --path_to_labels_dir "../../EHRSHOT_ASSETS/benchmark_starr" \
+#         --path_to_split_csv "../../EHRSHOT_ASSETS/splits_starr/person_id_map.csv" \
+#         --labeling_function "guo_los" \
+#         --shot_strat "all" \
+#         --n_replicates 5

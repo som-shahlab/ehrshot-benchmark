@@ -3,11 +3,10 @@
 #SBATCH --output=logs/7__eval_helper_gpu_%A.out
 #SBATCH --error=logs/7__eval_helper_gpu_%A.err
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=gpu,nigam-v100,nigam-a100
+#SBATCH --partition=nigam-a100,nigam-h100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
-#SBATCH --gres=gpu:4
-#SBATCH --exclude=secure-gpu-1,secure-gpu-2
+#SBATCH --gres=gpu:3
 
 # For running multiple labeling functions in parallel per node:
 echo "11: ${11}"
@@ -24,9 +23,10 @@ CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --ks $7 \
     --models $8 \
     --path_to_tokenized_timelines ${10} \
-    --heads finetune_layers=2,finetune_full,finetune_frozen-logregfirst \
+    --heads finetune_layers=2,finetune_full,finetune_full-logregfirst \
     --labeling_function ${11} \
     --num_threads 5 &
+
 
 CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --path_to_database $1 \
