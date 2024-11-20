@@ -10,12 +10,17 @@ from pathlib import Path
 def run_command(command):
     """Utility function to run a shell command and print its output."""
     print(command)
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate() 
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+    output_lines = []
+    for line in process.stdout:
+        print(line, end='')
+        output_lines.append(line)
+    process.wait()
+    
     if process.returncode != 0:
-        raise Exception(f"Command failed with error: {stderr.decode('utf-8')}")
-    print(stdout.decode('utf-8'))
-    return stdout
+        raise Exception(f"Command failed with error code {process.returncode}")
+    return ''.join(output_lines)
 
 def check_slurm_jobs_status(job_ids):
     # Convert list of job IDs to a comma-separated string
@@ -34,6 +39,12 @@ def main(args):
     # Check that the experiment folder exists
     if not os.path.exists(args.experiment_folder):
         raise ValueError(f"Experiment folder {args.experiment_folder} does not exist")
+        
+    # Initialize wandb
+    experiment_name = Path(args.experiment_folder).name.split("_202")[0]
+    # Get experiment identifier from name of folder above
+    experiment_id = Path(args.experiment_folder).parent.name
+    wandb.init(project=f"ehrshot-{experiment_id}", name=experiment_name)
     
     # Step 1: Generate EHR embeddings
     if start_from_step <= 1:
@@ -47,6 +58,7 @@ def main(args):
         --path_to_features_dir {args.experiment_folder} \
         --text_encoder {args.text_encoder} \
         --serialization_strategy {args.serialization_strategy} \
+        --add_parent_concepts {args.add_parent_concepts} \
         {tasks_to_instructions}
         """
         run_command(feature_command)
@@ -62,10 +74,10 @@ def main(args):
         --path_to_features_dir {args.experiment_folder} \
         --path_to_output_dir {args.experiment_folder}
         """
-        stdout = run_command(eval_command)
+        output = run_command(eval_command)
 
         # Step 2.1: Check for job completion
-        job_ids = [int(line.split()[-1]) for line in stdout.decode('utf-8').split("\n") if "Submitted batch job" in line]
+        job_ids = [int(line.split()[-1]) for line in output.split("\n") if "Submitted batch job" in line]
         print(f"Manual kill command: scancel {' '.join(map(str, job_ids))}")
         status = check_slurm_jobs_status(job_ids)
         while status:
@@ -89,12 +101,13 @@ def main(args):
         --path_to_output_file {os.path.join(args.experiment_folder, 'all_results.csv')}
         """
         run_command(calculate_metrics_command)
-
+        
+    # Clean up the experiment folder
+    llm_features_file = os.path.join(args.experiment_folder, 'llm_features.pkl')
+    if os.path.exists(llm_features_file):
+        os.remove(llm_features_file)
+       
     # Step 4: Log results to wandb
-    experiment_name = Path(args.experiment_folder).name.split("_202")[0]
-    # Get experiment identifier from name of folder above
-    experiment_id = Path(args.experiment_folder).parent.name
-    wandb.init(project=f"ehrshot-{experiment_id}", name=experiment_name)
     results_path = os.path.join(args.experiment_folder, 'all_results.csv')
     # Read results and log to wandb
     results = pd.read_csv(results_path)
@@ -102,6 +115,7 @@ def main(args):
     experimental_setup = {
         "text_encoder": args.text_encoder,
         "serialization_strategy": args.serialization_strategy,
+        "add_parent_concepts": args.add_parent_concepts,
         "task_to_instructions": False if args.task_to_instructions == "" else True
     }
     performance_results = {f"{row['subtask']}_{row['score']}": row['est'] for _, row in results.iterrows()}
@@ -115,6 +129,14 @@ def main(args):
     ]
     if args.task_to_instructions:
         files_to_upload.append(args.task_to_instructions)
+        
+    # Save slurm log file
+    slurm_log_file_prefix = f'{args.base_dir}/ehrshot/bash_scripts/logs/ehrshot_'
+    slurm_id = os.getenv('SLURM_JOB_ID')
+    slurm_log_file = f"{slurm_log_file_prefix}{slurm_id}.log"
+    if os.path.exists(slurm_log_file):
+        files_to_upload.append(slurm_log_file)
+        
     for file_path in files_to_upload:
         shutil.copy(file_path, args.experiment_folder)
         wandb.save(os.path.join(args.experiment_folder, os.path.basename(file_path)))
@@ -131,7 +153,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_threads", type=int, default=20, help="Number of threads")
     parser.add_argument("--text_encoder", required=True, help="Text encoder to be used")
     parser.add_argument("--serialization_strategy", required=True, help="Serialization strategy to be used")
-    parser.add_argument( "--task_to_instructions", type=str, default="", help="Path to task to instructions file")
+    parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
+    parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     
     args = parser.parse_args()
     main(args)

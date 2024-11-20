@@ -4,8 +4,8 @@
 #SBATCH --error=logs/7__eval_helper_%A.err
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=compute
-#SBATCH --mem=80G
-#SBATCH --cpus-per-task=10
+#SBATCH --mem=40G
+#SBATCH --cpus-per-task=20
 #--exclude=secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
 
 python3 ../7_eval.py \

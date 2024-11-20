@@ -2,81 +2,151 @@ from datetime import datetime
 from typing import List, Optional, Union, Dict, Callable
 from abc import ABC, abstractmethod
 from femr import Event
-import re
-        
+from collections import defaultdict
+
+# Define constant time for labeling
+CONSTANT_LABEL_TIME = datetime(2024, 1, 1)
+
+# Define headings
+EHR_HEADING = "\n\n# Electronic Healthcare Record\n\n"
+STATIC_EVENTS_HEADING = "## General Events\n\n"
+VISITS_EVENTS_HEADING = "## Medical History\n\n"
+
+def datetime_to_markdown(dt):
+    display_date = dt.strftime("%Y-%m-%d %H:%M")
+    iso_date = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return f"[{display_date}]({iso_date})"
+
+def datetimes_to_visit_time(label_dt, visit_dt, duration_days=None):
+    days_before_label = (label_dt - visit_dt).days
+    if duration_days is not None and duration_days > 0:
+        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time, Duration: {duration_days} days)"
+    else:
+        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time)"
+
+def visit_heading(label_dt: datetime, visit) -> str:
+    shifted_visit_dt = CONSTANT_LABEL_TIME - (label_dt - visit.start)
+    duration_days = (visit.end - visit.start).days if visit.end is not None else None
+    return f"### {visit.description} {datetimes_to_visit_time(CONSTANT_LABEL_TIME, shifted_visit_dt, duration_days)}\n\n"
+
 class SerializationStrategy(ABC):
     @abstractmethod
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         pass
+
+    def get_time_text(self):
+        return f"Current time: {datetime_to_markdown(CONSTANT_LABEL_TIME)}\n\n"
+
+def get_unique_events(events: List[Event]) -> List[Event]:
+    descriptions = set()
+    unique_events = []
+    for event in events:
+        if event.description not in descriptions:
+            descriptions.add(event.description)
+            unique_events.append(event)
+    return unique_events
+
+def format_float(value: float, decimals: int) -> str:
+    formatted = f"{value:.{decimals}f}"
+    # Remove trailing zeros after the decimal point
+    formatted = formatted.rstrip('0')
+    # If all decimal places are zero, remove the decimal point
+    if formatted.endswith('.'):
+        formatted = formatted[:-1]
+    return formatted
+
+def format_value(value: Union[str, int, float]) -> str:
+    if isinstance(value, float):
+        return format_float(value, 2)
+    else:
+        return str(value)
     
 def serialize_event(event: Event, numeric_values=False) -> str:
-    """ Create dashed line of event with value """
-    if type(event.value) is float or type(event.value) is int:
+    """ Create markdown list item of event with value """
+    if event.value is None:
+        return f"- {event.description}"
+    elif isinstance(event.value, (float, int)):
         if numeric_values:
-            numeric_str = f"{event.value:.2f}" if type(event.value) is float else f"{event.value}"
-            return f"- {event.description}: {numeric_str}"
+            numeric_str = format_value(event.value)
+            unit_str = f" [{event.unit}]" if event.unit is not None else ""
+            return f"- {event.description}{unit_str}: {numeric_str}"
         else:
             return f"- {event.description}"
-    elif type(event.value) is str:
+    elif isinstance(event.value, str):
         return f"- {event.description}: {event.value}"
     else:
         return f"- {event.description}"
-    
-def serialize_event_list(events: List[Event], numeric_values=False) -> str:
-    """ Create dashed list of events with values """
-    return '\n'.join([serialize_event(event, numeric_values) for event in events])
 
-def list_visits_with_events(ehr_serializer, label_time, numeric_values=False):
-    # Implement the logic to list all visits and their respective events
+def serialize_event_list(events: List[Event], numeric_values=False, unique_events=False) -> str:
+    """ Create markdown list of events with values """
+    if unique_events:
+        return serialize_unique_event_list(events, numeric_values)
+    else:
+        return '\n'.join([serialize_event(event, numeric_values) for event in events])
+
+def serialize_unique_event_list(events: List[Event], numeric_values=False) -> str:
+    event_dict = defaultdict(lambda: {'values': [], 'unit': None})
+    for event in events:
+        event_dict[event.description]['values'].append(event.value)
+        event_dict[event.description]['unit'] = event.unit
+    # Remove all None values
+    for description, data in event_dict.items():
+        data['values'] = [value for value in data['values'] if value is not None]
+
+    serialized_events = []
+    for description, data in event_dict.items():
+        if numeric_values:
+            values_str = ', '.join(map(format_value, data['values']))
+            unit_str = f" [{data['unit']}]" if data['unit'] is not None else ""
+            if values_str:
+                serialized_events.append(f"- {description}{unit_str}: {values_str}")
+            else:
+                serialized_events.append(f"- {description}")
+        else:
+            serialized_events.append(f"- {description}")
+        values_str = ', '.join(map(str, data['values']))
+
+    return '\n'.join(serialized_events)
+
+def list_visits_with_events(ehr_serializer, label_time, numeric_values=False, unique_events=False) -> str:
     visit_texts = []
-    for visit in sorted(ehr_serializer.visits):
-        days_before_label = (label_time - visit.start).days
-        visit_text = f"{days_before_label} days before: {visit.description}\n{serialize_event_list(visit.events, numeric_values=numeric_values)}"
+    # Set label time to a constant value for all patients
+    for visit in sorted(ehr_serializer.visits, reverse=True):
+        visit_text = visit_heading(label_time, visit) + serialize_event_list(visit.events, numeric_values=numeric_values, unique_events=unique_events)
         visit_texts.append(visit_text)
-        
+
     return '\n\n'.join(visit_texts)
     
 class ListUniqueEventsWoNumericValuesStrategy(SerializationStrategy):
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        descriptions = set()
-        
         events = ehr_serializer.static_events + [event for visit in ehr_serializer.visits for event in visit.events]
         events = sorted(events, key=lambda x: x.start)
-        unique_events = []
-        for event in events:
-            if event.description not in descriptions:
-                descriptions.add(event.description)
-                unique_events.append(event)
-                
-        return serialize_event_list(unique_events, numeric_values=False)
+        unique_events = get_unique_events(events)
+        return EHR_HEADING + STATIC_EVENTS_HEADING + serialize_event_list(unique_events, numeric_values=False)
     
-        # TODO: Potential processing of decriptions
-        # # Remove some suffixes:
-        # # 'in Serum or Plasma', 'Serum or Plasma', ' - Serum or Plasma', 'in Serum', 'in Plasma'
-        # # 'in Blood', ' - Blood', 'in Blood by Automated count', 'by Automated count', ', automated'
-        # # 'by Manual count'
-        # re_exclude_description_suffixes = re.compile(r"( in Serum or Plasma| Serum or Plasma| - Serum or Plasma| in Serum| in Plasma| in Blood| - Blood| in Blood by Automated count| by Automated count|, automated| by Manual count)")
-        
-        # # Remove some irrelevant artifacts
-        # # Remove all [*] - often correspond to units
-        # description = re.sub(r"\[.*\]", "", description)
-        # # Remove suffixes
-        # description = re_exclude_description_suffixes.sub("", description)
-        # # Remove repeated whitespaces
-        # description = re.sub(r"\s+", " ", description)
-        # description = description.strip()
+class ListVisitsWithUniqueEventsWoNumericValuesStrategy(SerializationStrategy):   
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        static_text = STATIC_EVENTS_HEADING + serialize_unique_event_list(ehr_serializer.static_events, numeric_values=False)
+        visits_text = VISITS_EVENTS_HEADING + list_visits_with_events(ehr_serializer, label_time, numeric_values=False, unique_events=True)
+        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
+
+class ListVisitsWithUniqueEventsStrategy(SerializationStrategy):
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        static_text = STATIC_EVENTS_HEADING + serialize_unique_event_list(ehr_serializer.static_events, numeric_values=True)
+        visits_text = VISITS_EVENTS_HEADING + list_visits_with_events(ehr_serializer, label_time, numeric_values=True, unique_events=True)
+        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
 
 class ListVisitsWithEventsWoNumericValuesStrategy(SerializationStrategy):   
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = serialize_event_list(ehr_serializer.static_events, numeric_values=False)
-        visits_text = list_visits_with_events(ehr_serializer, label_time, numeric_values=False)
-        return f"{static_text}\n\n{visits_text}"
+        static_text = STATIC_EVENTS_HEADING + serialize_event_list(ehr_serializer.static_events, numeric_values=False, unique_events=False)
+        visits_text = VISITS_EVENTS_HEADING + list_visits_with_events(ehr_serializer, label_time, numeric_values=False, unique_events=False)
+        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
 
 class ListVisitsWithEventsStrategy(SerializationStrategy):
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = serialize_event_list(ehr_serializer.static_events, numeric_values=True)
-        visits_text = list_visits_with_events(ehr_serializer, label_time, numeric_values=True)
-        return f"{static_text}\n\n{visits_text}"
+        static_text = STATIC_EVENTS_HEADING + serialize_event_list(ehr_serializer.static_events, numeric_values=True, unique_events=False)
+        visits_text = VISITS_EVENTS_HEADING + list_visits_with_events(ehr_serializer, label_time, numeric_values=True, unique_events=False)
+        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
 
 class EHRVisit:
     def __init__(
@@ -137,7 +207,7 @@ class EHRSerializer:
         
     def load_from_femr_events(self, events: List[Event], resolve_code: Callable[[str], str], is_visit_event: Callable[[Event], bool]) -> None:
 
-        # First process all visit
+        # First process all visits
         visit_ids_to_visits: Dict[int, EHRVisit] = {}
         for event_visit in filter(is_visit_event, events):
             description = resolve_code(event_visit.code)

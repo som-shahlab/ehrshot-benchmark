@@ -14,6 +14,7 @@ from nptyping import NDArray
 from dataclasses import dataclass
 import csv
 import collections
+import itertools
 import multiprocessing
 from femr.labelers import Label
 from femr.extension import datasets as extension_datasets
@@ -164,11 +165,18 @@ class LLMFeaturizer():
     Produces LLM-encoded representation of patient.
     """
 
-    def __init__(self, embedding_size: int, serialization_strategy: SerializationStrategy, task_to_instructions: Optional[Dict[str, str]] = {}):
+    def __init__(
+        self,
+        embedding_size: int,
+        serialization_strategy: SerializationStrategy,
+        task_to_instructions: Optional[Dict[str, str]] = {},
+        add_condition_parent_concepts: Optional[bool] = False
+    ):
 
         self.embedding_dim = embedding_size
         self.serialization_strategy = serialization_strategy
         self.task_to_instructions = task_to_instructions
+        self.add_condition_parent_concepts = add_condition_parent_concepts
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -202,7 +210,6 @@ class LLMFeaturizer():
 
         # Remove some non-informative semantic codes / descriptions
         exclude_description_prefixes = ['Birth']
-        # exclude_description_prefixes = ['CARE\_SITE\/', 'Birth', 'Plan Stop Reason', 'Patient discharge']
         self.re_exclude_description_prefixes = None if exclude_description_prefixes == [] else re.compile(r"^(" + "|".join(exclude_description_prefixes) + ")")
     
     def get_num_columns(self) -> int:
@@ -219,7 +226,6 @@ class LLMFeaturizer():
         
         # Resolve semantic code to its description with default and custom onotologies
         description = ontology.get_text_description(code)
-        
         # Exclude some custom ontologies / descriptions
         if self.re_exclude_description_prefixes is not None and self.re_exclude_description_prefixes.match(description):
             return None
@@ -267,6 +273,20 @@ class LLMFeaturizer():
         for label_idx, label in enumerate(labels):
             # According to existing feature processing, all events before or at the label time are included
             events_until_label = [event for event in patient.events if event.start <= label.time]
+            
+            if self.add_condition_parent_concepts:
+                # Add all direct parents of conditions (omop_table=condition_occurrence)
+
+                def create_conditions_parent_events(event, parent_codes) -> List[Event]:
+                    events = [event]
+                    if event.omop_table == 'condition_occurrence':
+                        for parent_code in parent_codes:
+                            events.append(Event(event.start, parent_code, None))
+                    return events
+                
+                events_until_label = [create_conditions_parent_events(event, ontology.get_parents(event.code)) for event in events_until_label]
+                events_until_label = list(itertools.chain(*events_until_label))
+            
             # Manually change age event - according to featurizer.get_patient_birthdate always first event
             patient_birth_date: datetime = get_patient_birthdate(patient)
             age = int((label.time - patient_birth_date).days / 365)
@@ -282,7 +302,10 @@ class LLMFeaturizer():
             text = serializer.serialize(self.serialization_strategy, label_time=label.time)
         
             # Get instruction
+            instruction_prefix = self.task_to_instructions.get("instruction_prefix", "")
             instruction = self.task_to_instructions.get(label.task, "")
+            if instruction_prefix != "":
+                instruction = f"{instruction_prefix} {instruction}"
             assert isinstance(instruction, str), f"Instruction for task {label.task} must be a string"
 
             self.pid_label_idx_serializations[(patient.patient_id, label_idx)] = (instruction, text)
@@ -343,11 +366,22 @@ class LLMFeaturizer():
         assert self.embeddings is None, "Embeddings already exist"
         serializations = [serialization for _, serialization in self.serializations_instructions]
         instructions = [instruction for instruction, _ in self.serializations_instructions]
-        # Print first example encoded for the language model
-        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[0], serializations[0])}")
-        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[8], serializations[8])}")
-        logging.warn(f"First example used for encoding:\n{text_encoder.encoder.add_instruction(instructions[20], serializations[20])}")
         
+        # Debug - careful: data is sensitive!
+        def print_example(idx):
+            instruced_example = text_encoder.encoder.add_instruction(instructions[idx], serializations[idx])
+            # Check if instruced example is list
+            if isinstance(instruced_example, list):
+                # Use code from llm2vec
+                instruced_example = f"{instruced_example[0].strip()} !@#$%^&*(){instruced_example[1].strip()}"
+            logging.warning(f"Example used for encoding:\n{instruced_example}")
+
+        # Print single example for debugging purpose
+        # print_example(0)
+        
+        # Print character statistics
+        print(f"Character statistics for serializations:\n{pd.Series([len(s) for s in serializations]).describe()}")
+
         self.embeddings = text_encoder.encode_texts(instructions, serializations)
 
     def featurize(
