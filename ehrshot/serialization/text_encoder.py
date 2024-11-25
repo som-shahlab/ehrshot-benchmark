@@ -148,15 +148,56 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
         super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
-        model_path = "/home/sthe14/llm2vec/output"
+        # peft_model_name_or_path = "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000"
+        peft_model_name_or_path = "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised"
+        if 'custom_path' in kwargs:
+            model_path = "/home/sthe14/llm2vec/output"
+            peft_model_name_or_path = model_path + kwargs['custom_path']
+        # Changed this to updated loading instructions from https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised
         self.model = LLM2Vec.from_pretrained(
-            model_path + "/mntp/Meta-Llama-3.1-8B-Instruct",
-            peft_model_name_or_path=model_path + "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000",
+            "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",
+            trust_remote_code=True,
+            peft_model_name_or_path=peft_model_name_or_path,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
             torch_dtype=torch.bfloat16,
             max_length=self.max_input_length,
             doc_max_length=self.max_input_length,
         )
+
+# class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
+#     
+#     def __init__(self, max_input_length: int, **kwargs) -> None:
+#         super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
+#         # peft_model_name_or_path = "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000"
+#         peft_model_name_or_path = "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised"
+#         if 'custom_path' in kwargs:
+#             model_path = "/home/sthe14/llm2vec/output"
+#             peft_model_name_or_path = model_path + kwargs['custom_path']
+#         # Changed this to updated loading instructions from https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised
+#         # self.model = LLM2Vec.from_pretrained(
+#         #     "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",
+#         #     trust_remote_code=True,
+#         #     peft_model_name_or_path=peft_model_name_or_path,
+#         #     device_map="cuda" if torch.cuda.is_available() else "cpu",
+#         #     torch_dtype=torch.bfloat16,
+#         #     max_length=self.max_input_length,
+#         #     doc_max_length=self.max_input_length,
+#         # )
+#         tokenizer = AutoTokenizer.from_pretrained("McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp")
+#         config = AutoConfig.from_pretrained("McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp", trust_remote_code=True)
+#         model = AutoModel.from_pretrained(
+#             "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",
+#             trust_remote_code=True,
+#             config=config,
+#             torch_dtype=torch.bfloat16,
+#             device_map="cuda" if torch.cuda.is_available() else "cpu",
+#         )
+#         model = PeftModel.from_pretrained(model, "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",)
+#         model = model.merge_and_unload()  # This can take several minutes on cpu
+#         # Loading supervised model. This loads the trained LoRA weights on top of MNTP model. Hence the final weights are -- Base model + MNTP (LoRA) + supervised (LoRA).
+#         model = PeftModel.from_pretrained(model, peft_model_name_or_path)
+#         # Wrapper for encoding and pooling operations
+#         self.model = LLM2Vec(model, tokenizer, pooling_mode="mean", max_length=self.max_input_length, doc_max_length=self.max_input_length)
 
     
 class GTEQwen2_7B_InstructEncoder(Qwen2LLMEncoder):
