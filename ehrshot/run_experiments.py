@@ -58,6 +58,7 @@ def main(args):
         --path_to_features_dir {args.experiment_folder} \
         --text_encoder {args.text_encoder} \
         --serialization_strategy {args.serialization_strategy} \
+        --excluded_ontologies {args.excluded_ontologies} \
         --add_parent_concepts {args.add_parent_concepts} \
         {tasks_to_instructions}
         """
@@ -153,6 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_threads", type=int, default=20, help="Number of threads")
     parser.add_argument("--text_encoder", required=True, help="Text encoder to be used")
     parser.add_argument("--serialization_strategy", required=True, help="Serialization strategy to be used")
+    parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     

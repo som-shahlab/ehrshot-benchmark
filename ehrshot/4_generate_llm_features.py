@@ -35,7 +35,8 @@ if __name__ == "__main__":
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels_tasks.csv')
     PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
-    EXCLUDED_ONTOLOGIES: List[str] = args.excluded_ontologies.split(',') if args.excluded_ontologies else []
+    EXCLUDED_ONTOLOGIES: List[str] = ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3'] if args.excluded_ontologies == 'no_labs' else \
+        ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else []
     ADD_CONDITIONS_PARENT_CONCEPTS: bool = args.add_parent_concepts == 'conditions'
         
     # Serialization strategy

@@ -16,11 +16,11 @@
 export PYTHONUNBUFFERED=1
 
 # Check if instruction file at position 10 is given, then set instructions_file_arg
-if [ -z "${10}" ]
+if [ -z "${11}" ]
 then
     instructions_file_arg=""
 else
-    instructions_file_arg="--task_to_instructions ${10}"
+    instructions_file_arg="--task_to_instructions ${11}"
 fi
 
 python  /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
@@ -32,5 +32,6 @@ python  /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --num_threads $6 \
     --text_encoder $7 \
     --serialization_strategy $8 \
-    --add_parent_concepts $9 \
+    --excluded_ontologies $9 \
+    --add_parent_concepts $10 \
     $instructions_file_arg

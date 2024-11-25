@@ -62,7 +62,7 @@
                 // "--text_encoder", "gteqwen2_1_5b_instruct",
                 "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json",
                 "--serialization_strategy", "list_visits_with_unique_events", //"list_unique_events_wo_numeric_values", // "list_visits_with_unique_events",
-                "--excluded_ontologies", "LOINC,Domain,CARE_SITE,ICDO3,RxNorm,RxNorm Extension", // "LOINC,Domain,CARE_SITE,ICDO3",
+                "--excluded_ontologies", "none",
                 "--add_parent_concepts", "none"
             ],
         },

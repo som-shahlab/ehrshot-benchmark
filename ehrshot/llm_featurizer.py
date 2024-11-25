@@ -384,7 +384,7 @@ class LLMFeaturizer():
             logging.warning(f"Example used for encoding:\n{instruced_example}")
 
         # Print single example for debugging purpose
-        # print_example(0)
+        print_example(0)
         
         # Print character statistics
         print(f"Character statistics for serializations:\n{pd.Series([len(s) for s in serializations]).describe()}")

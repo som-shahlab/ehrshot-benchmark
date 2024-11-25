@@ -53,48 +53,50 @@ serialization_strategies=(
     # "list_visits_with_unique_events_wo_numeric_values"
     # "list_visits_with_unique_events"
 )
+excluded_ontologies=("none" "no_labs" "no_labs_meds")
 parent_concepts=("none" "conditions")
-# All codes, no lab values/irrelevant codes, no lab values/irrelevant codes/medications
-excluded_ontologies=("" "LOINC,Domain,CARE_SITE,ICDO3" "LOINC,Domain,CARE_SITE,ICDO3,RxNorm,RxNorm Extension")
 instructions_options=("true" "false")
 
 for text_encoder in "${text_encoders[@]}"; do
     for serialization_strategy in "${serialization_strategies[@]}"; do
-        for parent_concept in "${parent_concepts[@]}"; do
-            for use_instructions in "${instructions_options[@]}"; do
-                # Define experiment name based on concatenation of options and create timestamped directory
-                instructions_suffix=""
-                instructions_file_arg=""
-                if [ $use_instructions == "true" ]; then
-                    instructions_suffix="_instr"
-                    instructions_file_arg="$INSTRUCTIONS_FILE"
-                fi
+        for excluded_ontology in "${excluded_ontologies}[@]}"; do
+            for parent_concept in "${parent_concepts[@]}"; do
+                for use_instructions in "${instructions_options[@]}"; do
+                    # Define experiment name based on concatenation of options and create timestamped directory
+                    instructions_suffix=""
+                    instructions_file_arg=""
+                    if [ $use_instructions == "true" ]; then
+                        instructions_suffix="_instr"
+                        instructions_file_arg="$INSTRUCTIONS_FILE"
+                    fi
 
-                experiment_name="${text_encoder}_${serialization_strategy}_${parent_concept}${instructions_suffix}"
-                experiment_dir="${EXPERIMENTS_DIR}/${experiment_name}"
-                mkdir -p $experiment_dir
+                    experiment_name="${text_encoder}_${serialization_strategy}_${excluded_ontology}_${parent_concept}${instructions_suffix}"
+                    experiment_dir="${EXPERIMENTS_DIR}/${experiment_name}"
+                    mkdir -p $experiment_dir
 
-                # Check if the experiment has already been run by testing if all_results.csv exists in the experiment directory
-                if [ -f "${experiment_dir}/all_results.csv" ]; then
-                    echo "Experiment $experiment_name already exists. Skipping..."
-                    continue
-                fi
+                    # Check if the experiment has already been run by testing if all_results.csv exists in the experiment directory
+                    if [ -f "${experiment_dir}/all_results.csv" ]; then
+                        echo "Experiment $experiment_name already exists. Skipping..."
+                        continue
+                    fi
 
-                # Run the experiment with bash or slurm
-                cmd="bash"
-                [[ " $* " == *" --is_use_slurm "* ]] && cmd="sbatch"
+                    # Run the experiment with bash or slurm
+                    cmd="bash"
+                    [[ " $* " == *" --is_use_slurm "* ]] && cmd="sbatch"
 
-                $cmd /home/sthe14/ehrshot-benchmark/ehrshot/bash_scripts/run_experiments_helper.sh \
-                    $BASE_DIR \
-                    $experiment_dir \
-                    $BASE_DIR/EHRSHOT_ASSETS/femr/extract \
-                    $BASE_DIR/EHRSHOT_ASSETS/benchmark \
-                    $BASE_DIR/EHRSHOT_ASSETS/splits/person_id_map.csv \
-                    $num_threads \
-                    $text_encoder \
-                    $serialization_strategy \
-                    $parent_concept \
-                    $instructions_file_arg
+                    $cmd /home/sthe14/ehrshot-benchmark/ehrshot/bash_scripts/run_experiments_helper.sh \
+                        $BASE_DIR \
+                        $experiment_dir \
+                        $BASE_DIR/EHRSHOT_ASSETS/femr/extract \
+                        $BASE_DIR/EHRSHOT_ASSETS/benchmark \
+                        $BASE_DIR/EHRSHOT_ASSETS/splits/person_id_map.csv \
+                        $num_threads \
+                        $text_encoder \
+                        $serialization_strategy \
+                        $excluded_ontology \
+                        $parent_concept \
+                        $instructions_file_arg
+                done
             done
         done
     done
