@@ -81,7 +81,7 @@ class BERTLLMEncoder(LLMEncoder):
         return {'embedding': first_last_avg_embedding}
 
 
-class LLM2VecLlamaLLMEncoder(LLMEncoder):
+class LLM2VecLLMEncoder(LLMEncoder):
     def __init__(self, embedding_size: int, model_max_input_length: int, max_input_length: int) -> None:
         super().__init__(embedding_size, model_max_input_length, max_input_length)
         
@@ -130,7 +130,7 @@ class Qwen2LLMEncoder(LLMEncoder):
             return np.concatenate(all_embeddings, axis=0)
 
 
-class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
+class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
         super().__init__(embedding_size=4096, model_max_input_length=8192, max_input_length=max_input_length)
@@ -144,7 +144,7 @@ class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
         )
 
 
-class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
+class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
         super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
@@ -198,6 +198,20 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
 #         model = PeftModel.from_pretrained(model, peft_model_name_or_path)
 #         # Wrapper for encoding and pooling operations
 #         self.model = LLM2Vec(model, tokenizer, pooling_mode="mean", max_length=self.max_input_length, doc_max_length=self.max_input_length)
+
+
+class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
+    
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=4096, model_max_input_length=32768, max_input_length=max_input_length)
+        self.model = LLM2Vec.from_pretrained(
+            "McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp",
+            peft_model_name_or_path="McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp-supervised",
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            torch_dtype=torch.bfloat16,
+            max_length=self.max_input_length,
+            doc_max_length=self.max_input_length,
+        )
 
     
 class GTEQwen2_7B_InstructEncoder(Qwen2LLMEncoder):

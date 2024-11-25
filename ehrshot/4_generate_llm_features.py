@@ -5,7 +5,7 @@ from loguru import logger
 from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
-from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
 from serialization.ehr_serializer import ListUniqueEventsWoNumericValuesStrategy, ListVisitsWithEventsWoNumericValuesStrategy, ListVisitsWithEventsStrategy, ListVisitsWithUniqueEventsStrategy, ListVisitsWithUniqueEventsWoNumericValuesStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     parser.add_argument("--text_encoder", type=str, help="Text encoder to use")
     parser.add_argument("--serialization_strategy", required=True, type=str, help="Serialization strategy to use")
+    parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     return parser.parse_args()
     
@@ -34,6 +35,7 @@ if __name__ == "__main__":
     PATH_TO_FEATURES_DIR = args.path_to_features_dir
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels_tasks.csv')
     PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
+    EXCLUDED_ONTOLOGIES: List[str] = args.excluded_ontologies.split(',') if args.excluded_ontologies else []
     ADD_CONDITIONS_PARENT_CONCEPTS: bool = args.add_parent_concepts == 'conditions'
         
     # Serialization strategy
@@ -61,6 +63,7 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__} with max length: {max_input_length}")
+    logger.info(f"Exlude ontologies: {EXCLUDED_ONTOLOGIES}")
     
     # LLM text encoder
     # TODO Debug: Use specific text encoder
@@ -69,6 +72,11 @@ if __name__ == "__main__":
         text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
     elif args.text_encoder == 'llm2vec_llama3_1_7b_instruct_supervised':
         text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
+    elif args.text_encoder.startswith('llm2vec_llama3_1_7b_instruct_mimic_'):
+        custom_path = args.text_encoder.removeprefix('llm2vec_llama3_1_7b_instruct_mimic_')
+        text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder(max_input_length=max_input_length, custom_path=custom_path))
+    elif args.text_encoder == 'llm2vec_mistral_7b_instruct_supervised':
+        text_encoder = TextEncoder(LLM2VecMistral_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
     elif args.text_encoder == 'gteqwen2_7b_instruct':
         text_encoder = TextEncoder(GTEQwen2_7B_InstructEncoder(max_input_length=max_input_length))
     elif args.text_encoder == 'gteqwen2_1_5b_instruct':
@@ -117,7 +125,7 @@ if __name__ == "__main__":
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label
     logger.info("Start | Preprocess featurizers")
-    llm_featurizer = LLMFeaturizer(text_encoder.encoder.embedding_size, serialization_strategy, task_to_instructions, ADD_CONDITIONS_PARENT_CONCEPTS) 
+    llm_featurizer = LLMFeaturizer(text_encoder.encoder.embedding_size, serialization_strategy, task_to_instructions, EXCLUDED_ONTOLOGIES, ADD_CONDITIONS_PARENT_CONCEPTS) 
     llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, llm_featurizer, patients_to_labels, NUM_THREADS)
 
     logger.info("Finish | Preprocess featurizers")

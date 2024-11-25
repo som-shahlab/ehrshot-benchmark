@@ -15,6 +15,7 @@ mkdir -p $EXPERIMENTS_DIR
 text_encoders=(
     # "llm2vec_llama3_7b_instruct_supervised"
     # "llm2vec_llama3_1_7b_instruct_supervised"
+    # "llm2vec_mistral_7b_instruct_supervised"
     # "gteqwen2_7b_instruct"
     # "gteqwen2_1_5b_instruct"
     # "st_gte_large_en_v15"
@@ -28,7 +29,6 @@ text_encoders=(
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-simcse-mimic/Meta-Llama-3.1-8B-Instruct_2000_mntp_steps_05/checkpoint-200"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps_2e-4/MimicIVDISup_train_m-Meta-Llama-3.1-8B-Instruct_l-2048/checkpoint-200"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/MedNLI_train_m-Meta-Llama-3.1-8B-Instruct_l-512/checkpoint-200"
-    # "llm2vec_llama3_1_7b_instruct_supervised"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic/Meta-Llama-3.1-8B-Instruct/MimicIVDISup_train_m-Meta-Llama-3.1-8B-Instruct/checkpoint-200"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-sup/Meta-Llama-3.1-8B-Instruct/MimicIVDISup_train_m-Meta-Llama-3.1-8B-Instruct/checkpoint-200"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mednli/Meta-Llama-3.1-8B-Instruct/MedNLI_train_m-Meta-Llama-3.1-8B-Instruct/checkpoint-200"
@@ -44,7 +44,7 @@ text_encoders=(
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5MM_train_m-Meta-Llama-3.1-8B-Instruct_0.2_medical_2000/checkpoint-400"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5MM_train_m-Meta-Llama-3.1-8B-Instruct_0.2_medical_2000/checkpoint-1000"
     # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5MM_train_m-Meta-Llama-3.1-8B-Instruct_0.2_medical_2000/checkpoint-1400"
-    "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5MM_train_m-Meta-Llama-3.1-8B-Instruct_0.2_medical_2000/checkpoint-2000"
+    # "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mimic-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5MM_train_m-Meta-Llama-3.1-8B-Instruct_0.2_medical_2000/checkpoint-2000"
 )
 serialization_strategies=(
     "list_unique_events_wo_numeric_values"
@@ -53,10 +53,10 @@ serialization_strategies=(
     # "list_visits_with_unique_events_wo_numeric_values"
     # "list_visits_with_unique_events"
 )
-# parent_concepts=("none" "conditions")
-# instructions_options=("true" "false")
-parent_concepts=("none")
-instructions_options=("true")
+parent_concepts=("none" "conditions")
+# All codes, no lab values/irrelevant codes, no lab values/irrelevant codes/medications
+excluded_ontologies=("" "LOINC,Domain,CARE_SITE,ICDO3" "LOINC,Domain,CARE_SITE,ICDO3,RxNorm,RxNorm Extension")
+instructions_options=("true" "false")
 
 for text_encoder in "${text_encoders[@]}"; do
     for serialization_strategy in "${serialization_strategies[@]}"; do

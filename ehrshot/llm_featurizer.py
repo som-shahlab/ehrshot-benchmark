@@ -170,13 +170,14 @@ class LLMFeaturizer():
         embedding_size: int,
         serialization_strategy: SerializationStrategy,
         task_to_instructions: Optional[Dict[str, str]] = {},
+        excluded_ontologies: List[str] = [],
         add_condition_parent_concepts: Optional[bool] = False
     ):
-
         self.embedding_dim = embedding_size
         self.serialization_strategy = serialization_strategy
         self.task_to_instructions = task_to_instructions
         self.add_condition_parent_concepts = add_condition_parent_concepts
+        self.excluded_onotologies = excluded_ontologies
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -206,7 +207,7 @@ class LLMFeaturizer():
         for name, ontology in custom_ontologies.items():
             custom_ontologies[name] = {str(k).strip().lower(): v for k, v in ontology.items()}
         self.custom_ontologies = custom_ontologies
-        self.re_custom_ontologies = re.compile(r"^(" + "|".join(custom_ontologies.keys()) + ")\/")
+        self.re_custom_ontologies = re.compile(r"^(" + "|".join(custom_ontologies.keys()) + r")\/")
 
         # Remove some non-informative semantic codes / descriptions
         exclude_description_prefixes = ['Birth']
@@ -219,34 +220,40 @@ class LLMFeaturizer():
         self,
         ontology: extension_datasets.Ontology,
         code: str
-    ) -> str:
+    ) -> Optional[str]:
+        
+        ontology_name = code.split('/')[0].strip()
+            
+        # Ignore excluded ontologies
+        if ontology_name in self.excluded_onotologies:
+            return None
+                
         # Handle special case age
         if code.startswith(f"{age_identifier}: "):
             return code
-        
+        # Custom treatment of Cancer Modifier, either omop code which we cannot resolve or staging
+        if ontology_name == "Cancer Modifier":
+            if 'OMOP' not in code:
+                # Typical example "Cancer Modifier/c-8th_AJCC/UICC-Stage-1B" to "c-8th AJCC UICC Stage 1B"
+                return code.split('/', 1)[1].replace('_', ' ').replace('-', ' ').replace('/', ' ').strip()
+            
         # Resolve semantic code to its description with default and custom onotologies
-        description = ontology.get_text_description(code)
-        # Exclude some custom ontologies / descriptions
+        description = ontology.get_text_description(code)  # type: ignore
+        # Exclude some descriptions (e.g. "Birth" to handle age manually)
         if self.re_exclude_description_prefixes is not None and self.re_exclude_description_prefixes.match(description):
             return None
-
+        
         # Check if custom ontology is applicable
         if self.re_custom_ontologies.match(code):
             ontology_name = code.split('/')[0]
             code = code.split('/')[1].lower()
             if code in self.custom_ontologies[ontology_name]:
                 description = self.custom_ontologies[ontology_name][code]
+            else:
+                # TODO: There are several codes (esp. CPT4 that are not in the custom ontology)
+                return None
 
-        # TODO: Post-process the description
-        # # Remove some irrelevant artifacts
-        # # Remove all [*] - often correspond to units
-        # description = re.sub(r"\[.*\]", "", description)
-        # # Remove suffixes
-        # description = re_exclude_description_suffixes.sub("", description)
-        # # Remove repeated whitespaces
-        # description = re.sub(r"\s+", " ", description)
         description = description.strip()
-
         return description
 
     def preprocess(
@@ -267,7 +274,7 @@ class LLMFeaturizer():
         def is_visit_event(event: Event) -> bool:
             return event.code.startswith('Visit/')
         
-        def resolve_code(code: str) -> str:
+        def resolve_code(code: str) -> Optional[str]:
             return self.resolve_code_with_custom_ontologies(ontology, code)
         
         for label_idx, label in enumerate(labels):
