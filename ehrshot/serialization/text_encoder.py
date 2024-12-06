@@ -33,7 +33,10 @@ class LLMEncoder(ABC):
         # Use simple heuristic to determine batch size
         # TODO: Adapt based on available GPU memory
         def determine_llm_batch_size():
-            default_batch_size = 4
+            # For max_input_length = 8192 (2 for 40 GB, 16 (llama), 8 for Qwen for 80 GB)
+            default_batch_size = 8
+            if self.__class__.__name__.startswith('LLM2VecLlama3'):
+                default_batch_size = 16
             if max_input_length > 32768:
                 return 1
             elif max_input_length > 8192:
@@ -164,14 +167,14 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
             doc_max_length=self.max_input_length,
         )
 
-# class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLlamaLLMEncoder):
+# class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
 #     
 #     def __init__(self, max_input_length: int, **kwargs) -> None:
 #         super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
 #         # peft_model_name_or_path = "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000"
 #         peft_model_name_or_path = "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised"
 #         if 'custom_path' in kwargs:
-#             model_path = "/home/sthe14/llm2vec/output"
+#             model_path = "/home/sthe14/llm2vec-repro/output"
 #             peft_model_name_or_path = model_path + kwargs['custom_path']
 #         # Changed this to updated loading instructions from https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised
 #         # self.model = LLM2Vec.from_pretrained(
@@ -183,16 +186,16 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
 #         #     max_length=self.max_input_length,
 #         #     doc_max_length=self.max_input_length,
 #         # )
-#         tokenizer = AutoTokenizer.from_pretrained("McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp")
-#         config = AutoConfig.from_pretrained("McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp", trust_remote_code=True)
+#         tokenizer = AutoTokenizer.from_pretrained("/home/sthe14/llm2vec-repro/output/mntp/Meta-Llama-3.1-8B-Instruct/checkpoint-1000")
+#         config = AutoConfig.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct", trust_remote_code=True)
 #         model = AutoModel.from_pretrained(
-#             "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",
+#             "meta-llama/Meta-Llama-3.1-8B-Instruct",
 #             trust_remote_code=True,
 #             config=config,
 #             torch_dtype=torch.bfloat16,
 #             device_map="cuda" if torch.cuda.is_available() else "cpu",
 #         )
-#         model = PeftModel.from_pretrained(model, "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",)
+#         model = PeftModel.from_pretrained(model, "/home/sthe14/llm2vec-repro/output/mntp/Meta-Llama-3.1-8B-Instruct/checkpoint-1000",)
 #         model = model.merge_and_unload()  # This can take several minutes on cpu
 #         # Loading supervised model. This loads the trained LoRA weights on top of MNTP model. Hence the final weights are -- Base model + MNTP (LoRA) + supervised (LoRA).
 #         model = PeftModel.from_pretrained(model, peft_model_name_or_path)
