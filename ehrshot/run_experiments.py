@@ -144,6 +144,10 @@ def main(args):
 
     print("Experiment completed and results uploaded to wandb.")
 
+    # TODO
+    # Sleep for 60 minutes to allow for manual inspection of results
+    # time.sleep(3600)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run EHRShot experiments")
     parser.add_argument("--base_dir", required=True, help="Base directory")
