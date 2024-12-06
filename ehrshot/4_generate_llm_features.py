@@ -44,23 +44,23 @@ if __name__ == "__main__":
     # args.serialization_strategy = 'list_visits_with_events'
     if args.serialization_strategy == 'list_unique_events_wo_numeric_values':
         serialization_strategy = ListUniqueEventsWoNumericValuesStrategy()
-        max_input_length = 16384
+        max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events_wo_numeric_values':
         serialization_strategy = ListVisitsWithEventsWoNumericValuesStrategy()
         # max_input_length = 32000
-        max_input_length = 16384
+        max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events':
         serialization_strategy = ListVisitsWithEventsStrategy()
         # max_input_length = 32000
-        max_input_length = 16384
+        max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_unique_events_wo_numeric_values':
         serialization_strategy = ListVisitsWithUniqueEventsWoNumericValuesStrategy()
         # max_input_length = 32000
-        max_input_length = 16384
+        max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_unique_events':
         serialization_strategy = ListVisitsWithUniqueEventsStrategy()
         # max_input_length = 32000
-        max_input_length = 16384
+        max_input_length = 8192
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__} with max length: {max_input_length}")
