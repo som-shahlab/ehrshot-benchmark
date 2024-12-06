@@ -336,4 +336,25 @@ class TextEncoder:
         else:
             inputs = [self.encoder.add_instruction(instruction, text) for instruction, text in zip(instructions, texts)]
         
-        return self.encoder._encode(inputs)
+        # Old:
+        # return self.encoder._encode(inputs)
+        
+        # Performance improvement: Remove exact duplicates and restore them after encoding
+        # Careful: inputs are lists of strings, so we need to convert them to tuples for hashing
+        # Use dictionary for deduplication and index tracking
+        if all(isinstance(x, str) for x in inputs):
+            input_to_index = {input: idx for idx, input in enumerate(inputs)}
+        else:
+            input_to_index = {tuple(input): idx for idx, input in enumerate(inputs)}
+            
+        # Deduplicate inputs while preserving the first occurrence
+        unique_inputs = list(input_to_index.keys())
+        
+        # Encode unique inputs
+        unique_embeddings = self.encoder._encode(unique_inputs)
+        unique_embeddings = unique_embeddings.tolist()
+        
+        # Restore original order using input_to_index
+        embeddings = [unique_embeddings[input_to_index[input if isinstance(input, str) else tuple(input)]] for input in inputs]  # type: ignore
+        return np.array(embeddings)
+    
