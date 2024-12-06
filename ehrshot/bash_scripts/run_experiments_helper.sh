@@ -1,13 +1,18 @@
 #!/bin/bash
 #SBATCH --job-name=ehrshot
 #SBATCH --output=logs/ehrshot_%A.log
-#SBATCH --time=2-00:00:00
+#SBATCH --time=0-20:00:00
 #SBATCH --cpus-per-task=20
-#SBATCH --mem=80G
 
-# GPU resources: gpu, nvidia_a100_80gb_pcie:1
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:nvidia_a100_80gb_pcie:1
+# PGPU resources: 
+# --partition=pgpu
+# --gres=gpu:nvidia_a100-sxm4-80gb:4
+# --mem=400G
+
+# GPU resources: 
+# --partition=gpu
+# --gres=gpu:nvidia_a100_80gb_pcie:1
+# --mem=40G
 
 # CPU
 # --partition=compute
@@ -23,7 +28,9 @@ else
     instructions_file_arg="--task_to_instructions ${11}"
 fi
 
-python  /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
+# TODO: For multi-gpu setup
+# CUDA_VISIBLE_DEVICES=0 
+python /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --base_dir $1 \
     --experiment_folder $2 \
     --path_to_database $3 \
