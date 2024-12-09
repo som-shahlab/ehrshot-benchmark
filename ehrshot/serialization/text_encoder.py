@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Any
+from git import Optional
 from numpy.typing import NDArray
 import numpy as np
 import torch
@@ -12,6 +13,7 @@ from torch.utils.data import Dataset as TorchDataset
 from datasets import Dataset
 from tqdm import tqdm
 from typing import Tuple
+from collections import defaultdict
     
         
 class TextsDataset(TorchDataset):
@@ -330,7 +332,7 @@ class TextEncoder:
     def __init__(self, encoder: LLMEncoder):
         self.encoder = encoder
 
-    def encode_texts(self, instructions: List[str], texts: List[str]) -> NDArray[Any]:
+    def encode_texts(self, instructions: List[str], texts: List[str], cache_dir: Optional[str]) -> NDArray[Any]:
         if all([instruction is None or len(instruction) == 0 for instruction in instructions]):
             inputs = texts
         else:
@@ -341,20 +343,23 @@ class TextEncoder:
         
         # Performance improvement: Remove exact duplicates and restore them after encoding
         # Careful: inputs are lists of strings, so we need to convert them to tuples for hashing
-        # Use dictionary for deduplication and index tracking
-        if all(isinstance(x, str) for x in inputs):
-            input_to_index = {input: idx for idx, input in enumerate(inputs)}
-        else:
-            input_to_index = {tuple(input): idx for idx, input in enumerate(inputs)}
-            
-        # Deduplicate inputs while preserving the first occurrence
-        unique_inputs = list(input_to_index.keys())
+        def serialize_input(input):
+            return input if isinstance(input, str) else tuple(input)
         
-        # Encode unique inputs
+        # Store original indices of inputs
+        input_to_indices = defaultdict(list)
+        for i, input in enumerate(inputs):
+            input_to_indices[serialize_input(input)].append(i)
+            
+        # Deduplicate inputs while preserving the first occurrence and encode them
+        unique_inputs = list(input_to_indices.keys())
         unique_embeddings = self.encoder._encode(unique_inputs)
         unique_embeddings = unique_embeddings.tolist()
         
-        # Restore original order using input_to_index
-        embeddings = [unique_embeddings[input_to_index[input if isinstance(input, str) else tuple(input)]] for input in inputs]  # type: ignore
+        # Create empty list of size inputs
+        embeddings = [None] * len(inputs)
+        for i, input in enumerate(unique_inputs):
+            for j in input_to_indices[input]:
+                embeddings[j] = unique_embeddings[i]
+        assert all(embedding is not None for embedding in embeddings)
         return np.array(embeddings)
-    
