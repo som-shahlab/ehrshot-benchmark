@@ -260,7 +260,7 @@ class LLMFeaturizer():
         ontology_name = code.split('/')[0].strip()
             
         # Ignore excluded ontologies
-        # Manually include some special LOINC events
+        # Manually include aggregated events for LOINC
         if ontology_name in self.excluded_ontologies and code not in AGGREGATED_EVENTS_CODES_LOINC:
             return None
                 
