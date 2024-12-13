@@ -18,7 +18,7 @@ import itertools
 import multiprocessing
 from femr.labelers import Label
 from femr.extension import datasets as extension_datasets
-from serialization.ehr_serializer import SerializationStrategy
+from serialization.ehr_serializer import SerializationStrategy, AGGREGATED_EVENTS_CODES_LOINC
 
 PatientDatabase = extension_datasets.PatientDatabase
 Ontology = extension_datasets.Ontology
@@ -60,12 +60,45 @@ def _run_llm_preprocess_featurizer(task):
         featurizer.preprocess(database_path, patient_id, patients_to_labels[patient_id])
     return featurizer
 
+def _get_cache_folder_and_fingerprint(
+    llm_featurizer: LLMFeaturizer,
+    patients_to_labels: Dict[int, List[Tuple[datetime, str]]]
+) -> Tuple[str, str]:
+    
+    # For cache folder name combine: serialization_strategy, task_to_instructions not {}, excluded_ontologies, add_condition_parent_concepts
+    cache_folder_name = [
+        len(patients_to_labels),
+        sum([len(labels) for labels in patients_to_labels.values()]),
+        llm_featurizer.serialization_strategy,
+        'instr-' + str(llm_featurizer.task_to_instructions != {}),
+        'eo-' + '-'.join(llm_featurizer.excluded_ontologies),
+        'apc-' + str(llm_featurizer.add_condition_parent_concepts)
+    ]
+    cache_folder_name = '_'.join(cache_folder_name)
+    # Create caching fingerprint with hash over patients_to_labels
+    cache_fingerprint = str(hash(tuple(patients_to_labels.items())))
+    return (cache_folder_name, cache_fingerprint)
+
 def preprocess_llm_featurizer(
     database_path: str,
     llm_featurizer: LLMFeaturizer,
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]],
     num_threads: int = 1,
 ):
+    # # Check if cached serialization for this setting exists
+    # cache_dir = f"{database_path}/cache"
+    # cache_folder_name, cache_fingerprint = _get_cache_folder_and_fingerprint(llm_featurizer, patients_to_labels)
+    # cache_path = f"{cache_dir}/{cache_folder_name}"
+    
+    # # Check if cache folder exists and contains correct fingerprint.txt
+    # if os.path.exists(cache_path):
+    #     with open(f"{cache_path}/fingerprint.txt", "r") as f:
+    #         cached_fingerprint = f.read()
+    #     if cached_fingerprint == cache_fingerprint:
+    #         # Load embeddings from cache
+    #         llm_featurizer.embeddings = np.load(f"{cache_path}/{cache_folder_name}.npy")
+    #         return llm_featurizer
+    
     # Split patients across multiple threads
     patient_ids: List[int] = list(patients_to_labels.keys())
     patient_ids_per_thread: List[NDArray] = np.array_split(patient_ids, num_threads * 10)
@@ -171,13 +204,15 @@ class LLMFeaturizer():
         serialization_strategy: SerializationStrategy,
         task_to_instructions: Optional[Dict[str, str]] = {},
         excluded_ontologies: List[str] = [],
+        filter_aggregated_events: bool = False,
         add_condition_parent_concepts: Optional[bool] = False
     ):
         self.embedding_dim = embedding_size
         self.serialization_strategy = serialization_strategy
         self.task_to_instructions = task_to_instructions
+        self.excluded_ontologies = excluded_ontologies
+        self.filter_aggregated_events = filter_aggregated_events
         self.add_condition_parent_concepts = add_condition_parent_concepts
-        self.excluded_onotologies = excluded_ontologies
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -225,7 +260,8 @@ class LLMFeaturizer():
         ontology_name = code.split('/')[0].strip()
             
         # Ignore excluded ontologies
-        if ontology_name in self.excluded_onotologies:
+        # Manually include some special LOINC events
+        if ontology_name in self.excluded_ontologies and code not in AGGREGATED_EVENTS_CODES_LOINC:
             return None
                 
         # Handle special case age
@@ -255,6 +291,13 @@ class LLMFeaturizer():
 
         description = description.strip()
         return description
+    
+    def _create_conditions_parent_events(self, event: Event, parent_codes) -> List[Event]:
+        events = [event]
+        if event.omop_table == 'condition_occurrence':
+            for parent_code in parent_codes:
+                events.append(Event(event.start, parent_code, None))
+        return events
 
     def preprocess(
         self,
@@ -283,15 +326,8 @@ class LLMFeaturizer():
             
             if self.add_condition_parent_concepts:
                 # Add all direct parents of conditions (omop_table=condition_occurrence)
-
-                def create_conditions_parent_events(event, parent_codes) -> List[Event]:
-                    events = [event]
-                    if event.omop_table == 'condition_occurrence':
-                        for parent_code in parent_codes:
-                            events.append(Event(event.start, parent_code, None))
-                    return events
                 
-                events_until_label = [create_conditions_parent_events(event, ontology.get_parents(event.code)) for event in events_until_label]
+                events_until_label = [self._create_conditions_parent_events(event, ontology.get_parents(event.code)) for event in events_until_label]
                 events_until_label = list(itertools.chain(*events_until_label))
             
             # Manually change age event - according to featurizer.get_patient_birthdate always first event
@@ -303,7 +339,7 @@ class LLMFeaturizer():
                 events_until_label[0] = Event(birth_event.start, custom_age_code, birth_event.value)
             
             serializer = EHRSerializer()
-            serializer.load_from_femr_events(events_until_label, resolve_code, is_visit_event)
+            serializer.load_from_femr_events(events_until_label, resolve_code, is_visit_event, self.filter_aggregated_events)
             
             # text = serialize_unique_codes([event for event in patient.events if event.start <= label.time])
             text = serializer.serialize(self.serialization_strategy, label_time=label.time)
@@ -367,7 +403,8 @@ class LLMFeaturizer():
     
     def encode_serializations(
         self,
-        text_encoder: TextEncoder
+        text_encoder: TextEncoder,
+        cache_dir: str
     ) -> None:
         """ Encode all serializations into embeddings. Outside of featurizer functions to prevent CUDA issues. """
         assert self.embeddings is None, "Embeddings already exist"
@@ -381,15 +418,18 @@ class LLMFeaturizer():
             if isinstance(instruced_example, list):
                 # Use code from llm2vec
                 instruced_example = f"{instruced_example[0].strip()} !@#$%^&*(){instruced_example[1].strip()}"
+            # NOTE: Only print beginning of example
+            max_len = 2500
+            instruced_example = instruced_example[:max_len] + "..." if len(instruced_example) > max_len else instruced_example
             logging.warning(f"Example used for encoding:\n{instruced_example}")
 
         # Print single example for debugging purpose
-        print_example(0)
+        print_example(2)
         
         # Print character statistics
         print(f"Character statistics for serializations:\n{pd.Series([len(s) for s in serializations]).describe()}")
 
-        self.embeddings = text_encoder.encode_texts(instructions, serializations)
+        self.embeddings = text_encoder.encode_texts(instructions, serializations, cache_dir)
 
     def featurize(
         self,

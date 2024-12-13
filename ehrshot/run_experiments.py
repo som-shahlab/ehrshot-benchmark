@@ -33,6 +33,7 @@ def check_slurm_jobs_status(job_ids):
     return [] if not squeue_output else [status for status in squeue_output]
 
 def main(args):
+    # NOTE: Manually skip steps
     start_from_step = 1
     os.chdir(args.base_dir)
     
@@ -59,11 +60,31 @@ def main(args):
         --text_encoder {args.text_encoder} \
         --serialization_strategy {args.serialization_strategy} \
         --excluded_ontologies {args.excluded_ontologies} \
+        --unique_events {args.unique_events} \
+        --numeric_values {args.numeric_values} \
+        --num_aggregated {args.num_aggregated} \
         --add_parent_concepts {args.add_parent_concepts} \
         {tasks_to_instructions}
         """
         run_command(feature_command)
 
+    # Step 1.2: Optional - Also evaluate counts and climbr baselines
+    # TODO: Unclear if these patient representations remain the same for different patient subgroups (e.g., only new_*)
+    # For now just link to representation for all patients via symlinks
+    # feature_files = {
+    #     'count_features': '/home/sthe14/ehrshot-benchmark/EHRSHOT_ASSETS_old/features/count_features.pkl',
+    #     'clmbr_features': '/home/sthe14/ehrshot-benchmark/EHRSHOT_ASSETS_old/features/clmbr_features.pkl',
+    #     'agr_features': '/home/sthe14/ehrshot-benchmark/EHRSHOT_ASSETS_old/features/agr_features.pkl',
+    # }
+    # for feature_name, feature_file in feature_files.items():
+    #     feature_symlink = os.path.join(args.experiment_folder, f'{feature_name}.pkl')
+    #     if not os.path.exists(feature_symlink):
+    #         os.symlink(feature_file, feature_symlink)
+    # print(f"Linked {', '.join(list(feature_files.keys()))} features to {args.experiment_folder}")
+
+    # TODO: Not for all - takes too long on GPU node
+    # return
+            
     # Change into scripts directory
     os.chdir(f"{args.base_dir}/ehrshot/bash_scripts")
 
@@ -159,6 +180,9 @@ if __name__ == "__main__":
     parser.add_argument("--text_encoder", required=True, help="Text encoder to be used")
     parser.add_argument("--serialization_strategy", required=True, help="Serialization strategy to be used")
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
+    parser.add_argument("--unique_events", type=str, default="true", help="Whether to use unique events")
+    parser.add_argument("--numeric_values", type=str, default="false", help="Whether to use numeric values")
+    parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     

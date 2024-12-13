@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import List, Any
-from git import Optional
 from numpy.typing import NDArray
 import numpy as np
 import torch
@@ -14,6 +13,9 @@ from datasets import Dataset
 from tqdm import tqdm
 from typing import Tuple
 from collections import defaultdict
+import hashlib
+import os
+import pickle
     
         
 class TextsDataset(TorchDataset):
@@ -156,7 +158,8 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
         # peft_model_name_or_path = "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000"
         peft_model_name_or_path = "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised"
         if 'custom_path' in kwargs:
-            model_path = "/home/sthe14/llm2vec/output"
+            # TODO: Added reproducibility path
+            model_path = "/home/sthe14/llm2vec-repro/output"
             peft_model_name_or_path = model_path + kwargs['custom_path']
         # Changed this to updated loading instructions from https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised
         self.model = LLM2Vec.from_pretrained(
@@ -331,8 +334,36 @@ class LongformerLargeEncoder(BERTLLMEncoder):
 class TextEncoder:
     def __init__(self, encoder: LLMEncoder):
         self.encoder = encoder
+        
+    def _store_or_check_fingerprint(self, inputs: List, cache_dir: str) -> None:
+        fingerprint_file = os.path.join(cache_dir, "cache_fingerprint.txt")
+        
+        # Generate fingerprint
+        hasher = hashlib.sha256()
+        for input in inputs:
+            hasher.update((str(input)).encode('utf-8'))
+        fingerprint = str(len(inputs)) + '-' + hasher.hexdigest()
+        
+        # Check for existing fingerprint
+        if os.path.exists(fingerprint_file):
+            with open(fingerprint_file, "r") as f:
+                existing_fingerprint = f.read().strip()
+            if existing_fingerprint != fingerprint:
+                raise ValueError("Cache fingerprint does not match. Data inconsistency detected.")
+        else:
+            with open(fingerprint_file, "w") as f:
+                f.write(fingerprint)
 
-    def encode_texts(self, instructions: List[str], texts: List[str], cache_dir: Optional[str]) -> NDArray[Any]:
+    def _get_cache_files(self, cache_dir: str) -> List[str]:
+        file_names = os.listdir(cache_dir)
+        return [f for f in file_names if f.startswith('cache_') and f.endswith('.pkl')]
+    
+    def _delete_all_cache_files(self, cache_dir: str) -> None:
+        cache_files = self._get_cache_files(cache_dir)
+        for cache_file in cache_files:
+            os.remove(os.path.join(cache_dir, cache_file))
+    
+    def encode_texts(self, instructions: List[str], texts: List[str], cache_dir: str) -> NDArray[Any]:
         if all([instruction is None or len(instruction) == 0 for instruction in instructions]):
             inputs = texts
         else:
@@ -353,8 +384,45 @@ class TextEncoder:
             
         # Deduplicate inputs while preserving the first occurrence and encode them
         unique_inputs = list(input_to_indices.keys())
-        unique_embeddings = self.encoder._encode(unique_inputs)
-        unique_embeddings = unique_embeddings.tolist()
+        batch_size = 65536  # 65536
+        current_index = 0
+        
+        # Store or check fingerprint
+        self._store_or_check_fingerprint(unique_inputs, cache_dir)
+        
+        # Load cached intermediate results of format cache_{start_index}.pkl
+        cache_files = self._get_cache_files(cache_dir)
+        if len(cache_files) > 0:
+            max_start_indices = max([int(f.split('_')[1].split('.')[0]) for f in cache_files])
+            current_index = max_start_indices
+            cache_file = os.path.join(cache_dir, f"cache_{max_start_indices}.pkl")
+            with open(cache_file, "rb") as f:
+                unique_embeddings = pickle.load(f)
+                if isinstance(unique_embeddings, np.ndarray):
+                    unique_embeddings = unique_embeddings.tolist()
+            print(f"Loaded {len(unique_embeddings)} cached embeddings.")
+        else:
+            unique_embeddings = []
+            print("No cache files found.")
+            
+        # Create embeddings
+        for start in range(current_index, len(unique_inputs), batch_size):
+            print(f"Processing batch {start // batch_size + 1} of {len(unique_inputs) // batch_size + 1}")
+            batch = unique_inputs[start:start + batch_size]
+            batch_embeddings = self.encoder._encode(batch)
+            unique_embeddings.extend(batch_embeddings.tolist())
+            
+            # Delete all old cache files
+            self._delete_all_cache_files(cache_dir)
+                
+            # Save intermediate results
+            cache_file = os.path.join(cache_dir, f"cache_{len(unique_embeddings)}.pkl")
+            with open(cache_file, "wb") as f:
+                pickle.dump(unique_embeddings, f)
+            print(f"Saved {len(unique_embeddings)} embeddings to {cache_file}")
+               
+        # Delete all old cache files
+        self._delete_all_cache_files(cache_dir)
         
         # Create empty list of size inputs
         embeddings = [None] * len(inputs)

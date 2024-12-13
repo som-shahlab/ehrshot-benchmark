@@ -1,8 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=ehrshot
 #SBATCH --output=logs/ehrshot_%A.log
-#SBATCH --time=0-20:00:00
+#SBATCH --time=4-00:00:00
 #SBATCH --cpus-per-task=20
+#SBATCH --qos=long_job 
+
+# DGX resources: 
+# --partition=pgpu
+# --gres=gpu:nvidia_a100-sxm4-80gb:8
+# --mem=800G
 
 # PGPU resources: 
 # --partition=pgpu
@@ -10,9 +16,9 @@
 # --mem=400G
 
 # GPU resources: 
-# --partition=gpu
-# --gres=gpu:nvidia_a100_80gb_pcie:1
-# --mem=40G
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:nvidia_a100_80gb_pcie:1
+#SBATCH --mem=80G
 
 # CPU
 # --partition=compute
@@ -25,7 +31,7 @@ if [ -z "${11}" ]
 then
     instructions_file_arg=""
 else
-    instructions_file_arg="--task_to_instructions ${11}"
+    instructions_file_arg="--task_to_instructions ${14}"
 fi
 
 # TODO: For multi-gpu setup
@@ -40,5 +46,8 @@ python /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --text_encoder $7 \
     --serialization_strategy $8 \
     --excluded_ontologies $9 \
-    --add_parent_concepts $10 \
+    --unique_events ${10} \
+    --numeric_values ${11} \
+    --num_aggregated ${12} \
+    --add_parent_concepts ${13} \
     $instructions_file_arg

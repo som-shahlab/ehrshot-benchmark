@@ -12,6 +12,225 @@ EHR_HEADING = "\n\n# Electronic Healthcare Record\n\n"
 STATIC_EVENTS_HEADING = "## General Events\n\n"
 VISITS_EVENTS_HEADING = "## Medical History\n\n"
 
+AGGREGATED_SUB_EVENTS = {
+    'Body Metrics': {
+        'heading': "## Recent Body Metrics\n",
+        'events': ['Body weight', 'Body height', 'Body mass index / BMI', 'Body surface area']
+    },
+    'Vital Signs': {
+        'heading': "## Recent Vital Signs\n",
+        'events': ['Heart rate', 'Respiratory rate', 'Systolic blood pressure', 'Diastolic blood pressure', 'Body temperature', 'Oxygen saturation']
+    },
+    'Lab Results': {
+        'heading': "## Recent Lab Results\n",
+        'events': ['Hemoglobin', 'Hematocrit', 'Erythrocytes', 'Leukocytes', 'Platelets', 'Sodium', 'Potassium', 'Chloride', 'Carbon dioxide, total', 'Calcium', 'Glucose', 'Urea nitrogen', 'Creatinine', 'Anion gap']
+    }
+}
+
+def format_int(x):
+    return f"{int(x)}"
+
+def format_one_decimal(x):
+    return f"{x:.1f}"
+
+def format_two_decimals(x):
+    return f"{x:.2f}"
+
+AGGREGATED_EVENTS = {
+    'Heart rate': {
+        'codes': ['LOINC/8867-4', 'SNOMED/364075005', 'SNOMED/78564009'],
+        'min_max': [5, 300],
+        'normal_range': [60, 100],
+        'unit': 'bpm',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Systolic blood pressure': {
+        'codes': ['LOINC/8480-6', 'SNOMED/271649006'],
+        'min_max': [20, 300],
+        'normal_range': [90, 140], # European Society of Cardiology
+        'unit': 'mmHg',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Diastolic blood pressure': {
+        'codes': ['LOINC/8462-4', 'SNOMED/271650006'],
+        'min_max': [20, 300],
+        'normal_range': [60, 90],  # European Society of Cardiology
+        'unit': 'mmHg',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Body temperature': {
+        'codes': ['LOINC/8310-5'], 
+        'min_max': [80, 120],
+        'normal_range': [95, 100,4],  # 35 - 38 °C
+        'unit': '°F',
+        'format': format_one_decimal
+    },
+    'Respiratory rate': {
+        'codes': ['LOINC/9279-1'],
+        'min_max': [1, 100],
+        'normal_range': [12, 18],
+        'unit': 'breaths/min',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Oxygen saturation': {
+        'codes': ['LOINC/LP21258-6'],
+        'min_max': [1, 100],
+        'normal_range': [95, 100],
+        'unit': '%',
+        'format': lambda x: f"{int(x)}"
+    },
+    
+    'Body weight': {
+        'codes': ['LOINC/29463-7'],
+        'min_max': [350, 10000],
+        'unit': 'oz',
+        'format': format_one_decimal
+    },
+    'Body height': {
+        'codes': ['LOINC/8302-2'],
+        'min_max': [5, 100],
+        'unit': 'inch',
+        'format': format_one_decimal
+    },
+    'Body mass index / BMI': {
+        'codes': ['LOINC/39156-5'],
+        'min_max': [10, 100],
+        'normal_range': [18.5, 24.9],
+        'unit': 'kg/m2',
+        'format': format_one_decimal
+    },
+    'Body surface area': {
+        'codes': ['LOINC/8277-6', 'SNOMED/301898006'],
+        'min_max': [0.1, 10],
+        'unit': 'm2',
+        'format': format_two_decimals
+    },
+
+    # Normal values: https://annualmeeting.acponline.org/sites/default/files/shared/documents/for-meeting-attendees/normal-lab-values.pdf
+    'Hemoglobin': {
+        'codes': ['LOINC/718-7', 'SNOMED/271026005', 'SNOMED/441689006'],
+        'min_max': [1, 20],
+        'normal_range': [12, 17], # combining female and male
+        'unit': 'g/dL',
+        'format': format_one_decimal
+    },
+    'Hematocrit': {
+        'codes': ['LOINC/4544-3', 'LOINC/20570-8', 'LOINC/48703-3', 'SNOMED/28317006'],
+        'min_max': [10, 100],
+        'normal_range': [36, 51], # combining female and male
+        'unit': '%',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Erythrocytes': {
+        'codes': ['LOINC/789-8', 'LOINC/26453-1'],
+        'min_max': [1, 10],
+        'normal_range': [4.2, 5.9],
+        'unit': '10^6/uL',
+        'format': format_two_decimals
+    },
+    'Leukocytes': {
+        'codes': ['LOINC/20584-9', 'LOINC/6690-2'],
+        'min_max': [1, 100],
+        'normal_range': [4, 10],
+        'unit': '10^3/uL',
+        'format': format_one_decimal
+    },
+    'Platelets': {
+        'codes': ['LOINC/777-3', 'SNOMED/61928009'],
+        'min_max': [10, 1000],
+        'normal_range': [150, 350],
+        'unit': '10^3/uL',
+        'format': lambda x: f"{int(x)}"
+    },
+    
+    'Sodium': {
+        'codes': ['LOINC/2951-2', 'LOINC/2947-0', 'SNOMED/25197003'],
+        'min_max': [100, 200],
+        'normal_range': [136, 145],
+        'unit': 'mmol/L',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Potassium': {
+        'codes': ['LOINC/2823-3', 'SNOMED/312468003', 'LOINC/6298-4', 'SNOMED/59573005'],
+        'min_max': [0.1, 10],
+        'normal_range': [3.5, 5.0],
+        'unit': 'mmol/L',
+        'format': format_one_decimal
+    },
+    'Chloride': {
+        'codes': ['LOINC/2075-0', 'SNOMED/104589004', 'LOINC/2069-3'],
+        'min_max': [50, 200],
+        'normal_range': [98, 106],
+        'unit': 'mmol/L',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Carbon dioxide, total': {
+        'codes': ['LOINC/2028-9'],
+        'min_max': [10, 100],
+        'normal_range': [23, 28],
+        'unit': 'mmol/L',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Calcium': {
+        'codes': ['LOINC/17861-6', 'SNOMED/271240001'],
+        'min_max': [1, 20],
+        'normal_range': [9, 10.5],
+        'unit': 'mg/dL',
+        'format': format_one_decimal
+    },
+    'Glucose': {
+        'codes': ['LOINC/2345-7', 'SNOMED/166900001', 'LOINC/2339-0', 'SNOMED/33747003', 'LOINC/14749-6'],
+        'min_max': [10, 1000],
+        'normal_range': [70, 100],
+        'unit': 'mg/dL',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Urea nitrogen': {
+        'codes': ['LOINC/3094-0', 'SNOMED/105011006'],
+        'min_max': [1, 200],
+        'normal_range': [8, 20],
+        'unit': 'mg/dL',
+        'format': lambda x: f"{int(x)}"
+    },
+    'Creatinine': {
+        'codes': ['LOINC/2160-0', 'SNOMED/113075003'],
+        'min_max': [0.1, 10],
+        'normal_range': [0.7, 1.3],
+        'unit': 'mg/dL',
+        'format': format_one_decimal
+    },
+    'Anion gap': {
+        'codes': ['LOINC/33037-3', 'LOINC/41276-7', 'SNOMED/25469001'],
+        'min_max': [-20, 50],
+        'normal_range': [3, 11], # Wikipedia
+        'unit': 'mmol/L',
+        'format': lambda x: f"{int(x)}"
+    }
+}
+# Codes to aggregated events
+CODES_TO_AGGREGATED_EVENTS = {code: event for event, codes in AGGREGATED_EVENTS.items() for code in codes['codes']}
+# List of all aggregated codes
+AGGREGATED_EVENTS_CODES = [code for special_event in AGGREGATED_EVENTS.values() for code in special_event['codes']]
+AGGREGATED_EVENTS_CODES_LOINC = [code for special_event in AGGREGATED_EVENTS.values() for code in special_event['codes'] if 'LOINC' in code]
+
+def get_special_events_most_recent(events: List[Event]) -> Dict[str, List[Event]]:
+    
+    result_events = defaultdict(list)
+
+    for event in events:
+        # Some values are contain 'Invalid'
+        if event.value is not None and not isinstance(event.value, str):
+            aggregated_event = CODES_TO_AGGREGATED_EVENTS.get(event.code, None)
+            assert aggregated_event is not None, f"Event code {event.code} not found in aggregated events"
+            if event.value >= AGGREGATED_EVENTS[aggregated_event]['min_max'][0] and event.value <= AGGREGATED_EVENTS[aggregated_event]['min_max'][1]:
+                result_events[aggregated_event].append(event)
+   
+    # Sort all events by start time - newest first
+    for SPECIAL_EVENT in result_events:
+        result_events[SPECIAL_EVENT] = sorted(result_events[SPECIAL_EVENT], key=lambda x: x.start, reverse=True)         
+    
+    return result_events
+
 def datetime_to_markdown(dt):
     display_date = dt.strftime("%Y-%m-%d %H:%M")
     iso_date = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -80,11 +299,13 @@ class SerializationStrategy(ABC):
     def serialize_event_list(self, events: List[Event], numeric_values=False, unique_events=False) -> str:
         """ Create markdown list of events with values """
         if unique_events:
+            # Must be treated different to aggregate numeric values
             return self.serialize_unique_event_list(events, numeric_values)
         else:
             return '\n'.join([self.serialize_event(event, numeric_values) for event in events])
 
     def serialize_unique_event_list(self, events: List[Event], numeric_values=False) -> str:
+        # This function is more complex than just using the unique events, because it also aggregates numeric values
         event_dict = defaultdict(lambda: {'values': [], 'unit': None})
         for event in events:
             event_dict[event.description]['values'].append(event.value)  # type: ignore
@@ -118,36 +339,97 @@ class SerializationStrategy(ABC):
 
         return '\n\n'.join(visit_texts)
     
-class ListUniqueEventsWoNumericValuesStrategy(SerializationStrategy):
+    def _serialize_aggregated_events_list_value(self, type, event, include_date):
+        if event.value is None:
+            return ''
+        
+        formatted_value = AGGREGATED_EVENTS[type]['format'](event.value)
+        result = f"{formatted_value}"
+        
+        # Check if has normal range
+        if 'normal_range' in AGGREGATED_EVENTS[type]:
+                
+            rating = "normal"
+            if event.value < AGGREGATED_EVENTS[type]['normal_range'][0]:
+                rating = "low"
+            elif event.value > AGGREGATED_EVENTS[type]['normal_range'][1]:
+                rating = "high"
+            result += f" ({rating})"
+            
+        if include_date:
+            result += f" - {datetime_to_markdown(event.start)}"
+            
+        return result
+
+    def serialize_aggregated_events_list(self, aggregated_events, num_values, include_date=False):
+        serialization = []
+        aggregated_events_recent = get_special_events_most_recent(aggregated_events)
+        
+        for sub_list in ['Body Metrics', 'Vital Signs', 'Lab Results']:
+            serialization.append(AGGREGATED_SUB_EVENTS[sub_list]['heading'])
+            event_types = AGGREGATED_SUB_EVENTS[sub_list]['events']
+            for event_type in event_types:
+                if event_type in aggregated_events_recent:
+                    if len(aggregated_events_recent[event_type]) >= num_values:
+                        num_values_aggregated_events = aggregated_events_recent[event_type][:num_values]
+                    else:
+                        num_values_aggregated_events = aggregated_events_recent[event_type]
+                    num_values_aggregated_events = [event for event in num_values_aggregated_events if event.value is not None]
+                    serialization.append(f"- {event_type} ({AGGREGATED_EVENTS[event_type]['unit']}): " +\
+                        ', '.join([self._serialize_aggregated_events_list_value(event_type, event, include_date) for event in num_values_aggregated_events]))
+                else:
+                    serialization.append(f"- {event_type}: No recent data")
+            serialization.append("")
+            
+        return '\n'.join(serialization) + "\n"
+                
+class ListEventsStrategy(SerializationStrategy):
+    def __init__(self, unique_events: bool, numeric_values: bool, num_aggregated_events: int):
+        self.unique_events = unique_events
+        self.numeric_values = numeric_values
+        self.num_aggregated_events = num_aggregated_events
+        # TODO: Check events removed from ehr_serializer
+        # TODO: Check most recent values used
+    
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        aggr_events_serialization = ""
+        if self.num_aggregated_events > 0:
+            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+            
         events = ehr_serializer.static_events + [event for visit in ehr_serializer.visits for event in visit.events]
         events = sorted(events, key=lambda x: x.start)
         unique_events = self.get_unique_events(events)
-        return EHR_HEADING + STATIC_EVENTS_HEADING + self.serialize_event_list(unique_events, numeric_values=False)
-    
-class ListVisitsWithUniqueEventsWoNumericValuesStrategy(SerializationStrategy):   
-    def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=False)
-        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=False, unique_events=True)
-        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
+        return EHR_HEADING + aggr_events_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(unique_events, numeric_values=self.numeric_values, unique_events=self.unique_events)
 
-class ListVisitsWithUniqueEventsStrategy(SerializationStrategy):
-    def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=True)
-        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=True, unique_events=True)
-        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
+class DemographicsWithAggregatedEventsStrategy(SerializationStrategy):
+    def __init__(self, num_aggregated_events: int, use_dates: bool):
+        self.num_aggregated_events = num_aggregated_events
+        self.use_dates = use_dates
 
-class ListVisitsWithEventsWoNumericValuesStrategy(SerializationStrategy):   
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events, numeric_values=False, unique_events=False)
-        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=False, unique_events=False)
-        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
-
+        aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events, include_date=self.use_dates)
+        # Add the first three static events (age, race, gender)
+        return EHR_HEADING + aggr_events_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events[:3], numeric_values=False, unique_events=False)
+  
 class ListVisitsWithEventsStrategy(SerializationStrategy):
+    def __init__(self, unique_events: bool, numeric_values: bool, num_aggregated_events: int):
+        self.unique_events = unique_events
+        self.numeric_values = numeric_values
+        self.num_aggregated_events = num_aggregated_events
+        # TODO: Check events removed from ehr_serializer
+        # TODO: Check most recent values used 
+
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        static_text = STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events, numeric_values=True, unique_events=False)
-        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=True, unique_events=False)
-        return EHR_HEADING + self.get_time_text() + f"{static_text}\n\n{visits_text}"
+        aggr_events_serialization = ""
+        if self.num_aggregated_events > 0:
+            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+            
+        if self.unique_events:
+            static_text = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values)
+        else:
+            static_text = STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values, unique_events=False)
+        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=self.numeric_values, unique_events=self.unique_events) 
+        return EHR_HEADING + self.get_time_text() + aggr_events_serialization + f"{static_text}\n\n{visits_text}"
 
 class EHRVisit:
     def __init__(
@@ -205,8 +487,20 @@ class EHRSerializer:
     def __init__(self):
         self.visits: List[EHRVisit] = []
         self.static_events: List[EHREvent] = []
+        self.aggregated_events: List[Event] = []
         
-    def load_from_femr_events(self, events: List[Event], resolve_code: Callable[[str], Optional[str]], is_visit_event: Callable[[Event], bool]) -> None:
+    def load_from_femr_events(self, events: List[Event], resolve_code: Callable[[str], Optional[str]], is_visit_event: Callable[[Event], bool], filter_aggregated_events) -> None:
+        
+        # Filter aggregated events that are treated separately
+        # Do so when num_aggregated_events > 0, i.e. they should be displayed
+        if filter_aggregated_events:
+            non_aggregated_events = []
+            for event in events:
+                if event.code not in AGGREGATED_EVENTS_CODES:
+                    non_aggregated_events.append(event)
+                else:
+                    self.aggregated_events.append(event)
+            events = non_aggregated_events
 
         # First process all visits
         visit_ids_to_visits: Dict[int, EHRVisit] = {}

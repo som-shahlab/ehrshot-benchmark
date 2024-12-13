@@ -20,8 +20,8 @@ if __name__ == "__main__":
         # ('count', 'gbm'),
         # ('count', 'rf'),
         # Debug: Only count, agr, and llm models
-        ('count', 'lr_lbfgs'),
-        ('agr', 'lr_lbfgs'),
+        # ('count', 'lr_lbfgs'),
+        # ('agr', 'lr_lbfgs'),
         ('llm', 'lr_lbfgs'),
     ]
 
@@ -38,8 +38,20 @@ if __name__ == "__main__":
     score_map = collections.defaultdict(dict)
     
     LABELING_FUNCTIONS: List[str] = [ x for x in os.listdir(path_to_results_dir) if os.path.isdir(os.path.join(path_to_results_dir, x)) ]
-    # Debug: Remove lab and chexpert tasks
-    LABELING_FUNCTIONS = [ x for x in LABELING_FUNCTIONS if not x.startswith('lab') and not x.startswith('chexpert') ]
+    
+    # NOTE: Added selection of tasks that actually finished
+    # Choose folder that contain all_results.csv
+    LABELING_FUNCTIONS = [ x for x in LABELING_FUNCTIONS if os.path.exists(os.path.join(path_to_results_dir, x, 'all_results.csv')) ]
+    
+    # Ensure groups are complete or not existent
+    def ensure_num_tasks(task: str, num_tasks: int):
+        num_tasks_found = len([ x for x in LABELING_FUNCTIONS if x.startswith(task) ])
+        assert num_tasks_found == num_tasks or num_tasks_found == 0, f"Expected {num_tasks} tasks for {task}, found {num_tasks_found}"
+    ensure_num_tasks('new_', 6)
+    ensure_num_tasks('guo_', 3)
+    ensure_num_tasks('lab_', 5)
+    ensure_num_tasks('chexpert', 1)
+    
     SUBTASKS = []
 
     print("Labeling functions:", LABELING_FUNCTIONS)

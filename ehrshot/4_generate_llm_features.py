@@ -6,7 +6,7 @@ from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
-from serialization.ehr_serializer import ListUniqueEventsWoNumericValuesStrategy, ListVisitsWithEventsWoNumericValuesStrategy, ListVisitsWithEventsStrategy, ListVisitsWithUniqueEventsStrategy, ListVisitsWithUniqueEventsWoNumericValuesStrategy
+from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, DemographicsWithAggregatedEventsStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
@@ -17,12 +17,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
-    parser.add_argument( "--task_to_instructions", type=str, default="", help="Path to task to instructions file")
+    parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     parser.add_argument("--num_threads", type=int, help="Number of threads to use")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     parser.add_argument("--text_encoder", type=str, help="Text encoder to use")
     parser.add_argument("--serialization_strategy", required=True, type=str, help="Serialization strategy to use")
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
+    parser.add_argument("--unique_events", type=str, default="true", help="Whether to use unique events")
+    parser.add_argument("--numeric_values", type=str, default="false", help="Whether to use numeric values")
+    parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     return parser.parse_args()
     
@@ -37,37 +40,34 @@ if __name__ == "__main__":
     PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
     EXCLUDED_ONTOLOGIES: List[str] = ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3'] if args.excluded_ontologies == 'no_labs' else \
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else []
+    UNIQUE_EVENTS: bool = args.unique_events == 'true'
+    NUMERIC_VALUES: bool = args.numeric_values == 'true'
+    NUM_AGGREGATED_EVENTS: int = args.num_aggregated  # Default: 0
+    FILTER_AGGREGATED_EVENTS: bool = NUM_AGGREGATED_EVENTS > 0
     ADD_CONDITIONS_PARENT_CONCEPTS: bool = args.add_parent_concepts == 'conditions'
         
-    # Serialization strategy
-    # TODO Debug: Use specific serialization strategy
-    # args.serialization_strategy = 'list_visits_with_events'
-    if args.serialization_strategy == 'list_unique_events_wo_numeric_values':
-        serialization_strategy = ListUniqueEventsWoNumericValuesStrategy()
-        max_input_length = 8192
-    elif args.serialization_strategy == 'list_visits_with_events_wo_numeric_values':
-        serialization_strategy = ListVisitsWithEventsWoNumericValuesStrategy()
-        # max_input_length = 32000
+    # Serialization strategies
+    if args.serialization_strategy == 'list_events':
+        serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events':
-        serialization_strategy = ListVisitsWithEventsStrategy()
+        serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, NUM_AGGREGATED_EVENTS)
         # max_input_length = 32000
         max_input_length = 8192
-    elif args.serialization_strategy == 'list_visits_with_unique_events_wo_numeric_values':
-        serialization_strategy = ListVisitsWithUniqueEventsWoNumericValuesStrategy()
+    elif args.serialization_strategy == 'demographics_with_aggregated_events':
+        serialization_strategy = DemographicsWithAggregatedEventsStrategy(NUM_AGGREGATED_EVENTS, use_dates=False)
         # max_input_length = 32000
-        max_input_length = 8192
-    elif args.serialization_strategy == 'list_visits_with_unique_events':
-        serialization_strategy = ListVisitsWithUniqueEventsStrategy()
-        # max_input_length = 32000
-        max_input_length = 8192
+        max_input_length = 512
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
-    logger.info(f"Use serialization strategy: {serialization_strategy.__class__} with max length: {max_input_length}")
-    logger.info(f"Exlude ontologies: {EXCLUDED_ONTOLOGIES}")
+    logger.info(f"Use serialization strategy: {serialization_strategy.__class__}")
+    logger.info(f"    Unique events: {UNIQUE_EVENTS}")
+    logger.info(f"    Numeric values: {NUMERIC_VALUES}")
+    logger.info(f"    Num aggregated events: {NUM_AGGREGATED_EVENTS}")
+    logger.info(f"    Max input length: {max_input_length}")
+    logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")
     
     # LLM text encoder
-    # TODO Debug: Use specific text encoder
     # args.text_encoder = 'bioclinicalbert-fl'
     if args.text_encoder == 'llm2vec_llama3_7b_instruct_supervised':
         text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
@@ -120,19 +120,26 @@ if __name__ == "__main__":
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]] = load_labeled_patients_with_tasks(PATH_TO_LABELS_FILE)
     # TODO Debug: Consider subset of patients
-    # patients_to_labels = {k: v for k, v in list(patients_to_labels.items())[:20]}
+    # patients_to_labels = {k: v for k, v in list(patients_to_labels.items())[:10]}
     logger.info(f"Loaded {len(patients_to_labels)} patients with {sum([len(v) for v in patients_to_labels.values()])} labels")
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
     # they've had in their record up to the prediction timepoint for each label
     logger.info("Start | Preprocess featurizers")
-    llm_featurizer = LLMFeaturizer(text_encoder.encoder.embedding_size, serialization_strategy, task_to_instructions, EXCLUDED_ONTOLOGIES, ADD_CONDITIONS_PARENT_CONCEPTS) 
+    llm_featurizer = LLMFeaturizer(
+        embedding_size=text_encoder.encoder.embedding_size,
+        serialization_strategy=serialization_strategy,
+        task_to_instructions=task_to_instructions,
+        excluded_ontologies=EXCLUDED_ONTOLOGIES,
+        filter_aggregated_events=FILTER_AGGREGATED_EVENTS,
+        add_condition_parent_concepts=ADD_CONDITIONS_PARENT_CONCEPTS
+    ) 
     llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, llm_featurizer, patients_to_labels, NUM_THREADS)
 
     logger.info("Finish | Preprocess featurizers")
     
     # Run text encoding on serializations of patients - must be done separately to prevent multiprocessing issue with CUDA
-    llm_featurizer.encode_serializations(text_encoder)
+    llm_featurizer.encode_serializations(text_encoder, cache_dir=PATH_TO_FEATURES_DIR)
     # Encoder not necessary anymore
     del text_encoder
 
