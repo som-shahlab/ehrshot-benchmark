@@ -52,7 +52,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--path_to_database", "~/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract",
-                "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark",
+                "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_subsets/new_guo",  // Only two tasks
                 "--path_to_features_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/features",
                 "--num_threads", "1",
                 "--is_force_refresh",
@@ -66,6 +66,7 @@
                 "--excluded_ontologies", "no_labs",
                 "--unique_events", "true",
                 "--numeric_values", "false",
+                "--medication_entry", "false",
                 "--num_aggregated", "3",
                 "--add_parent_concepts", "none"
             ],
@@ -101,6 +102,22 @@
             "args": [
                 "--path_to_results_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/results"
             ], 
+        },
+
+        { 
+            "name": "Python Debugger: join_results.py",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/join_results.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--first_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS_old/results_complete_ll3_unique_codes",
+                "--first_source_filter", "count,gbm;clmbr,lr_lbfgs",
+                "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_demo_and_aggr/llm2vec_llama3_1_7b_instruct_supervised_list_visits_with_events_no_labs_true_false_1_full",
+                "--second_source_filter", "llm,lr_lbfgs",
+                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_demo_and_aggr/llm2vec_llama3_1_7b_instruct_supervised_list_visits_with_events_no_labs_true_false_1_full_with_baselines"
+            ]
         }
     ]
 }
