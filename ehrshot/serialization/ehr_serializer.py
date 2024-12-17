@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Union, Dict, Callable
+from typing import List, Optional, Union, Dict, Callable, Tuple
 from abc import ABC, abstractmethod
 from femr import Event
 from collections import defaultdict
@@ -11,6 +11,7 @@ CONSTANT_LABEL_TIME = datetime(2024, 1, 1)
 EHR_HEADING = "\n\n# Electronic Healthcare Record\n\n"
 STATIC_EVENTS_HEADING = "## General Events\n\n"
 VISITS_EVENTS_HEADING = "## Medical History\n\n"
+MEDICATIONS_EVENTS_HEADING = "## Recent Medications\n\n"
 
 AGGREGATED_SUB_EVENTS = {
     'Body Metrics': {
@@ -212,6 +213,9 @@ CODES_TO_AGGREGATED_EVENTS = {code: event for event, codes in AGGREGATED_EVENTS.
 # List of all aggregated codes
 AGGREGATED_EVENTS_CODES = [code for special_event in AGGREGATED_EVENTS.values() for code in special_event['codes']]
 AGGREGATED_EVENTS_CODES_LOINC = [code for special_event in AGGREGATED_EVENTS.values() for code in special_event['codes'] if 'LOINC' in code]
+# For medication entries
+MEDICATION_ONTOLOGIES = ['RxNorm', 'RxNorm Extension']
+
 
 def get_special_events_most_recent(events: List[Event]) -> Dict[str, List[Event]]:
     
@@ -382,24 +386,35 @@ class SerializationStrategy(ABC):
             serialization.append("")
             
         return '\n'.join(serialization) + "\n"
+
+    def get_medication_last_visit(self, ehr_serializer, numeric_values):
+        if ehr_serializer.most_recent_visit_with_medications is None:
+            return MEDICATIONS_EVENTS_HEADING + 'No recent medications\n\n'
+        
+        visit, events = ehr_serializer.most_recent_visit_with_medications
+        visit_text = MEDICATIONS_EVENTS_HEADING + self.serialize_unique_event_list(events, numeric_values=numeric_values) + '\n\n'
+        return visit_text
                 
 class ListEventsStrategy(SerializationStrategy):
-    def __init__(self, unique_events: bool, numeric_values: bool, num_aggregated_events: int):
+    def __init__(self, unique_events: bool, numeric_values: bool, medication_entry: bool, num_aggregated_events: int):
         self.unique_events = unique_events
         self.numeric_values = numeric_values
+        self.medication_entry = medication_entry
         self.num_aggregated_events = num_aggregated_events
-        # TODO: Check events removed from ehr_serializer
-        # TODO: Check most recent values used
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         aggr_events_serialization = ""
         if self.num_aggregated_events > 0:
             aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
             
+        medication_entry_serialization = ""
+        if self.medication_entry:
+            medication_entry_serialization = self.get_medication_last_visit(ehr_serializer, numeric_values=self.numeric_values)
+            
         events = ehr_serializer.static_events + [event for visit in ehr_serializer.visits for event in visit.events]
         events = sorted(events, key=lambda x: x.start)
         unique_events = self.get_unique_events(events)
-        return EHR_HEADING + aggr_events_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(unique_events, numeric_values=self.numeric_values, unique_events=self.unique_events)
+        return EHR_HEADING + aggr_events_serialization + medication_entry_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(unique_events, numeric_values=self.numeric_values, unique_events=self.unique_events)
 
 class DemographicsWithAggregatedEventsStrategy(SerializationStrategy):
     def __init__(self, num_aggregated_events: int, use_dates: bool):
@@ -412,24 +427,27 @@ class DemographicsWithAggregatedEventsStrategy(SerializationStrategy):
         return EHR_HEADING + aggr_events_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events[:3], numeric_values=False, unique_events=False)
   
 class ListVisitsWithEventsStrategy(SerializationStrategy):
-    def __init__(self, unique_events: bool, numeric_values: bool, num_aggregated_events: int):
+    def __init__(self, unique_events: bool, numeric_values: bool, medication_entry: bool, num_aggregated_events: int):
         self.unique_events = unique_events
         self.numeric_values = numeric_values
+        self.medication_entry = medication_entry
         self.num_aggregated_events = num_aggregated_events
-        # TODO: Check events removed from ehr_serializer
-        # TODO: Check most recent values used 
 
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         aggr_events_serialization = ""
         if self.num_aggregated_events > 0:
             aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+       
+        medication_entry_serialization = ""
+        if self.medication_entry:
+            medication_entry_serialization = self.get_medication_last_visit(ehr_serializer, numeric_values=self.numeric_values)
             
         if self.unique_events:
             static_text = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values)
         else:
             static_text = STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values, unique_events=False)
         visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=self.numeric_values, unique_events=self.unique_events) 
-        return EHR_HEADING + self.get_time_text() + aggr_events_serialization + f"{static_text}\n\n{visits_text}"
+        return EHR_HEADING + self.get_time_text() + static_text + '\n\n' + aggr_events_serialization + medication_entry_serialization + visits_text
 
 class EHRVisit:
     def __init__(
@@ -475,8 +493,7 @@ class EHREvent:
         description: Optional[str] = "",
         value: Optional[Union[str, int, float]] = None,
         unit: Optional[str] = None,
-        serialization_rank: float = 0.0,
-    ):
+     ):
         self.start = start
         self.end = end
         self.description = description
@@ -488,8 +505,26 @@ class EHRSerializer:
         self.visits: List[EHRVisit] = []
         self.static_events: List[EHREvent] = []
         self.aggregated_events: List[Event] = []
+        self.most_recent_visit_with_medications: Optional[Tuple[EHRVisit, List[EHREvent]]] = None
+                
+    def _parse_visit(self, event_visit: Event, description: str) -> EHRVisit:
+        return EHRVisit(
+            visit_id=event_visit.visit_id,
+            start=event_visit.start,
+            end=event_visit.end if hasattr(event_visit, 'end') else None,
+            description=description
+        )
         
-    def load_from_femr_events(self, events: List[Event], resolve_code: Callable[[str], Optional[str]], is_visit_event: Callable[[Event], bool], filter_aggregated_events) -> None:
+    def _parse_event(self, event: Event, description: str) -> EHREvent:
+        return EHREvent(
+            start=event.start,
+            end=event.end if hasattr(event, 'end') else None,
+            description=description,
+            value=event.value if hasattr(event, 'value') else None,
+            unit=event.unit if hasattr(event, 'unit') else None
+        )
+                
+    def load_from_femr_events(self, events: List[Event], resolve_code, is_visit_event: Callable[[Event], bool], filter_aggregated_events) -> None:
         
         # Filter aggregated events that are treated separately
         # Do so when num_aggregated_events > 0, i.e. they should be displayed
@@ -501,32 +536,28 @@ class EHRSerializer:
                 else:
                     self.aggregated_events.append(event)
             events = non_aggregated_events
+              
+        # For medication entry keep track of visits with medications and visit starts
+        visit_start_times = []
+        visits_with_medications = set()
 
         # First process all visits
         visit_ids_to_visits: Dict[int, EHRVisit] = {}
         for event_visit in filter(is_visit_event, events):
             description = resolve_code(event_visit.code)
             if description is not None:
-                visit = EHRVisit(
-                    visit_id=event_visit.visit_id,
-                    start=event_visit.start,
-                    end=event_visit.end if hasattr(event_visit, 'end') else None,
-                    description=description
-                )
+                visit = self._parse_visit(event_visit, description)
                 visit_ids_to_visits[event_visit.visit_id] = visit
+                visit_start_times.append([event_visit.start, visit])
         
         # Then process all events
         for event in filter(lambda x: not is_visit_event(x), events):
             visit = visit_ids_to_visits.get(event.visit_id, None)
+            if event.code.startswith(tuple(MEDICATION_ONTOLOGIES)) and event.visit_id is not None:
+                visits_with_medications.add(event.visit_id)
             description = resolve_code(event.code)
             if description is not None:
-                event = EHREvent(
-                    start=event.start,
-                    end=event.end if hasattr(event, 'end') else None,
-                    description=description,
-                    value=event.value if hasattr(event, 'value') else None,
-                    unit=event.unit if hasattr(event, 'unit') else None
-                )
+                event = self._parse_event(event, description)
                 if visit is not None:
                     visit.add_event(event)
                 else:
@@ -534,6 +565,25 @@ class EHRSerializer:
                     
         self.visits = sorted(visit_ids_to_visits.values())
         
+        # Find earlierst visit with medication and store them
+        recent_medication_visit = None
+        visit_start_times.sort(key=lambda x: x[0], reverse=True)
+        for _, visit in visit_start_times:
+            if visit.visit_id in visits_with_medications:
+                recent_medication_visit = visit
+                break
+        
+        if recent_medication_visit is None:
+            self.most_recent_visit_with_medications = None
+        else:
+            visit_medication_events = [e for e in events if (not is_visit_event(e)) and (e.visit_id == recent_medication_visit.visit_id) and (e.code.startswith(tuple(MEDICATION_ONTOLOGIES)))]
+            visit_medication_ehr_events = []
+            for event in visit_medication_events:
+                description = resolve_code(event.code, included_ontologies=MEDICATION_ONTOLOGIES)
+                if description is not None:
+                    visit_medication_ehr_events.append(self._parse_event(event, description))
+            self.most_recent_visit_with_medications = (recent_medication_visit, visit_medication_ehr_events)
+            
     def set_serialization_strategy(self, serialization_strategy: SerializationStrategy):
         self._serialization_strategy = serialization_strategy
 

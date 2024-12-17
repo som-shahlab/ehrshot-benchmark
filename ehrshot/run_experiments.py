@@ -62,6 +62,7 @@ def main(args):
         --excluded_ontologies {args.excluded_ontologies} \
         --unique_events {args.unique_events} \
         --numeric_values {args.numeric_values} \
+        --medication_entry {args.medication_entry} \
         --num_aggregated {args.num_aggregated} \
         --add_parent_concepts {args.add_parent_concepts} \
         {tasks_to_instructions}
@@ -182,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--unique_events", type=str, default="true", help="Whether to use unique events")
     parser.add_argument("--numeric_values", type=str, default="false", help="Whether to use numeric values")
+    parser.add_argument("--medication_entry", type=str, default="false", help="Whether to use a designated medication entry")
     parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")

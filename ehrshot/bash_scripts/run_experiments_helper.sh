@@ -6,19 +6,19 @@
 #SBATCH --qos=long_job 
 
 # DGX resources: 
-# --partition=pgpu
-# --gres=gpu:nvidia_a100-sxm4-80gb:8
-# --mem=800G
+#SBATCH --partition=pgpu
+#SBATCH --gres=gpu:nvidia_a100-sxm4-80gb:8
+#SBATCH --mem=800G
 
 # PGPU resources: 
 # --partition=pgpu
 # --gres=gpu:nvidia_a100-sxm4-80gb:4
-# --mem=400G
+# --mem=480G
 
 # GPU resources: 
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:nvidia_a100_80gb_pcie:1
-#SBATCH --mem=80G
+# --partition=gpu
+# --gres=gpu:nvidia_a100_80gb_pcie:1
+# --mem=100G
 
 # CPU
 # --partition=compute
@@ -27,11 +27,11 @@
 export PYTHONUNBUFFERED=1
 
 # Check if instruction file at position 10 is given, then set instructions_file_arg
-if [ -z "${11}" ]
+if [ -z "${15}" ]
 then
     instructions_file_arg=""
 else
-    instructions_file_arg="--task_to_instructions ${14}"
+    instructions_file_arg="--task_to_instructions ${15}"
 fi
 
 # TODO: For multi-gpu setup
@@ -48,6 +48,7 @@ python /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --excluded_ontologies $9 \
     --unique_events ${10} \
     --numeric_values ${11} \
-    --num_aggregated ${12} \
-    --add_parent_concepts ${13} \
+    --medication_entry ${12} \
+    --num_aggregated ${13} \
+    --add_parent_concepts ${14} \
     $instructions_file_arg

@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--unique_events", type=str, default="true", help="Whether to use unique events")
     parser.add_argument("--numeric_values", type=str, default="false", help="Whether to use numeric values")
+    parser.add_argument("--medication_entry", type=str, default="false", help="Whether to use a designated medication entry")
     parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
     parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     return parser.parse_args()
@@ -39,19 +40,21 @@ if __name__ == "__main__":
     PATH_TO_LABELS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels_tasks.csv')
     PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
     EXCLUDED_ONTOLOGIES: List[str] = ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3'] if args.excluded_ontologies == 'no_labs' else \
-        ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else []
+        ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else \
+        ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type']  if args.excluded_ontologies == 'no_labs_meds_single' else []
     UNIQUE_EVENTS: bool = args.unique_events == 'true'
     NUMERIC_VALUES: bool = args.numeric_values == 'true'
+    MEDICATION_ENTRY: bool = args.medication_entry == 'true'
     NUM_AGGREGATED_EVENTS: int = args.num_aggregated  # Default: 0
     FILTER_AGGREGATED_EVENTS: bool = NUM_AGGREGATED_EVENTS > 0
     ADD_CONDITIONS_PARENT_CONCEPTS: bool = args.add_parent_concepts == 'conditions'
         
     # Serialization strategies
     if args.serialization_strategy == 'list_events':
-        serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, NUM_AGGREGATED_EVENTS)
+        serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events':
-        serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, NUM_AGGREGATED_EVENTS)
+        serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
         # max_input_length = 32000
         max_input_length = 8192
     elif args.serialization_strategy == 'demographics_with_aggregated_events':
@@ -63,6 +66,7 @@ if __name__ == "__main__":
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__}")
     logger.info(f"    Unique events: {UNIQUE_EVENTS}")
     logger.info(f"    Numeric values: {NUMERIC_VALUES}")
+    logger.info(f"    Medication entry: {MEDICATION_ENTRY}")
     logger.info(f"    Num aggregated events: {NUM_AGGREGATED_EVENTS}")
     logger.info(f"    Max input length: {max_input_length}")
     logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")

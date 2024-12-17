@@ -254,14 +254,15 @@ class LLMFeaturizer():
     def resolve_code_with_custom_ontologies(
         self,
         ontology: extension_datasets.Ontology,
-        code: str
+        code: str,
+        included_ontologies: List[str] = []
     ) -> Optional[str]:
         
         ontology_name = code.split('/')[0].strip()
             
         # Ignore excluded ontologies
         # Manually include aggregated events for LOINC
-        if ontology_name in self.excluded_ontologies and code not in AGGREGATED_EVENTS_CODES_LOINC:
+        if (ontology_name in self.excluded_ontologies and code not in AGGREGATED_EVENTS_CODES_LOINC) and (ontology_name not in included_ontologies):
             return None
                 
         # Handle special case age
@@ -317,11 +318,12 @@ class LLMFeaturizer():
         def is_visit_event(event: Event) -> bool:
             return event.code.startswith('Visit/')
         
-        def resolve_code(code: str) -> Optional[str]:
-            return self.resolve_code_with_custom_ontologies(ontology, code)
+        def resolve_code(code: str, included_ontologies: List[str] = []) -> Optional[str]:
+            return self.resolve_code_with_custom_ontologies(ontology, code, included_ontologies)
         
         for label_idx, label in enumerate(labels):
             # According to existing feature processing, all events before or at the label time are included
+            # Manually checked two examples for anemia and hypoglycemia: label.time one minute before actual value
             events_until_label = [event for event in patient.events if event.start <= label.time]
             
             if self.add_condition_parent_concepts:
@@ -419,7 +421,7 @@ class LLMFeaturizer():
                 # Use code from llm2vec
                 instruced_example = f"{instruced_example[0].strip()} !@#$%^&*(){instruced_example[1].strip()}"
             # NOTE: Only print beginning of example
-            max_len = 2500
+            max_len = 3500
             instruced_example = instruced_example[:max_len] + "..." if len(instruced_example) > max_len else instruced_example
             logging.warning(f"Example used for encoding:\n{instruced_example}")
 
