@@ -2,7 +2,7 @@
 #SBATCH --job-name=ehrshot
 #SBATCH --output=logs/ehrshot_%A.log
 #SBATCH --time=4-00:00:00
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=40
 #SBATCH --qos=long_job 
 
 # DGX resources: 
