@@ -126,7 +126,8 @@ class Qwen2LLMEncoder(LLMEncoder):
         
     def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
         with torch.no_grad():
-            dataloader = DataLoader(TextsDataset(inputs), batch_size=self.batch_size, shuffle=False)
+            gpu_factor = 1 if torch.cuda.device_count() <= 1 else int(torch.cuda.device_count() / 2)  # Divide by 2 to ensure not too large batch per GPU
+            dataloader = DataLoader(TextsDataset(inputs), batch_size=self.batch_size * gpu_factor, shuffle=False)
             all_embeddings = []
             for batch in tqdm(dataloader, desc="Processing Batches"):
                 batch_dict = self.tokenizer(batch, max_length=self.max_input_length, padding=True, truncation=True, return_tensors='pt').to(self.device) # type: ignore
@@ -135,7 +136,6 @@ class Qwen2LLMEncoder(LLMEncoder):
                 normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
                 all_embeddings.append(normalized_embeddings)
             return np.concatenate(all_embeddings, axis=0)
-
 
 class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
@@ -229,8 +229,10 @@ class GTEQwen2_7B_InstructEncoder(Qwen2LLMEncoder):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True)
         self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-7B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)  
-
-    
+        # Enable multi-gpu support
+        if torch.cuda.device_count() > 1:
+            self.model = torch.nn.DataParallel(self.model)
+            
 class GTEQwen2_1_5B_InstructEncoder(Qwen2LLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
@@ -238,7 +240,9 @@ class GTEQwen2_1_5B_InstructEncoder(Qwen2LLMEncoder):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-1.5B-instruct', trust_remote_code=True)
         self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-1.5B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)  
-
+        # Enable multi-gpu support
+        if torch.cuda.device_count() > 1:
+            self.model = torch.nn.DataParallel(self.model)
         
 class STGTELargeENv15Encoder(LLMEncoder):
     

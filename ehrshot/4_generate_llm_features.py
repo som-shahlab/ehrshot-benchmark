@@ -6,7 +6,7 @@ from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
-from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, DemographicsWithAggregatedEventsStrategy
+from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, DemographicsWithAggregatedEventsStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
@@ -52,6 +52,9 @@ if __name__ == "__main__":
     # Serialization strategies
     if args.serialization_strategy == 'list_events':
         serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
+        max_input_length = 8192
+    if args.serialization_strategy == 'list_events_by_categories':
+        serialization_strategy = ListEventsByCategoriesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events':
         serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
