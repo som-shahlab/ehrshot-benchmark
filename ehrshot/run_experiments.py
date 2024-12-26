@@ -35,6 +35,7 @@ def check_slurm_jobs_status(job_ids):
 def main(args):
     # NOTE: Manually skip steps
     start_from_step = 1
+    stop_after_eval = True
     os.chdir(args.base_dir)
     
     # Check that the experiment folder exists
@@ -107,6 +108,8 @@ def main(args):
             print(f"Waiting for eval jobs to complete (current status: {[s[0:3] for s in status]})...")
             time.sleep(15)
             status = check_slurm_jobs_status(job_ids)
+            if stop_after_eval:
+                return
             
         # Ensure that all subfolder starting with "guo_", "new_", "lab_", "chexpert" have a all_results.csv file
         tasks = ["guo_", "new_", "lab_", "chexpert"]

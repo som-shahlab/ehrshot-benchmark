@@ -6,7 +6,7 @@ from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
-from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, DemographicsWithAggregatedEventsStrategy
+from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, DemographicsWithAggregatedEventsStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     PATH_TO_TASK_TO_INSTRUCTIONS_FILE: str = args.task_to_instructions
     EXCLUDED_ONTOLOGIES: List[str] = ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3'] if args.excluded_ontologies == 'no_labs' else \
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else \
+        ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type'] if args.excluded_ontologies == 'no_labs_single' else \
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type']  if args.excluded_ontologies == 'no_labs_meds_single' else []
     UNIQUE_EVENTS: bool = args.unique_events == 'true'
     NUMERIC_VALUES: bool = args.numeric_values == 'true'
@@ -56,13 +57,30 @@ if __name__ == "__main__":
     if args.serialization_strategy == 'list_events_by_categories':
         serialization_strategy = ListEventsByCategoriesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 8192
+    if args.serialization_strategy == 'list_events_by_categories_4k':
+        serialization_strategy = ListEventsByCategoriesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 4096
     elif args.serialization_strategy == 'list_visits_with_events':
         serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
         # max_input_length = 32000
         max_input_length = 8192
+    elif args.serialization_strategy == 'list_visits_with_events_detailed_aggr':
+        serialization_strategy = ListVisitsWithEventsDetailedAggrStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
+        max_input_length = 8192
+    elif args.serialization_strategy == 'unqiue_then_list_visits':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 8192
+    elif args.serialization_strategy == 'unqiue_then_list_visits_4k':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 4096
+    elif args.serialization_strategy == 'unqiue_then_list_visits_2k':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 2048
+    elif args.serialization_strategy == 'unqiue_then_list_visits_1k':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 1024
     elif args.serialization_strategy == 'demographics_with_aggregated_events':
         serialization_strategy = DemographicsWithAggregatedEventsStrategy(NUM_AGGREGATED_EVENTS, use_dates=False)
-        # max_input_length = 32000
         max_input_length = 512
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")

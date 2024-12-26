@@ -243,7 +243,7 @@ def datetime_to_markdown(dt):
 def datetimes_to_visit_time(label_dt, visit_dt, duration_days=None):
     days_before_label = (label_dt - visit_dt).days
     if duration_days is not None and duration_days > 0:
-        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time, Duration: {duration_days} days)"
+        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time, duration: {duration_days} days)"
     else:
         return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time)"
 
@@ -334,6 +334,28 @@ class SerializationStrategy(ABC):
 
         return '\n'.join(serialized_events)
 
+    def list_visits_with_events_by_category(self, ehr_serializer, label_time, numeric_values=False, unique_events=False) -> str:
+        visit_texts = []
+        # Set label time to a constant value for all patients
+        
+        for visit in sorted(ehr_serializer.visits, reverse=True):
+            visit_text = visit_heading(label_time, visit)
+            
+            general_events = [e for e in visit.events if e.code.split('/')[0] not in ['RxNorm', 'RxNorm Extension', 'CPT4', 'ICD10PCS', 'ICD9Proc', 'Visit']]
+            medication_events = [e for e in visit.events if e.code.split('/')[0] in ['RxNorm', 'RxNorm Extension']]
+            procedure_events = [e for e in visit.events if e.code.split('/')[0] in ['CPT4', 'ICD10PCS', 'ICD9Proc']]
+            
+            categories = []
+            if general_events:
+                categories.append("#### Conditions\n\n" + self.serialize_unique_event_list(general_events, numeric_values=numeric_values))
+            if medication_events:
+                categories.append("#### Medications\n\n" + self.serialize_unique_event_list(medication_events, numeric_values=numeric_values))
+            if procedure_events:    
+                categories.append("#### Procedures\n\n" + self.serialize_unique_event_list(procedure_events, numeric_values=numeric_values))
+            visit_texts.append(visit_text + '\n\n'.join(categories))
+
+        return '\n\n'.join(visit_texts)
+
     def list_visits_with_events(self, ehr_serializer, label_time, numeric_values=False, unique_events=False) -> str:
         visit_texts = []
         # Set label time to a constant value for all patients
@@ -384,6 +406,51 @@ class SerializationStrategy(ABC):
                 else:
                     serialization.append(f"- {event_type}: No recent data")
             serialization.append("")
+            
+        return '\n'.join(serialization) + "\n"
+    
+    def _serialize_aggregated_events_list_value_detailed(self, type, event, label_time=None):
+        if event.value is None:
+            return ''
+        
+        formatted_value = AGGREGATED_EVENTS[type]['format'](event.value)
+        
+        time = event.start
+        if label_time is not None:
+            time = CONSTANT_LABEL_TIME - (label_time - event.start)
+        result = f"- {datetime_to_markdown(time)}: {type} value was {formatted_value} {AGGREGATED_EVENTS[type]['unit']}"
+        
+        # Check if has normal range
+        if 'normal_range' in AGGREGATED_EVENTS[type]:
+                
+            rating = "normal"
+            if event.value < AGGREGATED_EVENTS[type]['normal_range'][0]:
+                rating = "too low"
+            elif event.value > AGGREGATED_EVENTS[type]['normal_range'][1]:
+                rating = "too high"
+                
+            result += f", which is {rating}"
+                
+        return result
+    
+    def serialize_aggregated_events_list_detailed(self, aggregated_events, num_values, include_date=False, label_time=None):
+        serialization = []
+        aggregated_events_recent = get_special_events_most_recent(aggregated_events)
+        
+        for sub_list in ['Body Metrics', 'Vital Signs', 'Lab Results']:
+            serialization.append(AGGREGATED_SUB_EVENTS[sub_list]['heading'])
+            event_types = AGGREGATED_SUB_EVENTS[sub_list]['events']
+            for event_type in event_types:
+                if event_type in aggregated_events_recent:
+                    if len(aggregated_events_recent[event_type]) >= num_values:
+                        num_values_aggregated_events = aggregated_events_recent[event_type][:num_values]
+                    else:
+                        num_values_aggregated_events = aggregated_events_recent[event_type]
+                    num_values_aggregated_events = [event for event in num_values_aggregated_events if event.value is not None]
+                    serialization.append(f"### {event_type}\n\n" +\
+                        '\n'.join([self._serialize_aggregated_events_list_value_detailed(event_type, event, label_time) for event in num_values_aggregated_events]) + "\n")
+                else:
+                    serialization.append(f"### {event_type}\n\n" + "No recent data\n")
             
         return '\n'.join(serialization) + "\n"
 
@@ -478,6 +545,42 @@ class ListEventsByCategoriesStrategy(SerializationStrategy):
         
         return EHR_HEADING + self.get_time_text() + aggr_events_serialization + visits_serialization + general_events_serialization + procedures_serialization + medications_serialization 
 
+
+class UniqueThenListVisitsStrategy(SerializationStrategy):
+    def __init__(self, num_aggregated_events: int, medication_entry: bool):
+        self.num_aggregated_events = num_aggregated_events
+        self.medication_entry = medication_entry
+    
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        
+        # Add demographics
+        num_demographics = 4
+        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
+            num_demographics = 3
+        if len(ehr_serializer.static_events) <= num_demographics:
+            num_demographics = len(ehr_serializer.static_events)
+            
+        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
+        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
+        
+        aggr_events_serialization = ""
+        if self.num_aggregated_events > 0:
+            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+        
+        # Add visits
+        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
+        
+        # Add general events
+        general_events_serialization = "## All Medical Conditions\n\n" + self.serialize_unique_event_list(
+            self.get_unique_values_of_ontologies(ehr_serializer, ['RxNorm', 'RxNorm Extension', 'CPT4', 'ICD10PCS', 'ICD9Proc', 'Visit'], negated=True),
+            numeric_values=False
+        ) + '\n\n'
+        
+        # Detailed Medical History
+        medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" + self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=False, unique_events=True) 
+        
+        return EHR_HEADING + self.get_time_text() + demographics_serialization + aggr_events_serialization + visits_serialization + general_events_serialization + medical_history
+
 class DemographicsWithAggregatedEventsStrategy(SerializationStrategy):
     def __init__(self, num_aggregated_events: int, use_dates: bool):
         self.num_aggregated_events = num_aggregated_events
@@ -499,6 +602,29 @@ class ListVisitsWithEventsStrategy(SerializationStrategy):
         aggr_events_serialization = ""
         if self.num_aggregated_events > 0:
             aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+       
+        medication_entry_serialization = ""
+        if self.medication_entry:
+            medication_entry_serialization = self.get_medication_last_visit(ehr_serializer, numeric_values=self.numeric_values)
+            
+        if self.unique_events:
+            static_text = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values)
+        else:
+            static_text = STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events, numeric_values=self.numeric_values, unique_events=False)
+        visits_text = VISITS_EVENTS_HEADING + self.list_visits_with_events(ehr_serializer, label_time, numeric_values=self.numeric_values, unique_events=self.unique_events) 
+        return EHR_HEADING + self.get_time_text() + static_text + '\n\n' + aggr_events_serialization + medication_entry_serialization + visits_text
+
+class ListVisitsWithEventsDetailedAggrStrategy(SerializationStrategy):
+    def __init__(self, unique_events: bool, numeric_values: bool, medication_entry: bool, num_aggregated_events: int):
+        self.unique_events = unique_events
+        self.numeric_values = numeric_values
+        self.medication_entry = medication_entry
+        self.num_aggregated_events = num_aggregated_events
+
+    def serialize(self, ehr_serializer, label_time: datetime) -> str:
+        aggr_events_serialization = ""
+        if self.num_aggregated_events > 0:
+            aggr_events_serialization = self.serialize_aggregated_events_list_detailed(ehr_serializer.aggregated_events, self.num_aggregated_events, include_date=False, label_time=label_time)
        
         medication_entry_serialization = ""
         if self.medication_entry:
