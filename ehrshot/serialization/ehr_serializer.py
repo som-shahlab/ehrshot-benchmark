@@ -240,17 +240,22 @@ def datetime_to_markdown(dt):
     iso_date = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     return f"[{display_date}]({iso_date})"
 
+def datetime_date_to_markdown(dt):
+    display_date = dt.strftime("%Y-%m-%d")
+    iso_date = dt.strftime("%Y-%m-%d")
+    return f"[{display_date}]({iso_date})"  
+
 def datetimes_to_visit_time(label_dt, visit_dt, duration_days=None):
     days_before_label = (label_dt - visit_dt).days
     if duration_days is not None and duration_days > 0:
-        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time, duration: {duration_days} days)"
+        return f"{datetime_date_to_markdown(visit_dt)} ({days_before_label} days before prediction time, duration: {duration_days} days)"
     else:
-        return f"{datetime_to_markdown(visit_dt)} ({days_before_label} days before prediction time)"
+        return f"{datetime_date_to_markdown(visit_dt)} ({days_before_label} days before prediction time)"
 
 def visit_heading(label_dt: datetime, visit) -> str:
     shifted_visit_dt = CONSTANT_LABEL_TIME - (label_dt - visit.start)
     duration_days = (visit.end - visit.start).days if visit.end is not None else None
-    return f"### {visit.description} {datetimes_to_visit_time(CONSTANT_LABEL_TIME, shifted_visit_dt, duration_days)}\n\n"
+    return f"### {visit.description} on {datetimes_to_visit_time(CONSTANT_LABEL_TIME, shifted_visit_dt, duration_days)}\n\n"
 
 class SerializationStrategy(ABC):
     @abstractmethod
@@ -258,7 +263,7 @@ class SerializationStrategy(ABC):
         pass
 
     def get_time_text(self):
-        return f"Current time: {datetime_to_markdown(CONSTANT_LABEL_TIME)}\n\n"
+        return f"Current time: {datetime_date_to_markdown(CONSTANT_LABEL_TIME)}\n\n"
 
     def get_unique_events(self, events: List[Event]) -> List[Event]:
         descriptions = set()
