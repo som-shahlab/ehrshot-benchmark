@@ -388,7 +388,7 @@ class TextEncoder:
             
         # Deduplicate inputs while preserving the first occurrence and encode them
         unique_inputs = list(input_to_indices.keys())
-        batch_size = 300288 # 131072 # 65536 / 131072 (around 10 batches for full) / 2097152
+        batch_size = 600576 # 131072 # 65536 / 131072 (around 10 batches for full) / 2097152
         current_index = 0
         
         # Store or check fingerprint
