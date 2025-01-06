@@ -58,15 +58,15 @@
                 "--is_force_refresh",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/MedNLI_train_m-Meta-Llama-3.1-8B-Instruct_l-512/checkpoint-200",
-                // "--text_encoder", "gteqwen2_7b_instruct",
+                "--text_encoder", "gteqwen2_7b_instruct",
                 // "--text_encoder", "gteqwen2_1_5b_instruct",
-                "--text_encoder", "bioclinicalbert-fl-average-chunks",
+                // "--text_encoder", "bioclinicalbert-fl-average-chunks",
                 "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json",
-                "--serialization_strategy", "list_visits_with_events",  // "list_events", "list_visits_with_events", ""demographics_with_aggregated_events"
-                "--excluded_ontologies", "no_labs",
+                "--serialization_strategy", "unqiue_then_list_visits_wo_allconds_w_values_4k",  // "unqiue_then_list_visits", "list_visits_with_events_detailed_aggr", "list_events", "list_events_by_categories", "list_visits_with_events", ""demographics_with_aggregated_events"
+                "--excluded_ontologies", "no_labs_single",
                 "--unique_events", "true",
                 "--numeric_values", "false",
-                "--medication_entry", "false",
+                "--medication_entry", "true",
                 "--num_aggregated", "3",
                 "--add_parent_concepts", "none"
             ],
@@ -114,9 +114,9 @@
             "args": [
                 "--first_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS_old/results_complete_ll3_unique_codes",
                 "--first_source_filter", "count,gbm;clmbr,lr_lbfgs",
-                "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_demo_and_aggr/llm2vec_llama3_1_7b_instruct_supervised_list_visits_with_events_no_labs_true_false_1_full",
+                "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_final/gteqwen2_7b_instruct_unqiue_then_list_visits_wo_allconds_w_values_4k_no_labs_single_true_false_true_3_full",
                 "--second_source_filter", "llm,lr_lbfgs",
-                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_demo_and_aggr/llm2vec_llama3_1_7b_instruct_supervised_list_visits_with_events_no_labs_true_false_1_full_with_baselines"
+                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_final/gteqwen2_7b_instruct_unqiue_then_list_visits_wo_allconds_w_values_4k_no_labs_single_true_false_true_3_full_with_baselines",
             ]
         }
     ]
