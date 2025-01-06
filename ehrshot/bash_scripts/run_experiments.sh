@@ -4,7 +4,7 @@ EHRSHOT_ENV="EHRSHOT_ENV"
 source activate $EHRSHOT_ENV
 
 # Paths
-EXPERIMENT_IDENTIFIER="markdown_serialization_neww" # _w_dates
+EXPERIMENT_IDENTIFIER="markdown_serialization_final" # _w_dates
 BASE_DIR="/home/sthe14/ehrshot-benchmark"
 SCRIPT_DIR="$BASE_DIR/ehrshot"
 INSTRUCTIONS_FILE="${BASE_DIR}/ehrshot/serialization/task_to_instructions.json"
@@ -33,10 +33,16 @@ text_encoders=(
 # serialization_strategies=(
 #     "list_events",
 #     "list_visits_with_events",
+#     "list_events_by_categories",
+#     "list_visits_with_events_detailed_aggr"
+#     "unqiue_then_list_visits"
+#     "unqiue_then_list_visits_4k"
+#     "unqiue_then_list_visits_2k"
+#     "unqiue_then_list_visits_1k"
 #     # Debug lab values
 #     "demographics_with_aggregated_events"
 # )
-# excluded_ontologies=("none" "no_labs" "no_labs_meds")
+# excluded_ontologies=("none" "no_labs" "no_labs_meds" "no_labs_meds_single" "no_labs_single")
 # unique_events=("true" "false")
 # numeric_values=("true" "false")
 # num_aggregated=(0 1 3 5)
@@ -45,12 +51,13 @@ text_encoders=(
 # Quantities of interest
 # supervised_list_visits_with_events_no_labs_true_false_1_full
 # serialization_strategies=("demographics_with_aggregated_events")
-
-serialization_strategies=("list_visits_with_events")
-excluded_ontologies=("no_labs_meds_single")
+# serialization_strategies=("unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds_4k" "unqiue_then_list_visits_wo_allconds_w_values_4k" "unqiue_then_list_visits_w_values" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
+# serialization_strategies=("unqiue_then_list_visits_4k" "unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds_w_values_4k" "unqiue_then_list_visits_w_values" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
+serialization_strategies=("unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
+excluded_ontologies=("no_labs_single")
 unique_events=("true")
 numeric_values=("false")
-medication_entry=("false")
+medication_entry=("true")
 num_aggregated=(3)
 
 # Labels = Dataset subset
