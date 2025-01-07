@@ -5,7 +5,7 @@ from loguru import logger
 from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
-from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BioClinicalBert, LongformerLargeEncoder
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder
 from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy, DemographicsWithAggregatedEventsStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
@@ -110,31 +110,30 @@ if __name__ == "__main__":
     logger.info(f"    Max input length: {max_input_length}")
     logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")
     
-    # LLM text encoder
-    # args.text_encoder = 'bioclinicalbert-fl'
-    if args.text_encoder == 'llm2vec_llama3_7b_instruct_supervised':
-        text_encoder = TextEncoder(LLM2VecLlama3_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'llm2vec_llama3_1_7b_instruct_supervised':
-        text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
-    elif args.text_encoder.startswith('llm2vec_llama3_1_7b_instruct_mimic_'):
+    # Mapping of text encoder names to their corresponding classes
+    encoder_mapping = {
+        'llm2vec_llama3_7b_instruct_supervised': LLM2VecLlama3_7B_InstructSupervisedEncoder,
+        'llm2vec_llama3_1_7b_instruct_supervised': LLM2VecLlama3_1_7B_InstructSupervisedEncoder,
+        'llm2vec_mistral_7b_instruct_supervised': LLM2VecMistral_7B_InstructSupervisedEncoder,
+        'llm2vec_llama2_sheared_1_3b_supervised': LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder,
+        'gteqwen2_7b_instruct': GTEQwen2_7B_InstructEncoder,
+        'gteqwen2_1_5b_instruct': GTEQwen2_1_5B_InstructEncoder,
+        'st_gte_large_en_v15': STGTELargeENv15Encoder,
+        'bioclinicalbert': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='emilyalsentzer/Bio_ClinicalBERT', embeddings_size=768, model_max_input_length=512), 
+        'bert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-base-uncased', embeddings_size=768, model_max_input_length=512),
+        'bert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-large-uncased', embeddings_size=1024, model_max_input_length=512),
+        'deberta_v3_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-base', embeddings_size=768, model_max_input_length=512),
+        'deberta_v3_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-large', embeddings_size=1024, model_max_input_length=512),
+        'modernbert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-base', embeddings_size=768, model_max_input_length=8192),
+        'modernbert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-large', embeddings_size=1024, model_max_input_length=8192),
+    }
+
+    # First check custom llm2vec model, than look up in mapping
+    if args.text_encoder.startswith('llm2vec_llama3_1_7b_instruct_mimic_'):
         custom_path = args.text_encoder.removeprefix('llm2vec_llama3_1_7b_instruct_mimic_')
         text_encoder = TextEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder(max_input_length=max_input_length, custom_path=custom_path))
-    elif args.text_encoder == 'llm2vec_mistral_7b_instruct_supervised':
-        text_encoder = TextEncoder(LLM2VecMistral_7B_InstructSupervisedEncoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'gteqwen2_7b_instruct':
-        text_encoder = TextEncoder(GTEQwen2_7B_InstructEncoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'gteqwen2_1_5b_instruct':
-        text_encoder = TextEncoder(GTEQwen2_1_5B_InstructEncoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'st_gte_large_en_v15':
-        text_encoder = TextEncoder(STGTELargeENv15Encoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'bioclinicalbert-fl':
-        text_encoder = TextEncoder(BioClinicalBert(max_input_length=max_input_length))
-    elif args.text_encoder == 'bioclinicalbert-fl-average-chunks':
-        text_encoder = TextEncoder(BioClinicalBert(max_input_length=max_input_length, handle_long_texts='average_chunks'))
-    elif args.text_encoder == 'longformerlarge-fl':
-        text_encoder = TextEncoder(LongformerLargeEncoder(max_input_length=max_input_length))
-    elif args.text_encoder == 'biomedicallongformerlarge-fl':
-        text_encoder = TextEncoder(LongformerLargeEncoder(max_input_length=max_input_length, biomedical=True))
+    elif args.text_encoder in encoder_mapping:
+        text_encoder = TextEncoder(encoder_mapping[args.text_encoder](max_input_length=max_input_length))
     else:
         raise ValueError(f"Text encoder `{args.text_encoder}` not recognized")
     logger.info(f"Use text encoder: {text_encoder.encoder.__class__} with max length: {text_encoder.encoder.max_input_length}")

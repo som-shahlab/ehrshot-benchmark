@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import re
 from typing import List, Any
 from numpy.typing import NDArray
 import numpy as np
@@ -57,6 +58,39 @@ class LLMEncoder(ABC):
     def add_instruction(self, instruction: str, text: str) -> Any:
         # Per default: ignore instruction
         return text
+    
+    def get_chunked_dataset(self, texts: List[str], tokenizer) -> Tuple[Dataset, List[int]]:
+        # Create chunks of size max_input_length tokens for each text
+        max_input_length = self.max_input_length - 8  # Subtract 8 to account for potential special tokens
+        all_chunks = []
+        chunk_counts = []
+
+        for text in texts:
+            # Tokenize the text and get the offsets for each token
+            encoding = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
+            offsets = encoding["offset_mapping"]
+            
+            # Split text into chunks of size max_input_length based on the token offsets
+            text_chunks = []
+            for i in range(0, len(offsets), max_input_length):
+                chunk_start = offsets[i][0]
+                chunk_end = offsets[min(i + max_input_length, len(offsets)) - 1][1]
+                text_chunks.append(text[chunk_start:chunk_end])
+            
+            assert re.sub(r'\s', '', ''.join(text_chunks)) == re.sub(r'\s', '', text), "Text chunks do not match original text."
+            all_chunks.extend(text_chunks)
+            chunk_counts.append(len(text_chunks))
+
+        return Dataset.from_dict({"text": all_chunks}), chunk_counts
+    
+    def get_averaged_chunks(self, all_embeddings: NDArray[Any], chunk_counts: List[int]) -> NDArray[Any]:
+        current_index = 0
+        averaged_embeddings = []
+        for count in chunk_counts:
+            chunk_embeddings = all_embeddings[current_index:current_index + count]
+            averaged_embeddings.append(np.mean(chunk_embeddings, axis=0))
+            current_index += count
+        return np.array(averaged_embeddings)
         
     @abstractmethod
     def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
@@ -76,16 +110,16 @@ class BERTLLMEncoder(LLMEncoder):
         last_hidden_states = outputs.hidden_states[-1]
         cls_embedding = last_hidden_states[:,0,:]
         return {'embedding': cls_embedding}
-    
-    # Get average of all hidden states in the first and laster hidden layer
-    # Shown to be superior to cls token or only last hidden state (http://arxiv.org/pdf/2103.15316)
-    # See: https://github.com/autoliuweijie/BERT-whitening-pytorch/blob/b5cfbd606bd19fc3b3adf9e074dc0bfd830ef597/all_utils.py#L33
-    def get_first_last_avg_embedding(self, batch):
-        inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_input_length, return_tensors='pt').to(self.device) # type: ignore
-        hidden_states = self.model(**inputs, output_hidden_states=True).hidden_states # type: ignore
-        # Average over all states in the first and the last layer (each layer return [batch_size, seq_len, hidden_size])
-        first_last_avg_embedding = (hidden_states[-1] + hidden_states[1]).mean(dim=1)
-        return {'embedding': first_last_avg_embedding}
+
+    # Get average of all hidden states in the last hidden layer
+    # Shown to be superior to cls token or max (https://arxiv.org/pdf/1908.10084)
+    # For implementation see: https://github.com/autoliuweijie/BERT-whitening-pytorch/blob/b5cfbd606bd19fc3b3adf9e074dc0bfd830ef597/all_utils.py#L33
+    def get_last_avg_embedding(self, batch):
+        with torch.no_grad():
+            inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_input_length, return_tensors='pt').to(self.device) # type: ignore
+            hidden_states = self.model(**inputs, output_hidden_states=True).hidden_states # type: ignore
+            last_avg_embedding = (hidden_states[-1]).mean(dim=1)
+            return {'embedding': last_avg_embedding} 
 
 
 class LLM2VecLLMEncoder(LLMEncoder):
@@ -150,7 +184,6 @@ class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
             doc_max_length=self.max_input_length,
         )
 
-
 class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
@@ -172,41 +205,18 @@ class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
             doc_max_length=self.max_input_length,
         )
 
-# class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
-#     
-#     def __init__(self, max_input_length: int, **kwargs) -> None:
-#         super().__init__(embedding_size=4096, model_max_input_length=128000, max_input_length=max_input_length)
-#         # peft_model_name_or_path = "/mntp-supervised/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/E5_train_m-Meta-Llama-3.1-8B-Instruct_p-mean_b-64_l-512_bidirectional-True_e-3_s-42_w-300_lr-0.0002_lora_r-16/checkpoint-1000"
-#         peft_model_name_or_path = "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised"
-#         if 'custom_path' in kwargs:
-#             model_path = "/home/sthe14/llm2vec-repro/output"
-#             peft_model_name_or_path = model_path + kwargs['custom_path']
-#         # Changed this to updated loading instructions from https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp-supervised
-#         # self.model = LLM2Vec.from_pretrained(
-#         #     "McGill-NLP/LLM2Vec-Meta-Llama-31-8B-Instruct-mntp",
-#         #     trust_remote_code=True,
-#         #     peft_model_name_or_path=peft_model_name_or_path,
-#         #     device_map="cuda" if torch.cuda.is_available() else "cpu",
-#         #     torch_dtype=torch.bfloat16,
-#         #     max_length=self.max_input_length,
-#         #     doc_max_length=self.max_input_length,
-#         # )
-#         tokenizer = AutoTokenizer.from_pretrained("/home/sthe14/llm2vec-repro/output/mntp/Meta-Llama-3.1-8B-Instruct/checkpoint-1000")
-#         config = AutoConfig.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct", trust_remote_code=True)
-#         model = AutoModel.from_pretrained(
-#             "meta-llama/Meta-Llama-3.1-8B-Instruct",
-#             trust_remote_code=True,
-#             config=config,
-#             torch_dtype=torch.bfloat16,
-#             device_map="cuda" if torch.cuda.is_available() else "cpu",
-#         )
-#         model = PeftModel.from_pretrained(model, "/home/sthe14/llm2vec-repro/output/mntp/Meta-Llama-3.1-8B-Instruct/checkpoint-1000",)
-#         model = model.merge_and_unload()  # This can take several minutes on cpu
-#         # Loading supervised model. This loads the trained LoRA weights on top of MNTP model. Hence the final weights are -- Base model + MNTP (LoRA) + supervised (LoRA).
-#         model = PeftModel.from_pretrained(model, peft_model_name_or_path)
-#         # Wrapper for encoding and pooling operations
-#         self.model = LLM2Vec(model, tokenizer, pooling_mode="mean", max_length=self.max_input_length, doc_max_length=self.max_input_length)
+class LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder(LLM2VecLLMEncoder):
 
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(embedding_size=2048, model_max_input_length=4096, max_input_length=max_input_length)
+        self.model = LLM2Vec.from_pretrained(
+            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
+            peft_model_name_or_path="McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp-supervised",
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            torch_dtype=torch.bfloat16,
+            max_length=self.max_input_length,
+            doc_max_length=self.max_input_length,
+        )
 
 class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
@@ -221,7 +231,6 @@ class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
             doc_max_length=self.max_input_length,
         )
 
-    
 class GTEQwen2_7B_InstructEncoder(Qwen2LLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
@@ -263,75 +272,28 @@ class STGTELargeENv15Encoder(LLMEncoder):
                 normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
                 all_embeddings.append(normalized_embeddings)
             return np.concatenate(all_embeddings, axis=0)
-        
 
-class BioClinicalBert(BERTLLMEncoder):
+class BertEncoder(BERTLLMEncoder):
     
-    def __init__(self, max_input_length: int, **kwargs) -> None:
+    def __init__(self, max_input_length: int, bert_identifier: str, embeddings_size: int, model_max_input_length: int, **kwargs) -> None:
         super().__init__(embedding_size=768, model_max_input_length=512, max_input_length=max_input_length)  
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
-        self.model = AutoModel.from_pretrained("emilyalsentzer/Bio_ClinicalBERT").to(self.device)
-        self.handle_long_texts = kwargs.get('handle_long_texts', 'truncate')    
-    
-    def chunk_texts(self, texts: List[str]) -> Tuple[List[str], List[int]]:
-        all_chunks = []
-        chunk_counts = []
-        for text in texts:
-            tokens = self.tokenizer.tokenize(text)
-            chunks = []
-            for i in range(0, len(tokens), self.max_input_length):
-                chunk = tokens[i:i + self.max_input_length]
-                chunks.append(self.tokenizer.convert_tokens_to_string(chunk))
-            all_chunks.extend(chunks)
-            chunk_counts.append(len(chunks))
-        return all_chunks, chunk_counts
+        self.tokenizer = AutoTokenizer.from_pretrained(bert_identifier)
+        self.model = AutoModel.from_pretrained(bert_identifier).to(self.device)
 
     def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
         
-        if self.handle_long_texts not in ['truncate', 'average_chunks']:
-            raise ValueError(f"handle_long_texts must be 'truncate' or 'average_chunks', but got {self.handle_long_texts}")
+        # Chunk input texts to handle long texts
+        num_inputs = len(inputs)
+        dataset, chunk_counts = self.get_chunked_dataset(inputs, self.tokenizer)
         
-        chunk_counts = []
-        if self.handle_long_texts == 'average_chunks':
-            inputs, chunk_counts = self.chunk_texts(inputs)
-             
-        dataset = Dataset.from_dict({"text": inputs})
-        dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=self.batch_size)
+        dataset = dataset.map(self.get_last_avg_embedding, batched=True, batch_size=self.batch_size)
         all_embeddings = np.array(dataset['embedding'])
         
-        if self.handle_long_texts == 'average_chunks':
-            # Average embeddings for each original text
-            final_embeddings = []
-            start_idx = 0
-            for count in chunk_counts:
-                text_embeddings = all_embeddings[start_idx:start_idx + count]
-                avg_embedding = np.mean(text_embeddings, axis=0)
-                final_embeddings.append(avg_embedding)
-                start_idx += count
-    
-            all_embeddings = np.array(final_embeddings)
+        # Average chunk embeddings for each original text
+        all_embeddings = self.get_averaged_chunks(all_embeddings, chunk_counts)
+        assert len(all_embeddings) == num_inputs
             
-        return all_embeddings
-
-
-class LongformerLargeEncoder(BERTLLMEncoder):
-        
-    def __init__(self, max_input_length: int, **kwargs) -> None:
-        super().__init__(embedding_size=1024, model_max_input_length=4096, max_input_length=max_input_length)  
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.biomedical = kwargs.get('biomedical', False)
-        if self.biomedical:
-            self.tokenizer = AutoTokenizer.from_pretrained("kiddothe2b/biomedical-longformer-large")
-            self.model = AutoModel.from_pretrained("kiddothe2b/biomedical-longformer-large").to(self.device)
-        else:
-            self.tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-large-4096")
-            self.model = AutoModel.from_pretrained("allenai/longformer-large-4096").to(self.device)
-
-    def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
-        dataset = Dataset.from_dict({"text": inputs})
-        dataset = dataset.map(self.get_first_last_avg_embedding, batched=True, batch_size=self.batch_size)
-        all_embeddings = np.array(dataset['embedding'])
         return all_embeddings
 
 
