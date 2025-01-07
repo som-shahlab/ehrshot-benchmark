@@ -17,6 +17,7 @@ from collections import defaultdict
 import hashlib
 import os
 import pickle
+from itertools import chain
     
         
 class TextsDataset(TorchDataset):
@@ -47,7 +48,7 @@ class LLMEncoder(ABC):
             elif max_input_length > 8192:
                 return 2
             elif model_max_input_length == 512:
-                return 32
+                return 64
             return default_batch_size
         self.batch_size: int = determine_llm_batch_size()
         
@@ -62,24 +63,20 @@ class LLMEncoder(ABC):
     def get_chunked_dataset(self, texts: List[str], tokenizer) -> Tuple[Dataset, List[int]]:
         # Create chunks of size max_input_length tokens for each text
         max_input_length = self.max_input_length - 8  # Subtract 8 to account for potential special tokens
-        all_chunks = []
-        chunk_counts = []
 
-        for text in texts:
-            # Tokenize the text and get the offsets for each token
-            encoding = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
-            offsets = encoding["offset_mapping"]
-            
+        def chunk_text(input_text, max_input_length):
+            offsets = tokenizer(input_text, add_special_tokens=False, return_offsets_mapping=True)["offset_mapping"]
             # Split text into chunks of size max_input_length based on the token offsets
-            text_chunks = []
-            for i in range(0, len(offsets), max_input_length):
-                chunk_start = offsets[i][0]
-                chunk_end = offsets[min(i + max_input_length, len(offsets)) - 1][1]
-                text_chunks.append(text[chunk_start:chunk_end])
-            
-            assert re.sub(r'\s', '', ''.join(text_chunks)) == re.sub(r'\s', '', text), "Text chunks do not match original text."
-            all_chunks.extend(text_chunks)
-            chunk_counts.append(len(text_chunks))
+            input_text_chunks = [
+                input_text[offsets[i][0]:offsets[min(i + max_input_length, len(offsets)) - 1][1]]
+                for i in range(0, len(offsets), max_input_length)
+            ]
+            assert re.sub(r'\s', '', ''.join(input_text_chunks)) == re.sub(r'\s', '', input_text), "Text chunks do not match original text."
+            return input_text_chunks 
+
+        nested_chunks = [chunk_text(text, max_input_length) for text in texts]
+        chunk_counts = [len(chunks) for chunks in nested_chunks]
+        all_chunks = list(chain.from_iterable(nested_chunks))
 
         return Dataset.from_dict({"text": all_chunks}), chunk_counts
     
@@ -170,6 +167,23 @@ class Qwen2LLMEncoder(LLMEncoder):
                 normalized_embeddings = F.normalize(embeddings, p=2, dim=1).cpu().detach().numpy()
                 all_embeddings.append(normalized_embeddings)
             return np.concatenate(all_embeddings, axis=0)
+
+# Workaround for modern BERT - transformers version incompatible with LLM2Vec
+# class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
+#     def __init__(self, max_input_length: int, **kwargs) -> None:
+#         pass
+#         
+# class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
+#     def __init__(self, max_input_length: int, **kwargs) -> None:
+#         pass
+#         
+# class LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder(LLM2VecLLMEncoder):
+#     def __init__(self, max_input_length: int, **kwargs) -> None:
+#         pass
+# 
+# class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
+#     def __init__(self, max_input_length: int, **kwargs) -> None:
+#         pass
 
 class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
@@ -275,8 +289,9 @@ class STGTELargeENv15Encoder(LLMEncoder):
 
 class BertEncoder(BERTLLMEncoder):
     
-    def __init__(self, max_input_length: int, bert_identifier: str, embeddings_size: int, model_max_input_length: int, **kwargs) -> None:
-        super().__init__(embedding_size=768, model_max_input_length=512, max_input_length=max_input_length)  
+    def __init__(self, max_input_length: int, bert_identifier: str, embedding_size: int, model_max_input_length: int, **kwargs) -> None:
+        # use variable bert_identifier, embedding_size, model_max_input_length to allow for different BERT models
+        super().__init__(embedding_size=embedding_size, model_max_input_length=model_max_input_length, max_input_length=max_input_length)  
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained(bert_identifier)
         self.model = AutoModel.from_pretrained(bert_identifier).to(self.device)
@@ -285,8 +300,10 @@ class BertEncoder(BERTLLMEncoder):
         
         # Chunk input texts to handle long texts
         num_inputs = len(inputs)
+        print(f"Creating chunks for {num_inputs} inputs.")
         dataset, chunk_counts = self.get_chunked_dataset(inputs, self.tokenizer)
         
+        print(f"Encoding {len(dataset)} chunks.")
         dataset = dataset.map(self.get_last_avg_embedding, batched=True, batch_size=self.batch_size)
         all_embeddings = np.array(dataset['embedding'])
         
