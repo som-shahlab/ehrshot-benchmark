@@ -119,13 +119,13 @@ if __name__ == "__main__":
         'gteqwen2_7b_instruct': GTEQwen2_7B_InstructEncoder,
         'gteqwen2_1_5b_instruct': GTEQwen2_1_5B_InstructEncoder,
         'st_gte_large_en_v15': STGTELargeENv15Encoder,
-        'bioclinicalbert': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='emilyalsentzer/Bio_ClinicalBERT', embeddings_size=768, model_max_input_length=512), 
-        'bert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-base-uncased', embeddings_size=768, model_max_input_length=512),
-        'bert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-large-uncased', embeddings_size=1024, model_max_input_length=512),
-        'deberta_v3_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-base', embeddings_size=768, model_max_input_length=512),
-        'deberta_v3_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-large', embeddings_size=1024, model_max_input_length=512),
-        'modernbert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-base', embeddings_size=768, model_max_input_length=8192),
-        'modernbert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-large', embeddings_size=1024, model_max_input_length=8192),
+        'bioclinicalbert': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='emilyalsentzer/Bio_ClinicalBERT', embedding_size=768, model_max_input_length=512), 
+        'bert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-base-uncased', embedding_size=768, model_max_input_length=512),
+        'bert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-large-uncased', embedding_size=1024, model_max_input_length=512),
+        'deberta_v3_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-base', embedding_size=768, model_max_input_length=512),
+        'deberta_v3_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-large', embedding_size=1024, model_max_input_length=512),
+        'modernbert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-base', embedding_size=768, model_max_input_length=8192),
+        'modernbert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-large', embedding_size=1024, model_max_input_length=8192),
     }
 
     # First check custom llm2vec model, than look up in mapping
