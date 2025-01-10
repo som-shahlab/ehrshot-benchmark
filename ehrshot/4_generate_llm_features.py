@@ -6,7 +6,7 @@ from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
-from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy
+from serialization.ehr_serializer import UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
@@ -23,11 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--text_encoder", type=str, help="Text encoder to use")
     parser.add_argument("--serialization_strategy", required=True, type=str, help="Serialization strategy to use")
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
-    parser.add_argument("--unique_events", type=str, default="true", help="Whether to use unique events")
-    parser.add_argument("--numeric_values", type=str, default="false", help="Whether to use numeric values")
-    parser.add_argument("--medication_entry", type=str, default="false", help="Whether to use a designated medication entry")
     parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
-    parser.add_argument("--add_parent_concepts", required=True, type=str, help="Category for parent concepts")
     return parser.parse_args()
     
 if __name__ == "__main__":
@@ -43,62 +39,46 @@ if __name__ == "__main__":
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension'] if args.excluded_ontologies == 'no_labs_meds' else \
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type'] if args.excluded_ontologies == 'no_labs_single' else \
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type']  if args.excluded_ontologies == 'no_labs_meds_single' else []
-    UNIQUE_EVENTS: bool = args.unique_events == 'true'
-    NUMERIC_VALUES: bool = args.numeric_values == 'true'
-    MEDICATION_ENTRY: bool = args.medication_entry == 'true'
     NUM_AGGREGATED_EVENTS: int = args.num_aggregated  # Default: 0
     FILTER_AGGREGATED_EVENTS: bool = NUM_AGGREGATED_EVENTS > 0
-    ADD_CONDITIONS_PARENT_CONCEPTS: bool = args.add_parent_concepts == 'conditions'
         
     # Serialization strategies
-    if args.serialization_strategy == 'list_events':
-        serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'list_visits_with_events':
-        serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'list_visits_with_events_detailed_aggr':
-        serialization_strategy = ListVisitsWithEventsDetailedAggrStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+    if args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_4k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 4096
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_2k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 2048
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_1k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 1024
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_512':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 512
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_4k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 4096
     elif args.serialization_strategy == 'unique_then_list_visits_w_values':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'unique_then_list_visits_w_values_4k':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 4096
     elif args.serialization_strategy == 'unique_then_list_visits':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
     elif args.serialization_strategy == 'unique_then_list_visits_4k':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS)
         max_input_length = 4096
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__}")
-    logger.info(f"    Unique events: {UNIQUE_EVENTS}")
-    logger.info(f"    Numeric values: {NUMERIC_VALUES}")
-    logger.info(f"    Medication entry: {MEDICATION_ENTRY}")
     logger.info(f"    Num aggregated events: {NUM_AGGREGATED_EVENTS}")
     logger.info(f"    Max input length: {max_input_length}")
     logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")
@@ -160,7 +140,7 @@ if __name__ == "__main__":
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]] = load_labeled_patients_with_tasks(PATH_TO_LABELS_FILE)
     # TODO Debug: Consider subset of patients
-    # patients_to_labels = {k: v for k, v in list(patients_to_labels.items())[:10]}
+    # patients_to_labels = {k: v for k, v in list(patients_to_labels.items())[:20]}
     logger.info(f"Loaded {len(patients_to_labels)} patients with {sum([len(v) for v in patients_to_labels.values()])} labels")
 
     # Combine two featurizations of each patient: one for the patient's age, and one for the text of every code
@@ -171,8 +151,7 @@ if __name__ == "__main__":
         serialization_strategy=serialization_strategy,
         task_to_instructions=task_to_instructions,
         excluded_ontologies=EXCLUDED_ONTOLOGIES,
-        filter_aggregated_events=FILTER_AGGREGATED_EVENTS,
-        add_condition_parent_concepts=ADD_CONDITIONS_PARENT_CONCEPTS
+        filter_aggregated_events=FILTER_AGGREGATED_EVENTS
     ) 
     llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, llm_featurizer, patients_to_labels, NUM_THREADS)
 

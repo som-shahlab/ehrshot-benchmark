@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=ehrshot
 #SBATCH --output=logs/ehrshot_%A.log
-#SBATCH --time=4-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --cpus-per-task=40
-#SBATCH --qos=long_job 
+# --qos=long_job 
 
 # DGX resources: 
 # --partition=pgpu
@@ -26,12 +26,12 @@
 # Disable Python output buffering
 export PYTHONUNBUFFERED=1
 
-# Check if instruction file at position 10 is given, then set instructions_file_arg
-if [ -z "${15}" ]
+# Check if instruction file at last position, then set instructions_file_arg
+if [ -z "${11}" ]
 then
     instructions_file_arg=""
 else
-    instructions_file_arg="--task_to_instructions ${15}"
+    instructions_file_arg="--task_to_instructions ${11}"
 fi
 
 # TODO: For multi-gpu setup
@@ -46,9 +46,5 @@ python /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --text_encoder $7 \
     --serialization_strategy $8 \
     --excluded_ontologies $9 \
-    --unique_events ${10} \
-    --numeric_values ${11} \
-    --medication_entry ${12} \
-    --num_aggregated ${13} \
-    --add_parent_concepts ${14} \
+    --num_aggregated ${10} \
     $instructions_file_arg

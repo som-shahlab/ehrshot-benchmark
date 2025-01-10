@@ -66,11 +66,7 @@
                 "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json",
                 "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_1k",  // "unique_then_list_visits_wo_allconds_w_values_4k"
                 "--excluded_ontologies", "no_labs_single",
-                "--unique_events", "true",
-                "--numeric_values", "false",
-                "--medication_entry", "true",
                 "--num_aggregated", "3",
-                "--add_parent_concepts", "none"
             ],
         },
 
