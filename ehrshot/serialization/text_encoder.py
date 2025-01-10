@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
-import re
 from typing import List, Any
 from numpy.typing import NDArray
 import numpy as np
-import torch
-from llm2vec import LLM2Vec
 import torch.nn.functional as F
 from torch import Tensor
 from transformers import AutoTokenizer, AutoModel
@@ -13,12 +10,15 @@ from torch.utils.data import Dataset as TorchDataset
 from datasets import Dataset
 from tqdm import tqdm
 from typing import Tuple
-from collections import defaultdict
 import hashlib
 import os
-import pickle
-from itertools import chain
-    
+from llm2vec import LLM2Vec
+import torch
+# Workaround for ModernBert
+# 1. Use different environment with github transformers version
+# 2. Remove LLM2Vec import as it cannot handle new transformers version and add stumbs for LLM2Vec classes
+# 3. For multi-GPU support, add "TORCHDYNAMO_DISABLE=1" to command
+
         
 class TextsDataset(TorchDataset):
     def __init__(self, texts):
@@ -40,16 +40,27 @@ class LLMEncoder(ABC):
         # TODO: Adapt based on available GPU memory
         def determine_llm_batch_size():
             # For max_input_length = 8192 (2 for 40 GB, 16 (llama), 8 for Qwen for 80 GB)
-            default_batch_size = 8
+            batch_size = 8
             if self.__class__.__name__.startswith('LLM2VecLlama3'):
-                default_batch_size = 16
+                batch_size = 16
+        
             if max_input_length > 32768:
-                return 1
+                batch_size = 1
             elif max_input_length > 8192:
-                return 2
+                batch_size = 2
             elif model_max_input_length == 512:
-                return 64
-            return default_batch_size
+                batch_size = 64
+        
+            # BERT models can use larger batch size, since they are generally smaller
+            if self.__class__.__name__.startswith('Bert'):
+                if model_max_input_length <= 512:
+                    batch_size = batch_size * 4
+                else:
+                    batch_size = batch_size * 2
+                
+            return batch_size
+        
+        
         self.batch_size: int = determine_llm_batch_size()
         
         # Ensure that tokenizer and model are set, but this is done in subclasses
@@ -60,25 +71,43 @@ class LLMEncoder(ABC):
         # Per default: ignore instruction
         return text
     
-    def get_chunked_dataset(self, texts: List[str], tokenizer) -> Tuple[Dataset, List[int]]:
+    def get_chunked_dataset(self, texts: List[str], tokenizer, max_chunks=None) -> Tuple[Dataset, List[int]]:
         # Create chunks of size max_input_length tokens for each text
+        batch_size=8192 
         max_input_length = self.max_input_length - 8  # Subtract 8 to account for potential special tokens
-
-        def chunk_text(input_text, max_input_length):
-            offsets = tokenizer(input_text, add_special_tokens=False, return_offsets_mapping=True)["offset_mapping"]
-            # Split text into chunks of size max_input_length based on the token offsets
-            input_text_chunks = [
-                input_text[offsets[i][0]:offsets[min(i + max_input_length, len(offsets)) - 1][1]]
-                for i in range(0, len(offsets), max_input_length)
-            ]
-            assert re.sub(r'\s', '', ''.join(input_text_chunks)) == re.sub(r'\s', '', input_text), "Text chunks do not match original text."
-            return input_text_chunks 
-
-        nested_chunks = [chunk_text(text, max_input_length) for text in texts]
-        chunk_counts = [len(chunks) for chunks in nested_chunks]
-        all_chunks = list(chain.from_iterable(nested_chunks))
-
-        return Dataset.from_dict({"text": all_chunks}), chunk_counts
+        
+        all_chunks = []
+        chunk_counts = []
+        
+        start_idx = 0
+        while start_idx < len(texts):
+            print(f"  Chunking batch {start_idx // batch_size + 1} of {len(texts) // batch_size + 1}")
+            end_idx = min(start_idx + batch_size, len(texts))
+            batch_texts = texts[start_idx:end_idx]
+            batch_offsets = tokenizer(batch_texts, add_special_tokens=False, return_offsets_mapping=True, truncation=False, padding=False)["offset_mapping"]
+        
+            for text, offsets in zip(batch_texts, batch_offsets):
+                num_offsets = len(offsets)
+                
+                # Pre-limit how many indices we'll iterate over, so we generate at most `max_chunks` slices.
+                if max_chunks is not None:
+                    limit = max_chunks * max_input_length
+                    end = min(num_offsets, limit)
+                else:
+                    end = num_offsets
+                
+                text_chunks = [
+                    text[offsets[i][0]:offsets[min(i + max_input_length, num_offsets) - 1][1]]
+                    for i in range(0, end, max_input_length)
+                ]
+                    
+                chunk_counts.append(len(text_chunks))
+                all_chunks.extend(text_chunks)
+                
+            start_idx = end_idx
+        print()
+            
+        return all_chunks, chunk_counts
     
     def get_averaged_chunks(self, all_embeddings: NDArray[Any], chunk_counts: List[int]) -> NDArray[Any]:
         current_index = 0
@@ -97,27 +126,7 @@ class LLMEncoder(ABC):
 class BERTLLMEncoder(LLMEncoder):
     def __init__(self, embedding_size: int, model_max_input_length: int, max_input_length: int) -> None:
         super().__init__(embedding_size, model_max_input_length, max_input_length)     
-    
-    # Want to reproduce Jiang et al. Health system-scale language models are all-purpose prediction engines 2023.
-    # However, unclear what MLM classification head exactly means, so will use the cls token for now.
-    def get_cls_embedding(self, batch):
-        inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_input_length, return_tensors='pt').to(self.device) # type: ignore
-        outputs = self.model(**inputs, output_hidden_states=True) # type: ignore
-        # Get last layer of hidden states
-        last_hidden_states = outputs.hidden_states[-1]
-        cls_embedding = last_hidden_states[:,0,:]
-        return {'embedding': cls_embedding}
-
-    # Get average of all hidden states in the last hidden layer
-    # Shown to be superior to cls token or max (https://arxiv.org/pdf/1908.10084)
-    # For implementation see: https://github.com/autoliuweijie/BERT-whitening-pytorch/blob/b5cfbd606bd19fc3b3adf9e074dc0bfd830ef597/all_utils.py#L33
-    def get_last_avg_embedding(self, batch):
-        with torch.no_grad():
-            inputs = self.tokenizer(batch['text'], padding=True, truncation=True, max_length=self.max_input_length, return_tensors='pt').to(self.device) # type: ignore
-            hidden_states = self.model(**inputs, output_hidden_states=True).hidden_states # type: ignore
-            last_avg_embedding = (hidden_states[-1]).mean(dim=1)
-            return {'embedding': last_avg_embedding} 
-
+        
 
 class LLM2VecLLMEncoder(LLMEncoder):
     def __init__(self, embedding_size: int, model_max_input_length: int, max_input_length: int) -> None:
@@ -255,7 +264,60 @@ class GTEQwen2_7B_InstructEncoder(Qwen2LLMEncoder):
         # Enable multi-gpu support
         if torch.cuda.device_count() > 1:
             self.model = torch.nn.DataParallel(self.model)
+
+class LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(LLM2VecLlama3_1_7B_InstructSupervisedEncoder):
+    
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(max_input_length=max_input_length, **kwargs)
+        
+    def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
+        # Use multiples of this base input length to determine the max number of chunks, e.g. for 2k chunks use max number of 2
+        BASE_INPUT_LENGTH = 4096
+        max_chunks = BASE_INPUT_LENGTH // self.max_input_length
+        # To save memory, shorten texts to BASE_INPUT_LENGTH * 8 characters as a very loose upper bound for the number of tokens
+        inputs = [text[:BASE_INPUT_LENGTH * 8] for text in inputs]
+        
+        # Create chunks of the inputs before calling the superclass encode method
+        num_inputs = len(inputs)
+        print(f"Creating chunks for {num_inputs} inputs of size {self.max_input_length} (max_chunks: {max_chunks}).")
+        # NOTE: Must use self.model.tokenizer instead of self.tokenizer
+        inputs, chunk_counts = self.get_chunked_dataset(inputs, self.model.tokenizer, max_chunks=max_chunks)
+        
+        print(f"Encoding {len(inputs)} chunks.")
+        all_embeddings = super()._encode(inputs)
+        
+        # Average chunk embeddings for each original text
+        all_embeddings = self.get_averaged_chunks(all_embeddings, chunk_counts)
+        assert len(all_embeddings) == num_inputs
             
+        return all_embeddings
+
+class GTEQwen2_7B_InstructChunkedEncoder(GTEQwen2_7B_InstructEncoder):
+    
+    def __init__(self, max_input_length: int, **kwargs) -> None:
+        super().__init__(max_input_length=max_input_length, **kwargs)
+        
+    def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
+        # Use multiples of this base input length to determine the max number of chunks, e.g. for 2k chunks use max number of 2
+        BASE_INPUT_LENGTH = 4096
+        max_chunks = BASE_INPUT_LENGTH // self.max_input_length
+        # To save memory, shorten texts to BASE_INPUT_LENGTH * 8 characters as a very loose upper bound for the number of tokens
+        inputs = [text[:BASE_INPUT_LENGTH * 8] for text in inputs]
+        
+        # Create chunks of the inputs before calling the superclass encode method
+        num_inputs = len(inputs)
+        print(f"Creating chunks for {num_inputs} inputs of size {self.max_input_length} (max_chunks: {max_chunks}).")
+        inputs, chunk_counts = self.get_chunked_dataset(inputs, self.tokenizer, max_chunks=max_chunks)
+        
+        print(f"Encoding {len(inputs)} chunks.")
+        all_embeddings = super()._encode(inputs)
+        
+        # Average chunk embeddings for each original text
+        all_embeddings = self.get_averaged_chunks(all_embeddings, chunk_counts)
+        assert len(all_embeddings) == num_inputs
+            
+        return all_embeddings
+               
 class GTEQwen2_1_5B_InstructEncoder(Qwen2LLMEncoder):
     
     def __init__(self, max_input_length: int, **kwargs) -> None:
@@ -263,8 +325,10 @@ class GTEQwen2_1_5B_InstructEncoder(Qwen2LLMEncoder):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-Qwen2-1.5B-instruct', trust_remote_code=True)
         self.model = AutoModel.from_pretrained('Alibaba-NLP/gte-Qwen2-1.5B-instruct', trust_remote_code=True, torch_dtype=torch.float16).to(self.device)  
+        
         # Enable multi-gpu support
         if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs.")
             self.model = torch.nn.DataParallel(self.model)
         
 class STGTELargeENv15Encoder(LLMEncoder):
@@ -296,23 +360,58 @@ class BertEncoder(BERTLLMEncoder):
         self.tokenizer = AutoTokenizer.from_pretrained(bert_identifier)
         self.model = AutoModel.from_pretrained(bert_identifier).to(self.device)
 
+        # Enable multi-gpu support
+        self.model = AutoModel.from_pretrained(bert_identifier).to(self.device)
+        
+        if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs.")
+            self.model = torch.nn.DataParallel(self.model)
+
     def _encode(self, inputs: List, **kwargs) -> NDArray[Any]:
+        # Use multiples of this base input length to determine the max number of chunks, e.g. for 2k chunks use max number of 2
+        BASE_INPUT_LENGTH = 4096
+        max_chunks = BASE_INPUT_LENGTH // self.max_input_length
+        # To save memory, shorten texts to BASE_INPUT_LENGTH * 8 characters as a very loose upper bound for the number of tokens
+        inputs = [text[:BASE_INPUT_LENGTH * 8] for text in inputs]
         
-        # Chunk input texts to handle long texts
+        # Create chunks of the inputs before calling the superclass encode method
         num_inputs = len(inputs)
-        print(f"Creating chunks for {num_inputs} inputs.")
-        dataset, chunk_counts = self.get_chunked_dataset(inputs, self.tokenizer)
+        print(f"Creating chunks for {num_inputs} inputs of size {self.max_input_length} (max_chunks: {max_chunks}).")
+        inputs, chunk_counts = self.get_chunked_dataset(inputs, self.tokenizer, max_chunks=max_chunks)
         
-        print(f"Encoding {len(dataset)} chunks.")
-        dataset = dataset.map(self.get_last_avg_embedding, batched=True, batch_size=self.batch_size)
-        all_embeddings = np.array(dataset['embedding'])
+        print(f"Encoding {len(inputs)} chunks.")
+        gpu_factor = 1 # if torch.cuda.device_count() <= 1 else int(torch.cuda.device_count() / 2)  # Divide by 2 to ensure not too large batch per GPU
+        dataloader = DataLoader(TextsDataset(inputs), batch_size=self.batch_size * gpu_factor, shuffle=False, collate_fn=lambda batch: batch)
         
-        # Average chunk embeddings for each original text
+        all_embeddings_list = []
+        with torch.no_grad():
+            for batch in tqdm(dataloader, desc="Encoding Chunks"):
+                inputs_dict = self.tokenizer(batch, padding=True, truncation=True, max_length=self.max_input_length, return_tensors='pt')
+                inputs_dict = {k: v.to(self.device) for k, v in inputs_dict.items()}
+                outputs = self.model(**inputs_dict, output_hidden_states=True)
+                # Get average of all hidden states in the last hidden layer
+                # Shown to be superior to cls token or max (https://arxiv.org/pdf/1908.10084)
+                # For implementation see: https://github.com/autoliuweijie/BERT-whitening-pytorch/blob/b5cfbd606bd19fc3b3adf9e074dc0bfd830ef597/all_utils.py#L33
+                # Want to reproduce Jiang et al. Health system-scale language models are all-purpose prediction engines 2023. However, unclear what MLM classification head exactly means.
+                last_avg_embedding = outputs.hidden_states[-1].mean(dim=1)
+                all_embeddings_list.append(last_avg_embedding.cpu().numpy())
+
+        all_embeddings = np.concatenate(all_embeddings_list, axis=0)
+
         all_embeddings = self.get_averaged_chunks(all_embeddings, chunk_counts)
         assert len(all_embeddings) == num_inputs
-            
-        return all_embeddings
 
+        return all_embeddings
+        
+#         # Old routine: 
+#         dataset = dataset.map(self.get_last_avg_embedding, batched=True, batch_size=self.batch_size)
+#         all_embeddings = np.array(dataset['embedding'])
+#         
+#         # Average chunk embeddings for each original text
+#         all_embeddings = self.get_averaged_chunks(all_embeddings, chunk_counts)
+#         assert len(all_embeddings) == num_inputs
+#             
+#         return all_embeddings
 
 class TextEncoder:
     def __init__(self, encoder: LLMEncoder):
@@ -352,65 +451,67 @@ class TextEncoder:
         else:
             inputs = [self.encoder.add_instruction(instruction, text) for instruction, text in zip(instructions, texts)]
         
-        # Old:
-        # return self.encoder._encode(inputs)
+        # Old variant: process with duplicates
+        return self.encoder._encode(inputs)
         
-        # Performance improvement: Remove exact duplicates and restore them after encoding
-        # Careful: inputs are lists of strings, so we need to convert them to tuples for hashing
-        def serialize_input(input):
-            return input if isinstance(input, str) else tuple(input)
+        # # Performance improvement: Remove exact duplicates and restore them after encoding
+        # # Careful: inputs are lists of strings, so we need to convert them to tuples for hashing
+        # def serialize_input(input):
+        #     return input if isinstance(input, str) else tuple(input)
         
-        # Store original indices of inputs
-        input_to_indices = defaultdict(list)
-        for i, input in enumerate(inputs):
-            input_to_indices[serialize_input(input)].append(i)
-            
-        # Deduplicate inputs while preserving the first occurrence and encode them
-        unique_inputs = list(input_to_indices.keys())
-        batch_size = 600576 # 131072 # 65536 / 131072 (around 10 batches for full) / 2097152
-        current_index = 0
+        # # Store original indices of inputs
+        # input_to_indices = defaultdict(list)
+        # for i, input in enumerate(inputs):
+        #     input_to_indices[serialize_input(input)].append(i)
+        #     
+        # # Deduplicate inputs while preserving the first occurrence and encode them
+        # unique_inputs = list(input_to_indices.keys())
         
-        # Store or check fingerprint
-        self._store_or_check_fingerprint(unique_inputs, cache_dir)
+        # # Performance improvement: Process in batches and store intermediate results
+        # batch_size = 600576 # 131072 # 65536 / 131072 (around 10 batches for full) / 2097152
+        # current_index = 0
         
-        # Load cached intermediate results of format cache_{start_index}.pkl
-        cache_files = self._get_cache_files(cache_dir)
-        if len(cache_files) > 0:
-            max_start_indices = max([int(f.split('_')[1].split('.')[0]) for f in cache_files])
-            current_index = max_start_indices
-            cache_file = os.path.join(cache_dir, f"cache_{max_start_indices}.pkl")
-            with open(cache_file, "rb") as f:
-                unique_embeddings = pickle.load(f)
-                if isinstance(unique_embeddings, np.ndarray):
-                    unique_embeddings = unique_embeddings.tolist()
-            print(f"Loaded {len(unique_embeddings)} cached embeddings.")
-        else:
-            unique_embeddings = []
-            print("No cache files found.")
-            
-        # Create embeddings
-        for start in range(current_index, len(unique_inputs), batch_size):
-            print(f"Processing batch {start // batch_size + 1} of {len(unique_inputs) // batch_size + 1}")
-            batch = unique_inputs[start:start + batch_size]
-            batch_embeddings = self.encoder._encode(batch)
-            unique_embeddings.extend(batch_embeddings.tolist())
-            
-            # Delete all old cache files
-            self._delete_all_cache_files(cache_dir)
-                
-            # Save intermediate results
-            cache_file = os.path.join(cache_dir, f"cache_{len(unique_embeddings)}.pkl")
-            with open(cache_file, "wb") as f:
-                pickle.dump(unique_embeddings, f)
-            print(f"Saved {len(unique_embeddings)} embeddings to {cache_file}")
-               
-        # Delete all old cache files
-        self._delete_all_cache_files(cache_dir)
+        # # Store or check fingerprint
+        # self._store_or_check_fingerprint(unique_inputs, cache_dir)
         
-        # Create empty list of size inputs
-        embeddings = [None] * len(inputs)
-        for i, input in enumerate(unique_inputs):
-            for j in input_to_indices[input]:
-                embeddings[j] = unique_embeddings[i]
-        assert all(embedding is not None for embedding in embeddings)
-        return np.array(embeddings)
+        # # Load cached intermediate results of format cache_{start_index}.pkl
+        # cache_files = self._get_cache_files(cache_dir)
+        # if len(cache_files) > 0:
+        #     max_start_indices = max([int(f.split('_')[1].split('.')[0]) for f in cache_files])
+        #     current_index = max_start_indices
+        #     cache_file = os.path.join(cache_dir, f"cache_{max_start_indices}.pkl")
+        #     with open(cache_file, "rb") as f:
+        #         unique_embeddings = pickle.load(f)
+        #         if isinstance(unique_embeddings, np.ndarray):
+        #             unique_embeddings = unique_embeddings.tolist()
+        #     print(f"Loaded {len(unique_embeddings)} cached embeddings.")
+        # else:
+        #     unique_embeddings = []
+        #     print("No cache files found.")
+        #     
+        # # Create embeddings
+        # for start in range(current_index, len(unique_inputs), batch_size):
+        #     print(f"Processing batch {start // batch_size + 1} of {len(unique_inputs) // batch_size + 1}")
+        #     batch = unique_inputs[start:start + batch_size]
+        #     batch_embeddings = self.encoder._encode(batch)
+        #     unique_embeddings.extend(batch_embeddings.tolist())
+        #     
+        #     # Delete all old cache files
+        #     self._delete_all_cache_files(cache_dir)
+        #         
+        #     # Save intermediate results
+        #     cache_file = os.path.join(cache_dir, f"cache_{len(unique_embeddings)}.pkl")
+        #     with open(cache_file, "wb") as f:
+        #         pickle.dump(unique_embeddings, f)
+        #     print(f"Saved {len(unique_embeddings)} embeddings to {cache_file}")
+        #        
+        # # Delete all old cache files
+        # self._delete_all_cache_files(cache_dir)
+        
+        # # Restore deduplicated embeddings to original order
+        # embeddings = [None] * len(inputs)
+        # for i, input in enumerate(unique_inputs):
+        #     for j in input_to_indices[input]:
+        #         embeddings[j] = unique_embeddings[i]
+        # assert all(embedding is not None for embedding in embeddings)
+        # return np.array(embeddings)

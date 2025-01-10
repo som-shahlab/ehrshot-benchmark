@@ -4,7 +4,7 @@ EHRSHOT_ENV="EHRSHOT_ENV"
 source activate $EHRSHOT_ENV
 
 # Paths
-EXPERIMENT_IDENTIFIER="markdown_serialization_final" # _w_dates
+EXPERIMENT_IDENTIFIER="markdown_serialization_baselines" # _w_dates
 BASE_DIR="/home/sthe14/ehrshot-benchmark"
 SCRIPT_DIR="$BASE_DIR/ehrshot"
 INSTRUCTIONS_FILE="${BASE_DIR}/ehrshot/serialization/task_to_instructions.json"
@@ -21,14 +21,28 @@ parent_concepts=("none")
 # Define the different options to iterate over
 text_encoders=(
     "llm2vec_llama3_1_7b_instruct_supervised"
+    # llm2vec_llama3_1_7b_instruct_supervised_chunked_2k
+    # llm2vec_llama3_1_7b_instruct_supervised_chunked_1k
+    # llm2vec_llama3_1_7b_instruct_supervised_chunked_512
     # "llm2vec_mistral_7b_instruct_supervised"
+    # "llm2vec_llama2_sheared_1_3b_supervised"
     # "gteqwen2_7b_instruct"
+    # "gteqwen2_7b_instruct_chunked_2k"
+    # "gteqwen2_7b_instruct_chunked_1k"
+    # "gteqwen2_7b_instruct_chunked_512"
     # "gteqwen2_1_5b_instruct"
     # "st_gte_large_en_v15"
     # "bioclinicalbert-fl"
     # "bioclinicalbert-fl-average-chunks"
     # "longformerlarge-fl"
     # "biomedicallongformerlarge-fl"
+    # "bioclinicalbert"
+    # "deberta_v3_base"
+    # "deberta_v3_large"
+    # "bert_base"
+    # "bert_large"
+    # "modernbert_base"
+    # "modernbert_large"
 )
 # serialization_strategies=(
 #     "list_events",
@@ -52,8 +66,10 @@ text_encoders=(
 # supervised_list_visits_with_events_no_labs_true_false_1_full
 # serialization_strategies=("demographics_with_aggregated_events")
 # serialization_strategies=("unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds_4k" "unqiue_then_list_visits_wo_allconds_w_values_4k" "unqiue_then_list_visits_w_values" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
-# serialization_strategies=("unqiue_then_list_visits_4k" "unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds_w_values_4k" "unqiue_then_list_visits_w_values" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
-serialization_strategies=("unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
+
+# Selected serialization
+serialization_strategies=("unqiue_then_list_visits_wo_allconds_w_values_4k")
+
 excluded_ontologies=("no_labs_single")
 unique_events=("true")
 numeric_values=("false")

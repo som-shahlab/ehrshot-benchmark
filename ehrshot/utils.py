@@ -19,21 +19,25 @@ SPLIT_VAL_CUTOFF: int = 85
 # Types of base models to test
 MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
 # Removed count based model for debugging
-    # 'count' : {
-    #     'label' : 'Count-based',
-    #     # 'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
-    #     'heads' : ['lr_lbfgs', ],
-    # },
-    # 'clmbr' : {
-    #     'label' : 'CLMBR',
-    #     'heads' : ['lr_lbfgs', ],
-    # },
+    'count' : {
+        'label' : 'Count-based',
+        # 'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
+        'heads' : ['gbm', ],
+    },
+    'clmbr' : {
+        'label' : 'CLMBR',
+        'heads' : ['lr_lbfgs', ],
+    },
     # 'agr' : {
     #     'label' : 'Age, Gender, Race',
     #     'heads' : ['lr_lbfgs', ],
     # },
     'llm' : {
-        'label' : 'LLM',
+        'label' : 'GTE Qwen2 7B', # 'LLM',
+        'heads' : ['lr_lbfgs', ],
+    },
+    'llm_llama' : {
+        'label' : 'LLM2Vec Llama 3.1 7B',
         'heads' : ['lr_lbfgs', ],
     },
 }
@@ -61,7 +65,7 @@ HEAD_2_INFO: Dict[str, Dict[str, str]] = {
 SCORE_MODEL_HEAD_2_COLOR = {
     'auroc' : {
         'count' : {
-            'gbm' : 'tab:red',
+            'gbm' : 'tab:green',
             'lr_lbfgs' : 'tab:green',
             'rf' : 'tab:orange',
         },
@@ -69,7 +73,10 @@ SCORE_MODEL_HEAD_2_COLOR = {
             'lr_lbfgs' : 'tab:blue',
         },
         'llm' : {
-            'lr_lbfgs' : 'tab:pink',
+            'lr_lbfgs' : 'tab:orange',
+        },
+        'llm_llama' : {
+            'lr_lbfgs' : 'tab:red',
         },
         'agr' : {
             'lr_lbfgs' : 'tab:brown',
@@ -77,8 +84,8 @@ SCORE_MODEL_HEAD_2_COLOR = {
     },
     'auprc' : {
         'count' : {
+            'gbm' : 'tab:green',
             'lr_lbfgs' : 'tab:green',
-            'gbm' : 'tab:red',
             'rf' : 'tab:orange',
         },
         'clmbr' : {
@@ -88,7 +95,10 @@ SCORE_MODEL_HEAD_2_COLOR = {
             'lr_femr' : 'tab:purple',
         },
         'llm' : {
-            'lr_lbfgs' : 'tab:pink',
+            'lr_lbfgs' : 'tab:orange',
+        },
+        'llm_llama' : {
+            'lr_lbfgs' : 'tab:red',
         },
         'agr' : {
             'lr_lbfgs' : 'tab:brown',

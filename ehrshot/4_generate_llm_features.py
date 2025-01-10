@@ -5,7 +5,7 @@ from loguru import logger
 from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
-from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
 from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy, DemographicsWithAggregatedEventsStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
@@ -114,9 +114,15 @@ if __name__ == "__main__":
     encoder_mapping = {
         'llm2vec_llama3_7b_instruct_supervised': LLM2VecLlama3_7B_InstructSupervisedEncoder,
         'llm2vec_llama3_1_7b_instruct_supervised': LLM2VecLlama3_1_7B_InstructSupervisedEncoder,
+        'llm2vec_llama3_1_7b_instruct_supervised_chunked_2k': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=2048),
+        'llm2vec_llama3_1_7b_instruct_supervised_chunked_1k': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=1024),
+        'llm2vec_llama3_1_7b_instruct_supervised_chunked_512': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=512),
         'llm2vec_mistral_7b_instruct_supervised': LLM2VecMistral_7B_InstructSupervisedEncoder,
         'llm2vec_llama2_sheared_1_3b_supervised': LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder,
         'gteqwen2_7b_instruct': GTEQwen2_7B_InstructEncoder,
+        'gteqwen2_7b_instruct_chunked_2k': lambda max_input_length: GTEQwen2_7B_InstructChunkedEncoder(max_input_length=2048),
+        'gteqwen2_7b_instruct_chunked_1k': lambda max_input_length: GTEQwen2_7B_InstructChunkedEncoder(max_input_length=1024),
+        'gteqwen2_7b_instruct_chunked_512': lambda max_input_length: GTEQwen2_7B_InstructChunkedEncoder(max_input_length=512),
         'gteqwen2_1_5b_instruct': GTEQwen2_1_5B_InstructEncoder,
         'st_gte_large_en_v15': STGTELargeENv15Encoder,
         'bioclinicalbert': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='emilyalsentzer/Bio_ClinicalBERT', embedding_size=768, model_max_input_length=512), 
@@ -124,8 +130,9 @@ if __name__ == "__main__":
         'bert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='bert-large-uncased', embedding_size=1024, model_max_input_length=512),
         'deberta_v3_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-base', embedding_size=768, model_max_input_length=512),
         'deberta_v3_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='microsoft/deberta-v3-large', embedding_size=1024, model_max_input_length=512),
-        'modernbert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-base', embedding_size=768, model_max_input_length=8192),
-        'modernbert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-large', embedding_size=1024, model_max_input_length=8192),
+        # Modern Bert models could handle 8192 tokens, but only use them with 4096 tokens
+        'modernbert_base': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-base', embedding_size=768, model_max_input_length=4096),
+        'modernbert_large': lambda max_input_length: BertEncoder(max_input_length=max_input_length, bert_identifier='answerdotai/ModernBERT-large', embedding_size=1024, model_max_input_length=4096),
     }
 
     # First check custom llm2vec model, than look up in mapping
