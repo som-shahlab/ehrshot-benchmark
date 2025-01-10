@@ -96,12 +96,10 @@ if __name__ == "__main__":
     
     # Mapping of text encoder names to their corresponding classes
     encoder_mapping = {
-        'llm2vec_llama3_7b_instruct_supervised': LLM2VecLlama3_7B_InstructSupervisedEncoder,
         'llm2vec_llama3_1_7b_instruct_supervised': LLM2VecLlama3_1_7B_InstructSupervisedEncoder,
         'llm2vec_llama3_1_7b_instruct_supervised_chunked_2k': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=2048),
         'llm2vec_llama3_1_7b_instruct_supervised_chunked_1k': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=1024),
         'llm2vec_llama3_1_7b_instruct_supervised_chunked_512': lambda max_input_length: LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(max_input_length=512),
-        'llm2vec_mistral_7b_instruct_supervised': LLM2VecMistral_7B_InstructSupervisedEncoder,
         'llm2vec_llama2_sheared_1_3b_supervised': LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder,
         'gteqwen2_7b_instruct': GTEQwen2_7B_InstructEncoder,
         'gteqwen2_7b_instruct_chunked_2k': lambda max_input_length: GTEQwen2_7B_InstructChunkedEncoder(max_input_length=2048),

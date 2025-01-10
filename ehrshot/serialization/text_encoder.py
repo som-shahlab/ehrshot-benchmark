@@ -177,11 +177,7 @@ class Qwen2LLMEncoder(LLMEncoder):
                 all_embeddings.append(normalized_embeddings)
             return np.concatenate(all_embeddings, axis=0)
 
-# Workaround for modern BERT - transformers version incompatible with LLM2Vec
-# class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
-#     def __init__(self, max_input_length: int, **kwargs) -> None:
-#         pass
-#         
+# Workaround for modern BERT - transformers version incompatible with LLM2Vec    
 # class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
 #     def __init__(self, max_input_length: int, **kwargs) -> None:
 #         pass
@@ -189,23 +185,6 @@ class Qwen2LLMEncoder(LLMEncoder):
 # class LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder(LLM2VecLLMEncoder):
 #     def __init__(self, max_input_length: int, **kwargs) -> None:
 #         pass
-# 
-# class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
-#     def __init__(self, max_input_length: int, **kwargs) -> None:
-#         pass
-
-class LLM2VecLlama3_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
-    
-    def __init__(self, max_input_length: int, **kwargs) -> None:
-        super().__init__(embedding_size=4096, model_max_input_length=8192, max_input_length=max_input_length)
-        self.model = LLM2Vec.from_pretrained(
-            "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
-            peft_model_name_or_path="McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.bfloat16,
-            max_length=self.max_input_length,
-            doc_max_length=self.max_input_length,
-        )
 
 class LLM2VecLlama3_1_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
     
@@ -235,19 +214,6 @@ class LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder(LLM2VecLLMEncoder):
         self.model = LLM2Vec.from_pretrained(
             "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
             peft_model_name_or_path="McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp-supervised",
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.bfloat16,
-            max_length=self.max_input_length,
-            doc_max_length=self.max_input_length,
-        )
-
-class LLM2VecMistral_7B_InstructSupervisedEncoder(LLM2VecLLMEncoder):
-    
-    def __init__(self, max_input_length: int, **kwargs) -> None:
-        super().__init__(embedding_size=4096, model_max_input_length=32768, max_input_length=max_input_length)
-        self.model = LLM2Vec.from_pretrained(
-            "McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp",
-            peft_model_name_or_path="McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp-supervised",
             device_map="cuda" if torch.cuda.is_available() else "cpu",
             torch_dtype=torch.bfloat16,
             max_length=self.max_input_length,
