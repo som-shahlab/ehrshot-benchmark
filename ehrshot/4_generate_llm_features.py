@@ -5,7 +5,7 @@ from loguru import logger
 from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
-from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
+from serialization.text_encoder import TextEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
 from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
@@ -66,6 +66,15 @@ if __name__ == "__main__":
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_4k':
         serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 4096
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_2k':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 2048
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_1k':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 1024
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_512':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 512
     elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds':
         serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 8192
