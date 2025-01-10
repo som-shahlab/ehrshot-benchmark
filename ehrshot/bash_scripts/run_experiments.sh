@@ -8,9 +8,8 @@ EXPERIMENT_IDENTIFIER="markdown_serialization_baselines" # _w_dates
 BASE_DIR="/home/sthe14/ehrshot-benchmark"
 SCRIPT_DIR="$BASE_DIR/ehrshot"
 INSTRUCTIONS_FILE="${BASE_DIR}/ehrshot/serialization/task_to_instructions.json"
-# TODO: Set to experiment path --> only LLM
-# TODO: Set to final_exp path --> LR and CLIMBR as well
-# EXPERIMENTS_DIR="$BASE_DIR/EHRSHOT_ASSETS/experiments/$EXPERIMENT_IDENTIFIER"
+# NOTE: Set to experiment path --> only LLM
+# NOTE: Set to final_exp path --> LR and CLIMBR as well
 EXPERIMENTS_DIR="$BASE_DIR/EHRSHOT_ASSETS/experiments/$EXPERIMENT_IDENTIFIER"
 mkdir -p $EXPERIMENTS_DIR
 
@@ -24,18 +23,12 @@ text_encoders=(
     # llm2vec_llama3_1_7b_instruct_supervised_chunked_2k
     # llm2vec_llama3_1_7b_instruct_supervised_chunked_1k
     # llm2vec_llama3_1_7b_instruct_supervised_chunked_512
-    # "llm2vec_mistral_7b_instruct_supervised"
     # "llm2vec_llama2_sheared_1_3b_supervised"
     # "gteqwen2_7b_instruct"
     # "gteqwen2_7b_instruct_chunked_2k"
     # "gteqwen2_7b_instruct_chunked_1k"
     # "gteqwen2_7b_instruct_chunked_512"
     # "gteqwen2_1_5b_instruct"
-    # "st_gte_large_en_v15"
-    # "bioclinicalbert-fl"
-    # "bioclinicalbert-fl-average-chunks"
-    # "longformerlarge-fl"
-    # "biomedicallongformerlarge-fl"
     # "bioclinicalbert"
     # "deberta_v3_base"
     # "deberta_v3_large"
@@ -47,14 +40,15 @@ text_encoders=(
 # serialization_strategies=(
 #     "list_events",
 #     "list_visits_with_events",
-#     "list_events_by_categories",
 #     "list_visits_with_events_detailed_aggr"
-#     "unqiue_then_list_visits"
-#     "unqiue_then_list_visits_4k"
-#     "unqiue_then_list_visits_2k"
-#     "unqiue_then_list_visits_1k"
-#     # Debug lab values
-#     "demographics_with_aggregated_events"
+#     "unique_then_list_visits_wo_allconds_w_values"
+#     "unique_then_list_visits_wo_allconds_w_values_4k"
+#     "unique_then_list_visits_wo_allconds"
+#     "unique_then_list_visits_wo_allconds_4k"
+#     "unique_then_list_visits_w_values"
+#     "unique_then_list_visits_w_values_4k"
+#     "unique_then_list_visits"
+#     "unique_then_list_visits_4k"
 # )
 # excluded_ontologies=("none" "no_labs" "no_labs_meds" "no_labs_meds_single" "no_labs_single")
 # unique_events=("true" "false")
@@ -62,13 +56,8 @@ text_encoders=(
 # num_aggregated=(0 1 3 5)
 # parent_concepts=("none")
 
-# Quantities of interest
-# supervised_list_visits_with_events_no_labs_true_false_1_full
-# serialization_strategies=("demographics_with_aggregated_events")
-# serialization_strategies=("unqiue_then_list_visits_w_values_4k" "unqiue_then_list_visits_wo_allconds_4k" "unqiue_then_list_visits_wo_allconds_w_values_4k" "unqiue_then_list_visits_w_values" "unqiue_then_list_visits_wo_allconds" "unqiue_then_list_visits_wo_allconds_w_values")
-
-# Selected serialization
-serialization_strategies=("unqiue_then_list_visits_wo_allconds_w_values_4k")
+# Selected serialization and settings
+serialization_strategies=("unique_then_list_visits_wo_allconds_w_values_4k")
 
 excluded_ontologies=("no_labs_single")
 unique_events=("true")

@@ -64,7 +64,7 @@
                 // "--text_encoder", "gteqwen2_7b_instruct_chunked_512",
                 "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised_chunked_2k",
                 "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json",
-                "--serialization_strategy", "unqiue_then_list_visits_wo_allconds_w_values_4k",  // "unqiue_then_list_visits", "list_visits_with_events_detailed_aggr", "list_events", "list_events_by_categories", "list_visits_with_events", ""demographics_with_aggregated_events"
+                "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k",
                 "--excluded_ontologies", "no_labs_single",
                 "--unique_events", "true",
                 "--numeric_values", "false",

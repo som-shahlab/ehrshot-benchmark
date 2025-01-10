@@ -520,41 +520,6 @@ class ListEventsStrategy(SerializationStrategy):
         unique_events = self.get_unique_events(events)
         return EHR_HEADING + aggr_events_serialization + medication_entry_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(unique_events, numeric_values=self.numeric_values, unique_events=self.unique_events)
 
-class ListEventsByCategoriesStrategy(SerializationStrategy):
-    def __init__(self, num_aggregated_events: int, medication_entry: bool):
-        self.num_aggregated_events = num_aggregated_events
-        self.medication_entry = medication_entry
-    
-    def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        aggr_events_serialization = ""
-        if self.num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
-        
-        # Add visits
-        visits_serialization = "## Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
-            
-        # Add medications
-        medications_serialization = ""
-        if self.medication_entry:
-            medications_serialization = "## Medications\n\n" + self.serialize_unique_event_list(
-                self.get_unique_values_of_ontologies(ehr_serializer, ['RxNorm', 'RxNorm Extension']),
-                numeric_values=False
-            )
-        
-        # Add procedures
-        procedures_serialization = "## Procedures\n\n" + self.serialize_unique_event_list(
-            self.get_unique_values_of_ontologies(ehr_serializer, ['CPT4', 'ICD10PCS', 'ICD9Proc']),
-            numeric_values=False
-        ) + '\n\n'
-        
-        # Add general events
-        general_events_serialization = "## General Events\n\n" + self.serialize_unique_event_list(
-            self.get_unique_values_of_ontologies(ehr_serializer, ['RxNorm', 'RxNorm Extension', 'CPT4', 'ICD10PCS', 'ICD9Proc', 'Visit'], negated=True),
-            numeric_values=False
-        ) + '\n\n'
-        
-        return EHR_HEADING + self.get_time_text() + aggr_events_serialization + visits_serialization + general_events_serialization + procedures_serialization + medications_serialization 
-
 
 class UniqueThenListVisitsStrategy(SerializationStrategy):
     def __init__(self, num_aggregated_events: int, medication_entry: bool):
@@ -705,16 +670,6 @@ class UniqueThenListVisitsWOAllCondsWithValuesStrategy(SerializationStrategy):
         
         return result
 
-class DemographicsWithAggregatedEventsStrategy(SerializationStrategy):
-    def __init__(self, num_aggregated_events: int, use_dates: bool):
-        self.num_aggregated_events = num_aggregated_events
-        self.use_dates = use_dates
-
-    def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events, include_date=self.use_dates)
-        # Add the first three static events (age, race, gender)
-        return EHR_HEADING + aggr_events_serialization + STATIC_EVENTS_HEADING + self.serialize_event_list(ehr_serializer.static_events[:3], numeric_values=False, unique_events=False)
-  
 class ListVisitsWithEventsStrategy(SerializationStrategy):
     def __init__(self, unique_events: bool, numeric_values: bool, medication_entry: bool, num_aggregated_events: int):
         self.unique_events = unique_events

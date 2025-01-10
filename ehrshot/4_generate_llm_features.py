@@ -6,7 +6,7 @@ from utils import check_file_existence_and_handle_force_refresh
 from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_7B_InstructSupervisedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, LLM2VecMistral_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
-from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListEventsByCategoriesStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy, DemographicsWithAggregatedEventsStrategy
+from serialization.ehr_serializer import ListEventsStrategy, ListVisitsWithEventsStrategy, ListVisitsWithEventsDetailedAggrStrategy, UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy
 from datetime import datetime
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
@@ -54,52 +54,36 @@ if __name__ == "__main__":
     if args.serialization_strategy == 'list_events':
         serialization_strategy = ListEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
-    if args.serialization_strategy == 'list_events_by_categories':
-        serialization_strategy = ListEventsByCategoriesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 8192
-    if args.serialization_strategy == 'list_events_by_categories_4k':
-        serialization_strategy = ListEventsByCategoriesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 4096
     elif args.serialization_strategy == 'list_visits_with_events':
         serialization_strategy = ListVisitsWithEventsStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
-        # max_input_length = 32000
         max_input_length = 8192
     elif args.serialization_strategy == 'list_visits_with_events_detailed_aggr':
         serialization_strategy = ListVisitsWithEventsDetailedAggrStrategy(UNIQUE_EVENTS, NUMERIC_VALUES, MEDICATION_ENTRY, NUM_AGGREGATED_EVENTS)
         max_input_length = 8192
-    elif args.serialization_strategy == 'unqiue_then_list_visits':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unqiue_then_list_visits_4k':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unqiue_then_list_visits_2k':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 2048
-    elif args.serialization_strategy == 'unqiue_then_list_visits_1k':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 1024
-    elif args.serialization_strategy == 'unqiue_then_list_visits_w_values':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unqiue_then_list_visits_w_values_4k':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unqiue_then_list_visits_wo_allconds':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unqiue_then_list_visits_wo_allconds_4k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unqiue_then_list_visits_wo_allconds_w_values':
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values':
         serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 8192
-    elif args.serialization_strategy == 'unqiue_then_list_visits_wo_allconds_w_values_4k':
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_4k':
         serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
         max_input_length = 4096
-    elif args.serialization_strategy == 'demographics_with_aggregated_events':
-        serialization_strategy = DemographicsWithAggregatedEventsStrategy(NUM_AGGREGATED_EVENTS, use_dates=False)
-        max_input_length = 512
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 8192
+    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_4k':
+        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 4096
+    elif args.serialization_strategy == 'unique_then_list_visits_w_values':
+        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 8192
+    elif args.serialization_strategy == 'unique_then_list_visits_w_values_4k':
+        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 4096
+    elif args.serialization_strategy == 'unique_then_list_visits':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 8192
+    elif args.serialization_strategy == 'unique_then_list_visits_4k':
+        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS, MEDICATION_ENTRY)
+        max_input_length = 4096
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__}")
