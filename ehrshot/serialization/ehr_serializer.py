@@ -498,6 +498,27 @@ class SerializationStrategy(ABC):
                     add_unique_event(event)
                         
         return unique_events
+    
+    def get_demographics_aggr_events_visits_serialization(self, ehr_serializer, label_time: datetime) -> str:
+        # Add demographics
+        num_demographics = 4
+        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
+            num_demographics = 3
+        if len(ehr_serializer.static_events) <= num_demographics:
+            num_demographics = len(ehr_serializer.static_events)
+            
+        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
+        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
+        
+        # Add aggregated events
+        aggr_events_serialization = ""
+        if self.num_aggregated_events > 0:
+            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
+        
+        # Add visits
+        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
+        
+        return demographics_serialization + aggr_events_serialization + visits_serialization
                 
 class ListEventsStrategy(SerializationStrategy):
     def __init__(self, unique_events: bool, numeric_values: bool, medication_entry: bool, num_aggregated_events: int):
@@ -527,23 +548,8 @@ class UniqueThenListVisitsStrategy(SerializationStrategy):
         self.medication_entry = medication_entry
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
-        
-        # Add demographics
-        num_demographics = 4
-        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
-            num_demographics = 3
-        if len(ehr_serializer.static_events) <= num_demographics:
-            num_demographics = len(ehr_serializer.static_events)
-            
-        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
-        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
-        
-        aggr_events_serialization = ""
-        if self.num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
-        
-        # Add visits
-        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
+
+        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time)
         
         # Add general events
         general_events_serialization = "## All Medical Conditions\n\n" + self.serialize_unique_event_list(
@@ -554,7 +560,7 @@ class UniqueThenListVisitsStrategy(SerializationStrategy):
         # Detailed Medical History
         medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" + self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=False, unique_events=True) 
         
-        result = EHR_HEADING + self.get_time_text() + demographics_serialization + aggr_events_serialization + visits_serialization + general_events_serialization + medical_history
+        result = EHR_HEADING + self.get_time_text() + demographics_aggr_events_visits_serialization + general_events_serialization + medical_history
         result = re.sub(r'\n{3,}', '\n\n', result)
         
         return result
@@ -566,23 +572,8 @@ class UniqueThenListVisitsWithValuesStrategy(SerializationStrategy):
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         
-        # Add demographics
-        num_demographics = 4
-        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
-            num_demographics = 3
-        if len(ehr_serializer.static_events) <= num_demographics:
-            num_demographics = len(ehr_serializer.static_events)
-            
-        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
-        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
-        
-        aggr_events_serialization = ""
-        if self.num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
-        
-        # Add visits
-        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
-        
+        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time)
+
         # Add general events
         general_events_serialization = "## All Medical Conditions\n\n" + self.serialize_unique_event_list(
             self.get_unique_values_of_ontologies(ehr_serializer, ['RxNorm', 'RxNorm Extension', 'CPT4', 'ICD10PCS', 'ICD9Proc', 'Visit'], negated=True),
@@ -594,7 +585,7 @@ class UniqueThenListVisitsWithValuesStrategy(SerializationStrategy):
         medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" +\
             self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=True, unique_events=True, keep_last=3) 
         
-        result = EHR_HEADING + self.get_time_text() + demographics_serialization + aggr_events_serialization + visits_serialization + general_events_serialization + medical_history
+        result = EHR_HEADING + self.get_time_text() + demographics_aggr_events_visits_serialization + general_events_serialization + medical_history
         result = re.sub(r'\n{3,}', '\n\n', result)
         
         return result
@@ -606,30 +597,15 @@ class UniqueThenListVisitsWOAllCondsStrategy(SerializationStrategy):
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         
-        # Add demographics
-        num_demographics = 4
-        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
-            num_demographics = 3
-        if len(ehr_serializer.static_events) <= num_demographics:
-            num_demographics = len(ehr_serializer.static_events)
-            
-        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
-        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
-        
-        aggr_events_serialization = ""
-        if self.num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
-        
-        # Add visits
-        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
-        
+        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time)
+
         # Add general events
         general_events_serialization = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=False) + '\n\n'
         
         # Detailed Medical History
         medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" + self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=False, unique_events=True) 
         
-        result = EHR_HEADING + self.get_time_text() + demographics_serialization + aggr_events_serialization + visits_serialization + general_events_serialization + medical_history
+        result = EHR_HEADING + self.get_time_text() + demographics_aggr_events_visits_serialization + general_events_serialization + medical_history
         result = re.sub(r'\n{3,}', '\n\n', result)
         
         return result
@@ -641,23 +617,8 @@ class UniqueThenListVisitsWOAllCondsWithValuesStrategy(SerializationStrategy):
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         
-        # Add demographics
-        num_demographics = 4
-        if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
-            num_demographics = 3
-        if len(ehr_serializer.static_events) <= num_demographics:
-            num_demographics = len(ehr_serializer.static_events)
-            
-        demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
-        ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
-        
-        aggr_events_serialization = ""
-        if self.num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, self.num_aggregated_events)
-        
-        # Add visits
-        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
-        
+        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time)
+
         # Add general events
         general_events_serialization = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=True, keep_last=3) + '\n\n'
         
@@ -665,7 +626,7 @@ class UniqueThenListVisitsWOAllCondsWithValuesStrategy(SerializationStrategy):
         medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" +\
             self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=True, unique_events=True, keep_last=3) 
         
-        result = EHR_HEADING + self.get_time_text() + demographics_serialization + aggr_events_serialization + visits_serialization + general_events_serialization + medical_history
+        result = EHR_HEADING + self.get_time_text() + demographics_aggr_events_visits_serialization + general_events_serialization + medical_history
         result = re.sub(r'\n{3,}', '\n\n', result)
         
         return result
