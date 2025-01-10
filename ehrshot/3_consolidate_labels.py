@@ -29,10 +29,12 @@ if __name__ == "__main__":
 
     # Get all labels currently in `PATH_TO_LABELS_DIR`
     labeling_functions: List[str] = os.listdir(PATH_TO_LABELS_DIR)
-    # NOTE: For faster testing only include tasks 'new_*' and 'guo_*'
-    labeling_functions = [x for x in labeling_functions if x.startswith('new_') or x.startswith('guo_')]
+    # NOTE: Include only some tasks
+    # labeling_functions = [x for x in labeling_functions if x.startswith('new_') or x.startswith('guo_') or x.startswith('chexpert')]
+    # NOTE: Include all tasks
+    labeling_functions = [x for x in labeling_functions if x.startswith('new_') or x.startswith('guo_') or x.startswith('lab_') or x.startswith('chexpert')]
     logger.info(f"Found {len(labeling_functions)} labeling functions to merge: {labeling_functions}")
-
+    
     # Merge all predictions times for all labels across all tasks into a single file,
     # and track the task (labeling function) used for each label.
     logger.info("Start | Consolidate patients")
