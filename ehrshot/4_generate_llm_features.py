@@ -41,47 +41,48 @@ if __name__ == "__main__":
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type']  if args.excluded_ontologies == 'no_labs_meds_single' else []
     NUM_AGGREGATED_EVENTS: int = args.num_aggregated  # Default: 0
     FILTER_AGGREGATED_EVENTS: bool = NUM_AGGREGATED_EVENTS > 0
-        
-    # Serialization strategies
-    if args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_4k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_2k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 2048
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_1k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 1024
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_512':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 512
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unique_then_list_visits_wo_allconds_4k':
-        serialization_strategy = UniqueThenListVisitsWOAllCondsStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unique_then_list_visits_w_values':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unique_then_list_visits_w_values_4k':
-        serialization_strategy = UniqueThenListVisitsWithValuesStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 4096
-    elif args.serialization_strategy == 'unique_then_list_visits':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 8192
-    elif args.serialization_strategy == 'unique_then_list_visits_4k':
-        serialization_strategy = UniqueThenListVisitsStrategy(NUM_AGGREGATED_EVENTS)
-        max_input_length = 4096
+
+    # Process serialization ablations for unique_then_list_visits_wo_allconds_w_values_4k
+    ablation_prefix = 'unique_then_list_visits_wo_allconds_w_values_4k_no_'
+    if args.serialization_strategy.startswith(ablation_prefix):
+        ablation_suffix = args.serialization_strategy[len(ablation_prefix):]
+        # Process appended ablations
+        ablation = [f"no_{component}" for component in ablation_suffix.split('_no_')]
+        args.serialization_strategy = 'unique_then_list_visits_wo_allconds_w_values_4k'
+    else:
+        ablation = []
+
+    # Serialization strategy mapping
+    strategy_map = {
+        'unique_then_list_visits_wo_allconds_w_values': (UniqueThenListVisitsWOAllCondsWithValuesStrategy, 8192),
+        'unique_then_list_visits_wo_allconds_w_values_4k': (UniqueThenListVisitsWOAllCondsWithValuesStrategy, 4096),
+        'unique_then_list_visits_wo_allconds_w_values_2k': (UniqueThenListVisitsWOAllCondsWithValuesStrategy, 2048),
+        'unique_then_list_visits_wo_allconds_w_values_1k': (UniqueThenListVisitsWOAllCondsWithValuesStrategy, 1024),
+        'unique_then_list_visits_wo_allconds_w_values_512': (UniqueThenListVisitsWOAllCondsWithValuesStrategy, 512),
+        'unique_then_list_visits_wo_allconds': (UniqueThenListVisitsWOAllCondsStrategy, 8192),
+        'unique_then_list_visits_wo_allconds_4k': (UniqueThenListVisitsWOAllCondsStrategy, 4096),
+        'unique_then_list_visits_w_values': (UniqueThenListVisitsWithValuesStrategy, 8192),
+        'unique_then_list_visits_w_values_4k': (UniqueThenListVisitsWithValuesStrategy, 4096),
+        'unique_then_list_visits': (UniqueThenListVisitsStrategy, 8192),
+        'unique_then_list_visits_4k': (UniqueThenListVisitsStrategy, 4096),
+    }
+
+    # Determine serialization strategy and max input length
+    if args.serialization_strategy in strategy_map:
+        strategy_class, max_input_length = strategy_map[args.serialization_strategy]
+        # Process potential ablations
+        if args.serialization_strategy == 'unique_then_list_visits_wo_allconds_w_values_4k':
+            serialization_strategy = strategy_class(NUM_AGGREGATED_EVENTS, ablation=ablation)
+        else:
+            serialization_strategy = strategy_class(NUM_AGGREGATED_EVENTS)
     else:
         raise ValueError(f"Serialization strategy `{args.serialization_strategy}` not recognized")
+    
     logger.info(f"Use serialization strategy: {serialization_strategy.__class__}")
     logger.info(f"    Num aggregated events: {NUM_AGGREGATED_EVENTS}")
     logger.info(f"    Max input length: {max_input_length}")
     logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")
+    logger.info(f"    Ablation: {ablation}")
     
     # Mapping of text encoder names to their corresponding classes
     encoder_mapping = {

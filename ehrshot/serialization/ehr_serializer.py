@@ -344,7 +344,7 @@ class SerializationStrategy(ABC):
 
         return '\n'.join(serialized_events)
 
-    def list_visits_with_events_by_category(self, ehr_serializer, label_time, numeric_values=False, unique_events=False, keep_last=None) -> str:
+    def list_visits_with_events_by_category(self, ehr_serializer, label_time, numeric_values=False, unique_events=False, keep_last=None, ablation: list[str] = []) -> str:
         visit_texts = []
         # Set label time to a constant value for all patients
         
@@ -356,11 +356,11 @@ class SerializationStrategy(ABC):
             procedure_events = [e for e in visit.events if e.code.split('/')[0] in ['CPT4', 'ICD10PCS', 'ICD9Proc']]
             
             categories = []
-            if general_events:
+            if general_events and 'no_conditions' not in ablation:
                 categories.append("#### Conditions\n\n" + self.serialize_unique_event_list(general_events, numeric_values=numeric_values, keep_last=keep_last))
-            if medication_events:
+            if medication_events and 'no_medications' not in ablation:
                 categories.append("#### Medications\n\n" + self.serialize_unique_event_list(medication_events, numeric_values=numeric_values, keep_last=keep_last))
-            if procedure_events:    
+            if procedure_events and 'no_procedures' not in ablation:    
                 categories.append("#### Procedures\n\n" + self.serialize_unique_event_list(procedure_events, numeric_values=numeric_values, keep_last=keep_last))
             visit_texts.append(visit_text + '\n\n'.join(categories))
 
@@ -499,24 +499,29 @@ class SerializationStrategy(ABC):
                         
         return unique_events
     
-    def get_demographics_aggr_events_visits_serialization(self, ehr_serializer, label_time: datetime, num_aggregated_events) -> str:
-        # Add demographics
+    def get_demographics_aggr_events_visits_serialization(self, ehr_serializer, label_time: datetime, num_aggregated_events, ablation: list[str] = []) -> str:
+        # Add demographics        
         num_demographics = 4
         if len(ehr_serializer.static_events) >= 3 and ehr_serializer.static_events[2].code.startswith('Ethnicity'):
             num_demographics = 3
         if len(ehr_serializer.static_events) <= num_demographics:
             num_demographics = len(ehr_serializer.static_events)
-            
         demographics_serialization = "## Patient Demographics\n\n" + self.serialize_unique_event_list(ehr_serializer.static_events[:num_demographics], numeric_values=False) + '\n\n'
         ehr_serializer.static_events = ehr_serializer.static_events[num_demographics:]
-        
+        # Remove afterwards to ensure that the demographics are not included in the general events
+        if 'no_demographics' in ablation:
+            demographics_serialization = ""
+            
         # Add aggregated events
         aggr_events_serialization = ""
-        if num_aggregated_events > 0:
-            aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, num_aggregated_events)
+        if 'no_aggregated_events' not in ablation:
+            if num_aggregated_events > 0:
+                aggr_events_serialization = self.serialize_aggregated_events_list(ehr_serializer.aggregated_events, num_aggregated_events)
         
         # Add visits
-        visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
+        visits_serialization = ""
+        if 'no_visits' not in ablation:
+            visits_serialization = "## Past Medical Visits\n\n" + '\n'.join(["- " + visit_heading(label_time, visit)[4:-2] for visit in sorted(ehr_serializer.visits, reverse=True)]) + '\n\n'
         
         return demographics_serialization + aggr_events_serialization + visits_serialization
                 
@@ -608,19 +613,28 @@ class UniqueThenListVisitsWOAllCondsStrategy(SerializationStrategy):
         return result
 
 class UniqueThenListVisitsWOAllCondsWithValuesStrategy(SerializationStrategy):
-    def __init__(self, num_aggregated_events: int):
+    def __init__(self, num_aggregated_events: int, ablation: list[str] = []):
         self.num_aggregated_events = num_aggregated_events
+        self.ablation = ablation
     
     def serialize(self, ehr_serializer, label_time: datetime) -> str:
         
-        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time, self.num_aggregated_events)
+        demographics_aggr_events_visits_serialization = self.get_demographics_aggr_events_visits_serialization(ehr_serializer, label_time, self.num_aggregated_events, self.ablation)
 
         # Add general events
+        if 'no_conditions' in self.ablation:
+            ehr_serializer.static_events = [e for e in ehr_serializer.static_events if e.code.split('/')[0] in ['RxNorm', 'RxNorm Extension', 'CPT4', 'ICD10PCS', 'ICD9Proc', 'Visit']]
+        if 'no_medications' in self.ablation:
+            ehr_serializer.static_events = [e for e in ehr_serializer.static_events if e.code.split('/')[0] not in ['RxNorm', 'RxNorm Extension']]
+        if 'no_procedures' in self.ablation:
+            ehr_serializer.static_events = [e for e in ehr_serializer.static_events if e.code.split('/')[0] not in ['CPT4', 'ICD10PCS', 'ICD9Proc']]
         general_events_serialization = STATIC_EVENTS_HEADING + self.serialize_unique_event_list(ehr_serializer.static_events, numeric_values=True, keep_last=3) + '\n\n'
         
         # Detailed Medical History
-        medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" +\
-            self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=True, unique_events=True, keep_last=3) 
+        medical_history = ""
+        if 'no_visits' not in self.ablation:
+            medical_history = "## Detailed Past Medical Visits (most recent first)\n\n" +\
+                self.list_visits_with_events_by_category(ehr_serializer, label_time, numeric_values=True, unique_events=True, keep_last=3, ablation=self.ablation) 
         
         result = EHR_HEADING + self.get_time_text() + demographics_aggr_events_visits_serialization + general_events_serialization + medical_history
         result = re.sub(r'\n{3,}', '\n\n', result)
