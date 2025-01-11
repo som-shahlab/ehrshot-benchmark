@@ -431,6 +431,9 @@ class LLMFeaturizer():
         # Print character statistics
         print(f"Character statistics for serializations:\n{pd.Series([len(s) for s in serializations]).describe()}")
 
+        # NOTE: For LLM2Vec code
+        # 1. Added inline processing in encode()
+        # 2. Added special case for self.max_length <= self.doc_max_length in _convert_to_str to save serial tokenization
         self.embeddings = text_encoder.encode_texts(instructions, serializations, cache_dir)
 
     def featurize(

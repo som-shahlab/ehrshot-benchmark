@@ -139,7 +139,7 @@ if __name__ == "__main__":
     # Load consolidated labels across all patients for all tasks
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELS_FILE}`")
     patients_to_labels: Dict[int, List[Tuple[datetime, str]]] = load_labeled_patients_with_tasks(PATH_TO_LABELS_FILE)
-    # TODO Debug: Consider subset of patients
+    # NOTE Debug: Consider subset of patients
     # patients_to_labels = {k: v for k, v in list(patients_to_labels.items())[:20]}
     logger.info(f"Loaded {len(patients_to_labels)} patients with {sum([len(v) for v in patients_to_labels.values()])} labels")
 
