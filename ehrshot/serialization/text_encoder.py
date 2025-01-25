@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Optional
 from numpy.typing import NDArray
 import numpy as np
 import torch.nn.functional as F
@@ -12,6 +12,7 @@ from tqdm import tqdm
 from typing import Tuple
 import hashlib
 import os
+import pickle
 from llm2vec import LLM2Vec
 import torch
 # Workaround for ModernBert
@@ -411,73 +412,59 @@ class TextEncoder:
         for cache_file in cache_files:
             os.remove(os.path.join(cache_dir, cache_file))
     
-    def encode_texts(self, instructions: List[str], texts: List[str], cache_dir: str) -> NDArray[Any]:
+    def encode_texts(self, instructions: List[str], texts: List[str], cache_dir: Optional[str] = None) -> NDArray[Any]:
+        # Add instructions to texts
         if all([instruction is None or len(instruction) == 0 for instruction in instructions]):
             inputs = texts
         else:
             inputs = [self.encoder.add_instruction(instruction, text) for instruction, text in zip(instructions, texts)]
         
-        # Old variant: process with duplicates
-        return self.encoder._encode(inputs)
-        
-        # # Performance improvement: Remove exact duplicates and restore them after encoding
-        # # Careful: inputs are lists of strings, so we need to convert them to tuples for hashing
-        # def serialize_input(input):
-        #     return input if isinstance(input, str) else tuple(input)
-        
-        # # Store original indices of inputs
-        # input_to_indices = defaultdict(list)
-        # for i, input in enumerate(inputs):
-        #     input_to_indices[serialize_input(input)].append(i)
-        #     
-        # # Deduplicate inputs while preserving the first occurrence and encode them
-        # unique_inputs = list(input_to_indices.keys())
-        
-        # # Performance improvement: Process in batches and store intermediate results
-        # batch_size = 600576 # 131072 # 65536 / 131072 (around 10 batches for full) / 2097152
-        # current_index = 0
-        
-        # # Store or check fingerprint
-        # self._store_or_check_fingerprint(unique_inputs, cache_dir)
-        
-        # # Load cached intermediate results of format cache_{start_index}.pkl
-        # cache_files = self._get_cache_files(cache_dir)
-        # if len(cache_files) > 0:
-        #     max_start_indices = max([int(f.split('_')[1].split('.')[0]) for f in cache_files])
-        #     current_index = max_start_indices
-        #     cache_file = os.path.join(cache_dir, f"cache_{max_start_indices}.pkl")
-        #     with open(cache_file, "rb") as f:
-        #         unique_embeddings = pickle.load(f)
-        #         if isinstance(unique_embeddings, np.ndarray):
-        #             unique_embeddings = unique_embeddings.tolist()
-        #     print(f"Loaded {len(unique_embeddings)} cached embeddings.")
-        # else:
-        #     unique_embeddings = []
-        #     print("No cache files found.")
-        #     
-        # # Create embeddings
-        # for start in range(current_index, len(unique_inputs), batch_size):
-        #     print(f"Processing batch {start // batch_size + 1} of {len(unique_inputs) // batch_size + 1}")
-        #     batch = unique_inputs[start:start + batch_size]
-        #     batch_embeddings = self.encoder._encode(batch)
-        #     unique_embeddings.extend(batch_embeddings.tolist())
-        #     
-        #     # Delete all old cache files
-        #     self._delete_all_cache_files(cache_dir)
-        #         
-        #     # Save intermediate results
-        #     cache_file = os.path.join(cache_dir, f"cache_{len(unique_embeddings)}.pkl")
-        #     with open(cache_file, "wb") as f:
-        #         pickle.dump(unique_embeddings, f)
-        #     print(f"Saved {len(unique_embeddings)} embeddings to {cache_file}")
-        #        
-        # # Delete all old cache files
-        # self._delete_all_cache_files(cache_dir)
-        
-        # # Restore deduplicated embeddings to original order
-        # embeddings = [None] * len(inputs)
-        # for i, input in enumerate(unique_inputs):
-        #     for j in input_to_indices[input]:
-        #         embeddings[j] = unique_embeddings[i]
-        # assert all(embedding is not None for embedding in embeddings)
-        # return np.array(embeddings)
+        # Encode texts
+        if cache_dir is None:
+            # Encode all texts at once
+            return self.encoder._encode(inputs)
+        else:
+            # Encode texts in batches and store intermediate results
+            num_batches = 4
+            batch_size = len(inputs) // num_batches + 1
+            current_index = 0
+            
+            # Store or check fingerprint
+            self._store_or_check_fingerprint(inputs, cache_dir)
+            
+            # Load cached intermediate results of format cache_{start_index}.pkl
+            cache_files = self._get_cache_files(cache_dir)
+            if len(cache_files) > 0:
+                max_start_indices = max([int(f.split('_')[1].split('.')[0]) for f in cache_files])
+                current_index = max_start_indices
+                cache_file = os.path.join(cache_dir, f"cache_{max_start_indices}.pkl")
+                with open(cache_file, "rb") as f:
+                    embeddings = pickle.load(f)
+                    if isinstance(embeddings, np.ndarray):
+                        embeddings = embeddings.tolist()
+                print(f"Loaded {len(embeddings)} cached embeddings.")
+            else:
+                embeddings = []
+                print("No cache files found.")
+                
+            # Create embeddings
+            for start in range(current_index, len(inputs), batch_size):
+                print(f"Processing batch {start // batch_size + 1} of {len(inputs) // batch_size + 1}")
+                batch = inputs[start:start + batch_size]
+                batch_embeddings = self.encoder._encode(batch)
+                embeddings.extend(batch_embeddings.tolist())
+                
+                # Delete all old cache files
+                self._delete_all_cache_files(cache_dir)
+                    
+                # Save intermediate results
+                cache_file = os.path.join(cache_dir, f"cache_{len(embeddings)}.pkl")
+                with open(cache_file, "wb") as f:
+                    pickle.dump(embeddings, f)
+                print(f"Saved {len(embeddings)} embeddings to {cache_file}")
+                
+            # Delete all old cache files
+            # NOTE: Keep last cached files in case anything goes wrong after this point
+            self._delete_all_cache_files(cache_dir)
+            
+            return np.array(embeddings)

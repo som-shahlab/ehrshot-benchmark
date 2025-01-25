@@ -159,7 +159,11 @@ if __name__ == "__main__":
     logger.info("Finish | Preprocess featurizers")
     
     # Run text encoding on serializations of patients - must be done separately to prevent multiprocessing issue with CUDA
-    llm_featurizer.encode_serializations(text_encoder, cache_dir=PATH_TO_FEATURES_DIR)
+    cache_dir = None
+    if args.text_encoder.startswith('llm2vec_llama'):
+        # Use cache_dir to store embeddings for llm2vec_llama models because otherwise memory allocation error on multiple GPUs
+        cache_dir=PATH_TO_FEATURES_DIR
+    llm_featurizer.encode_serializations(text_encoder, cache_dir=cache_dir)
     # Encoder not necessary anymore
     del text_encoder
 

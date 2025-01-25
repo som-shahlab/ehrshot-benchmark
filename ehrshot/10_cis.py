@@ -4,6 +4,7 @@ import math
 import collections
 from typing import List
 import pandas as pd
+from collections import defaultdict
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Make plots/tables of cohort stats")
@@ -90,9 +91,12 @@ if __name__ == "__main__":
                     results_df = results_df._append({'subtask': subtask, 'model': model, 'head': head, 'score': score, 'est': est, 'lower': lower, 'upper': upper}, ignore_index=True)
             print('-' * 80)
 
-    print("\n\nGrouped Tasks\n\n")
     prefixes: List[str] = list({a[:4] for a in LABELING_FUNCTIONS})
     for score in ['auroc', 'auprc']:
+        # Collect means and variances for all subtasks
+        group_means = defaultdict(list)
+        group_variances = defaultdict(list)
+
         print("==== SCORE:", score, "====")
         for p in prefixes:
             print(p)
@@ -107,12 +111,29 @@ if __name__ == "__main__":
                         count += 1
                 est = total / count
                 std = math.sqrt(variance / count**2)
+                group_means[f"{model}_{head}"].append(est)
+                group_variances[f"{model}_{head}"].append(std**2)
                 lower = est - std * 1.96
                 upper = est + std * 1.96
                 print(f"{model}-{head} {est:0.3f} ({lower:0.3f} - {upper:0.3f})")
                 if results_df is not None:
                     results_df = results_df._append({'subtask': p, 'model': model, 'head': head, 'score': score, 'est': est, 'lower': lower, 'upper': upper}, ignore_index=True)
             print('-' * 80)
+
+        print("task_group_average")
+        for model, head in model_heads:
+            # Compute overall mean and variance from group means
+            num_groups = len(group_means[f"{model}_{head}"])
+            assert num_groups == len(group_variances[f"{model}_{head}"])
+            overall_mean = sum(group_means[f"{model}_{head}"]) / num_groups
+            overall_variance = sum(group_variances[f"{model}_{head}"]) / num_groups
+            std = math.sqrt(overall_variance)
+            lower = overall_mean - std * 1.96
+            upper = overall_mean + std * 1.96
+            print(f"{model}-{head} {overall_mean:0.3f} ({lower:0.3f} - {upper:0.3f}) (groups: {len(group_means[f'{model}_{head}'])})")
+            if results_df is not None:
+                results_df = results_df._append({'subtask': 'task_group_average', 'model': model, 'head': head, 'score': score, 'est': overall_mean, 'lower': lower, 'upper': upper}, ignore_index=True)
+        print('-' * 80)
             
     if results_df is not None:
         results_df.to_csv(args.path_to_output_file, index=False)

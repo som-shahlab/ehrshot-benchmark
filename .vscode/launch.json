@@ -58,8 +58,8 @@
                 "--is_force_refresh",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/MedNLI_train_m-Meta-Llama-3.1-8B-Instruct_l-512/checkpoint-200",
-                // "--text_encoder", "gteqwen2_7b_instruct",
-                "--text_encoder", "gteqwen2_1_5b_instruct",
+                "--text_encoder", "gteqwen2_7b_instruct",
+                // "--text_encoder", "gteqwen2_1_5b_instruct",
                 // "--text_encoder", "deberta_v3_base",
                 // "--text_encoder", "gteqwen2_7b_instruct_chunked_512",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised_chunked_2k",
@@ -95,6 +95,23 @@
                 "--num_threads", "1"
             ]
 
+        },
+
+        {
+            "name": "Python Debugger: 9_make_cohort_plots.py",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/9_make_cohort_plots.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_to_database", "~/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract",
+                "--path_to_labels_and_feats_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark",
+                "--path_to_input_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/data",
+                "--path_to_splits_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/splits",
+                "--path_to_output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/cohort_stats",
+                "--num_threads", "32"
+            ]
         },
 
         {

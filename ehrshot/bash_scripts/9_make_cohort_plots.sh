@@ -3,7 +3,7 @@
 #SBATCH --output=logs/9_make_cohort_plots_%A.out
 #SBATCH --error=logs/9_make_cohort_plots_%A.err
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=normal
+#SBATCH --partition=compute
 #SBATCH --mem=300G
 #SBATCH --cpus-per-task=32
 

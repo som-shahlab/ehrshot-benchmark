@@ -462,6 +462,215 @@ if __name__ == "__main__":
     df_figure.insert(6, 'Spacer 2', '')
     write_table_to_latex(df_figure, PATH_TO_LATEX_TABLES_FILE, is_ignore_index=True)
 
+    
+    ########################################################
+    ########################################################
+    #
+    # CREATE FOURTH TABLE
+
+    # Define the splits
+    splits = ['train', 'val', 'test']
+
+    # Initialize a list to hold each row of the table
+    table_rows = []
+
+    # 1. Number of Events
+    total_events = df_demo['num_events'].sum()
+    events_counts = df_demo.groupby('split')['num_events'].sum()
+    events_formatted = {}
+    for split in splits:
+        count = events_counts.get(split, 0)
+        percent = (count / total_events * 100) if total_events > 0 else 0.0
+        events_formatted[split] = f"{count} ({percent:.1f})"
+    events_formatted['Total'] = f"{total_events} (100.0)"
+    table_rows.append({
+        'Attribute': 'Number of Events, n (%)',
+        'Train': events_formatted.get('train', '0 (0.0)'),
+        'Validation': events_formatted.get('val', '0 (0.0)'),
+        'Test': events_formatted.get('test', '0 (0.0)'),
+        'Total': events_formatted.get('Total', '0 (100.0)')
+    })
+
+    # 2. Number of Visits
+    total_visits = df_demo['num_visits'].sum()
+    visits_counts = df_demo.groupby('split')['num_visits'].sum()
+    visits_formatted = {}
+    for split in splits:
+        count = visits_counts.get(split, 0)
+        percent = (count / total_visits * 100) if total_visits > 0 else 0.0
+        visits_formatted[split] = f"{count} ({percent:.1f})"
+    visits_formatted['Total'] = f"{total_visits} (100.0)"
+    table_rows.append({
+        'Attribute': 'Number of Visits, n (%)',
+        'Train': visits_formatted.get('train', '0 (0.0)'),
+        'Validation': visits_formatted.get('val', '0 (0.0)'),
+        'Test': visits_formatted.get('test', '0 (0.0)'),
+        'Total': visits_formatted.get('Total', '0 (100.0)')
+    })
+
+    # 3. Number of Patients
+    total_patients = df_demo['patient_id'].nunique()
+    patients_counts = df_demo.groupby('split')['patient_id'].nunique()
+    patients_formatted = {}
+    for split in splits:
+        count = patients_counts.get(split, 0)
+        percent = (count / total_patients * 100) if total_patients > 0 else 0.0
+        patients_formatted[split] = f"{count} ({percent:.1f})"
+    patients_formatted['Total'] = f"{total_patients} (100.0)"
+    table_rows.append({
+        'Attribute': 'Number of Patients, n (%)',
+        'Train': patients_formatted.get('train', '0 (0.0)'),
+        'Validation': patients_formatted.get('val', '0 (0.0)'),
+        'Test': patients_formatted.get('test', '0 (0.0)'),
+        'Total': patients_formatted.get('Total', '0 (100.0)')
+    })
+
+    # 4. Number of Female
+    # Assuming 'is_male' is True for male, False for female
+    df_demo['is_female'] = ~df_demo['is_male']
+    total_female = df_demo['is_female'].sum()
+    female_counts = df_demo.groupby('split')['is_female'].sum()
+    female_formatted = {}
+    for split in splits:
+        count = female_counts.get(split, 0)
+        percent = (count / total_female * 100) if total_female > 0 else 0.0
+        female_formatted[split] = f"{int(count)} ({percent:.1f})"
+    female_formatted['Total'] = f"{int(total_female)} (100.0)"
+    table_rows.append({
+        'Attribute': 'Number of Female, n (%)',
+        'Train': female_formatted.get('train', '0 (0.0)'),
+        'Validation': female_formatted.get('val', '0 (0.0)'),
+        'Test': female_formatted.get('test', '0 (0.0)'),
+        'Total': female_formatted.get('Total', '0 (100.0)')
+    })
+
+    # 5. Number of Male
+    total_male = df_demo['is_male'].sum()
+    male_counts = df_demo.groupby('split')['is_male'].sum()
+    male_formatted = {}
+    for split in splits:
+        count = male_counts.get(split, 0)
+        percent = (count / total_male * 100) if total_male > 0 else 0.0
+        male_formatted[split] = f"{int(count)} ({percent:.1f})"
+    male_formatted['Total'] = f"{int(total_male)} (100.0)"
+    table_rows.append({
+        'Attribute': 'Number of Male, n (%)',
+        'Train': male_formatted.get('train', '0 (0.0)'),
+        'Validation': male_formatted.get('val', '0 (0.0)'),
+        'Test': male_formatted.get('test', '0 (0.0)'),
+        'Total': male_formatted.get('Total', '0 (100.0)')
+    })
+
+    # 6. Age, mean ± SD
+    age_stats = df_demo.groupby('split')['age'].agg(['mean', 'std'])
+    total_mean = df_demo['age'].mean()
+    total_std = df_demo['age'].std()
+    age_stats.loc['Total'] = [total_mean, total_std]
+    age_formatted = {}
+    for split in splits + ['Total']:
+        if split in age_stats.index:
+            mean = age_stats.loc[split, 'mean']
+            std = age_stats.loc[split, 'std']
+        else:
+            mean = total_mean
+            std = total_std
+        age_formatted[split] = f"{mean:.1f} ± {std:.1f}"
+    table_rows.append({
+        'Attribute': 'Age, mean ± SD, years',
+        'Train': age_formatted.get('train', f"{total_mean:.1f} ± {total_std:.1f}"),
+        'Validation': age_formatted.get('val', f"{total_mean:.1f} ± {total_std:.1f}"),
+        'Test': age_formatted.get('test', f"{total_mean:.1f} ± {total_std:.1f}"),
+        'Total': age_formatted.get('Total', f"{total_mean:.1f} ± {total_std:.1f}")
+    })
+
+    # 7. Race Categories
+    # Dynamically retrieve unique race categories from df_demo
+    unique_races = df_demo['race'].dropna().unique()
+    # Create a mapping for display purposes
+    def format_race_name(race_str):
+        return race_str.replace('_', ' ').title()
+
+    race_categories = unique_races.tolist()
+    race_display_names = {race: format_race_name(race) for race in race_categories}
+
+    for race in race_categories:
+        # Total count for the race across all splits
+        total_race = (df_demo['race'] == race).sum()
+        # Counts per split
+        race_counts = df_demo[df_demo['race'] == race].groupby('split')['race'].count()
+        race_formatted = {}
+        for split in splits:
+            count = race_counts.get(split, 0)
+            percent = (count / total_race * 100) if total_race > 0 else 0.0
+            race_formatted[split] = f"{count} ({percent:.1f})"
+        race_formatted['Total'] = f"{int(total_race)} (100.0)" if total_race > 0 else "0 (100.0)"
+        table_rows.append({
+            'Attribute': race_display_names.get(race, race),
+            'Train': race_formatted.get('train', '0 (0.0)'),
+            'Validation': race_formatted.get('val', '0 (0.0)'),
+            'Test': race_formatted.get('test', '0 (0.0)'),
+            'Total': race_formatted.get('Total', '0 (100.0)')
+        })
+
+    # 8. Hispanic and Non-Hispanic
+    # Hispanic
+    total_hispanic = df_demo['is_hispanic'].sum()
+    hispanic_counts = df_demo.groupby('split')['is_hispanic'].sum()
+    hispanic_formatted = {}
+    for split in splits:
+        count = hispanic_counts.get(split, 0)
+        percent = (count / total_hispanic * 100) if total_hispanic > 0 else 0.0
+        hispanic_formatted[split] = f"{int(count)} ({percent:.1f})"
+    hispanic_formatted['Total'] = f"{int(total_hispanic)} (100.0)"
+    table_rows.append({
+        'Attribute': 'Hispanic, n (%)',
+        'Train': hispanic_formatted.get('train', '0 (0.0)'),
+        'Validation': hispanic_formatted.get('val', '0 (0.0)'),
+        'Test': hispanic_formatted.get('test', '0 (0.0)'),
+        'Total': hispanic_formatted.get('Total', '0 (100.0)')
+    })
+
+    # Non-Hispanic
+    total_non_hispanic = df_demo.shape[0] - total_hispanic
+    non_hispanic_counts = df_demo.groupby('split')['is_hispanic'].apply(lambda x: (~x).sum())
+    non_hispanic_formatted = {}
+    for split in splits:
+        count = non_hispanic_counts.get(split, 0)
+        percent = (count / total_non_hispanic * 100) if total_non_hispanic > 0 else 0.0
+        non_hispanic_formatted[split] = f"{int(count)} ({percent:.1f})"
+    non_hispanic_formatted['Total'] = f"{int(total_non_hispanic)} (100.0)"
+    table_rows.append({
+        'Attribute': 'Non-Hispanic, n (%)',
+        'Train': non_hispanic_formatted.get('train', '0 (0.0)'),
+        'Validation': non_hispanic_formatted.get('val', '0 (0.0)'),
+        'Test': non_hispanic_formatted.get('test', '0 (0.0)'),
+        'Total': non_hispanic_formatted.get('Total', '0 (100.0)')
+    })
+
+    # Convert the list of dictionaries to a DataFrame
+    df_table = pd.DataFrame(table_rows)
+
+    # Ensure the rows are in the desired order
+    desired_order = [
+        'Number of Events, n (%)',
+        'Number of Visits, n (%)',
+        'Number of Patients, n (%)',
+        'Number of Female, n (%)',
+        'Number of Male, n (%)',
+        'Age, mean ± SD, years',
+    ] + sorted([format_race_name(race) for race in race_categories]) + [
+        'Hispanic, n (%)',
+        'Non-Hispanic, n (%)'
+    ]
+    df_table['Attribute'] = pd.Categorical(df_table['Attribute'], categories=desired_order, ordered=True)
+    df_table = df_table.sort_values('Attribute').reset_index(drop=True)
+
+    # Rename columns to match the desired output
+    df_table = df_table[['Attribute', 'Train', 'Validation', 'Test', 'Total']]
+
+    # Write the table to LaTeX
+    write_table_to_latex(df_table, PATH_TO_LATEX_TABLES_FILE)
+
     ########################################################
     ########################################################
     #

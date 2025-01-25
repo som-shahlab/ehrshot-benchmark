@@ -34,7 +34,7 @@ def check_slurm_jobs_status(job_ids):
 
 def main(args):
     # NOTE: Manually skip steps
-    start_from_step = 1
+    start_from_step = args.start
     stop_after_eval = True
     os.chdir(args.base_dir)
     
@@ -170,6 +170,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run EHRShot experiments")
+    parser.add_argument("--start", type=int, default=1, help="Start from fixed step")
     parser.add_argument("--base_dir", required=True, help="Base directory")
     parser.add_argument("--experiment_folder", required=True, help="Path to the experiment folder")
     parser.add_argument("--path_to_database", required=True, help="Path to the database")

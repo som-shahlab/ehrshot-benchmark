@@ -406,7 +406,7 @@ class LLMFeaturizer():
     def encode_serializations(
         self,
         text_encoder: TextEncoder,
-        cache_dir: str
+        cache_dir: Optional[str] = None
     ) -> None:
         """ Encode all serializations into embeddings. Outside of featurizer functions to prevent CUDA issues. """
         assert self.embeddings is None, "Embeddings already exist"

@@ -6,14 +6,14 @@
 # --qos=long_job 
 
 # DGX resources: 
-# --partition=pgpu
-# --gres=gpu:nvidia_a100-sxm4-80gb:8
-# --mem=400G
+#SBATCH --partition=pgpu
+#SBATCH --gres=gpu:nvidia_a100-sxm4-80gb:8
+#SBATCH --mem=800G
 
 # PGPU resources: 
-#SBATCH --partition=pgpu
-#SBATCH --gres=gpu:nvidia_a100-sxm4-80gb:4
-#SBATCH --mem=480G
+# --partition=pgpu
+# --gres=gpu:nvidia_a100-sxm4-80gb:4
+# --mem=480G
 
 # GPU resources: 
 # --partition=gpu

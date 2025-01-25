@@ -19,14 +19,14 @@ SPLIT_VAL_CUTOFF: int = 85
 # Types of base models to test
 MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
 # Removed count based model for debugging
+    'clmbr' : {
+        'label' : 'CLMBR',
+        'heads' : ['lr_lbfgs', ],
+    },
     'count' : {
         'label' : 'Count-based',
         # 'heads' : ['gbm', 'lr_lbfgs', 'rf', ],
         'heads' : ['gbm', ],
-    },
-    'clmbr' : {
-        'label' : 'CLMBR',
-        'heads' : ['lr_lbfgs', ],
     },
     # 'agr' : {
     #     'label' : 'Age, Gender, Race',
@@ -64,32 +64,32 @@ HEAD_2_INFO: Dict[str, Dict[str, str]] = {
 # Plotting
 SCORE_MODEL_HEAD_2_COLOR = {
     'auroc' : {
-        'count' : {
-            'gbm' : 'tab:green',
-            'lr_lbfgs' : 'tab:green',
-            'rf' : 'tab:orange',
-        },
         'clmbr' : {
             'lr_lbfgs' : 'tab:blue',
+        },
+        'count' : {
+            'gbm' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
+            'rf' : 'tab:orange',
         },
         'llm' : {
             'lr_lbfgs' : 'tab:orange',
         },
         'llm_llama' : {
-            'lr_lbfgs' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
         },
         'agr' : {
             'lr_lbfgs' : 'tab:brown',
         },
     },
     'auprc' : {
-        'count' : {
-            'gbm' : 'tab:green',
-            'lr_lbfgs' : 'tab:green',
-            'rf' : 'tab:orange',
-        },
         'clmbr' : {
             'lr_lbfgs' : 'tab:blue',
+        },
+        'count' : {
+            'gbm' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
+            'rf' : 'tab:orange',
         },
         'pytorch_clmbr' : {
             'lr_femr' : 'tab:purple',
@@ -98,7 +98,7 @@ SCORE_MODEL_HEAD_2_COLOR = {
             'lr_lbfgs' : 'tab:orange',
         },
         'llm_llama' : {
-            'lr_lbfgs' : 'tab:red',
+            'lr_lbfgs' : 'tab:green',
         },
         'agr' : {
             'lr_lbfgs' : 'tab:brown',
