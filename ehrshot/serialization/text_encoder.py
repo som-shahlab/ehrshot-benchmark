@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from math import e
 from typing import List, Any, Optional
 from numpy.typing import NDArray
 import numpy as np
@@ -72,7 +73,7 @@ class LLMEncoder(ABC):
         # Per default: ignore instruction
         return text
     
-    def get_chunked_dataset(self, texts: List[str], tokenizer, max_chunks=None) -> Tuple[Dataset, List[int]]:
+    def get_chunked_dataset(self, texts: List[str], tokenizer, max_chunks=None) -> Tuple[List[str], List[int]]:
         # Create chunks of size max_input_length tokens for each text
         batch_size=8192 
         max_input_length = self.max_input_length - 8  # Subtract 8 to account for potential special tokens
@@ -248,7 +249,18 @@ class LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder(LLM2VecLlama3_1_7B_Ins
         num_inputs = len(inputs)
         print(f"Creating chunks for {num_inputs} inputs of size {self.max_input_length} (max_chunks: {max_chunks}).")
         # NOTE: Must use self.model.tokenizer instead of self.tokenizer
+        # In contrast to qwen2, the instruction is handled separately for llama, to get same behavior add it to the text
+        instructions = [input[0] for input in inputs]
+        inputs = [input[0] + input[1] for input in inputs]
         inputs, chunk_counts = self.get_chunked_dataset(inputs, self.model.tokenizer, max_chunks=max_chunks)
+        # Remove instructions from first chunk at add them as llama instruction again
+        inputs = [['', input] for input in inputs]
+        first_chunk_idx = 0
+        for i, count in enumerate(chunk_counts):
+            assert instructions[i] == inputs[first_chunk_idx][1][:len(instructions[i])]
+            inputs[first_chunk_idx][0] = instructions[i]
+            inputs[first_chunk_idx][1] = inputs[first_chunk_idx][1][len(instructions[i]):]
+            first_chunk_idx += count
         
         print(f"Encoding {len(inputs)} chunks.")
         all_embeddings = super()._encode(inputs)
