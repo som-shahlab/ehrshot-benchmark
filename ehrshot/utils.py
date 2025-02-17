@@ -10,6 +10,7 @@ import torch.nn as nn
 from sklearn.metrics import pairwise_distances
 from femr.labelers import LabeledPatients
 from loguru import logger
+from tqdm import tqdm
 
 # SPLITS
 SPLIT_SEED: int = 97
@@ -26,17 +27,37 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
         'label' : 'CLMBR',
         'heads' : ['lr_lbfgs', ],
     },
+    'gpt' : {
+        'label' : 'gpt',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'gpt2' : {
+        'label' : 'gpt2',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'bert' : {
+        'label' : 'bert',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'hyena' : {
+        'label' : 'hyena',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'mamba' : {
+        'label' : 'mamba',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
+    'llama' : {
+        'label' : 'llama',
+        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+    },
 }
 
-# Map each base model to a set of heads to test
 HEAD_2_INFO: Dict[str, Dict[str, str]] = {
     'gbm' : {
         'label' : 'GBM',
     },
     'lr_lbfgs' : {
-        'label' : 'LR',
-    },
-    'lr_newton-cg' : {
         'label' : 'LR',
     },
     'protonet' : {
@@ -45,32 +66,17 @@ HEAD_2_INFO: Dict[str, Dict[str, str]] = {
     'rf' : {
         'label' : 'Random Forest',
     },
-}
-
-# Plotting
-SCORE_MODEL_HEAD_2_COLOR = {
-    'auroc' : {
-        'count' : {
-            'gbm' : 'tab:red',
-            'lr_lbfgs' : 'tab:green',
-            'rf' : 'tab:orange',
-        },
-        'clmbr' : {
-            'lr_lbfgs' : 'tab:blue',
-        },
+    'finetune_full' : {
+        'label' : 'Finetune (full)',
     },
-    'auprc' : {
-        'count' : {
-            'lr_lbfgs' : 'tab:green',
-            'gbm' : 'tab:red',
-            'rf' : 'tab:orange',
-        },
-        'clmbr' : {
-            'lr_lbfgs' : 'tab:blue',
-        },
-        'pytorch_clmbr' : {
-            'lr_femr' : 'tab:purple',
-        },
+    'finetune_frozen' : {
+        'label' : 'Finetune (frozen)',
+    },
+    'finetune_layers=1' : {
+        'label' : 'Finetune (last 1 layer)',
+    },
+    'finetune_layers=2' : {
+        'label' : 'Finetune (last 2 layers)',
     },
 }
 
@@ -93,7 +99,11 @@ LABELING_FUNCTION_2_PAPER_NAME = {
     "lab_hyponatremia": "Hyponatremia",
     "lab_anemia": "Anemia",
     # Custom tasks
-    "chexpert": "Chest X-ray Findings"
+    "chexpert": "Chest X-ray Findings",
+    # MIMIC-IV tasks
+    "mimic4_los" : "Long LOS (MIMIC-IV)",
+    "mimic4_readmission" : "30-day Readmission (MIMIC-IV)",
+    "mimic4_mortality" : "Inpatient Mortality (MIMIC-IV)",
 }
 
 TASK_GROUP_2_PAPER_NAME = {
@@ -125,7 +135,10 @@ TASK_GROUP_2_LABELING_FUNCTION = {
     "operational_outcomes": [
         "guo_los",
         "guo_readmission",
-        "guo_icu"
+        "guo_icu",
+        "mimic4_los",
+        "mimic4_mortality",
+        "mimic4_readmission",
     ],
     "lab_values": [
         "lab_thrombocytopenia",
@@ -144,7 +157,7 @@ TASK_GROUP_2_LABELING_FUNCTION = {
     ],
     "chexpert": [
         "chexpert"
-    ]
+    ],
 }
 
 # Hyperparameter search
@@ -154,7 +167,7 @@ XGB_PARAMS = {
     'num_leaves' : [10, 25, 100],
 }
 LR_PARAMS = {
-    "C": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5, 1e6], 
+    "C": [1e-8, 1e-6, 1e-4, 1e-2, 1e-1, 1, 1e2, 1e4, ],
     "penalty": ['l2']
 }
 RF_PARAMS = {
@@ -168,6 +181,7 @@ SHOT_STRATS = {
     'long' : [-1],
     'all' : [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 128, -1],
     'debug' : [10],
+    'mimic' : [-1],
 }
 
 def get_splits(path_to_split_csv: str,
@@ -209,8 +223,9 @@ def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -
     df_split = pd.read_csv(path_to_split_csv)
     split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
     for split in ['train', 'val', 'test']:
+        split_patient_ids = set(df_split[df_split['split'] == split]['omop_person_id'].tolist())
         for idx, id in enumerate(patient_ids.tolist()):
-            if id in df_split[df_split['split'] == split]['omop_person_id'].values:
+            if id in split_patient_ids:
                 split_2_idxs[split].append(idx)
     return (
         split_2_idxs['train'],
@@ -240,11 +255,15 @@ def compute_feature_label_alignment(label_pids, label_dates, feature_pids, featu
             j += 1
 
         if feature_pids[j] != label_pids[i] or feature_dates[j] != label_dates[i]:
-            raise RuntimeError(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
+            # raise RuntimeError(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
+            print(f"Could not find match for {label_pids[i]} {label_dates[i]}, closest is {feature_pids[j]} {feature_dates[j]}")
         result[i] = j
     return result
 
-def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_dir: Optional[str]) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, np.ndarray]]:
+def get_labels_and_features(labeled_patients: LabeledPatients, 
+                            path_to_features_dir: Optional[str], 
+                            path_to_tokenized_timelines_dir: Optional[str],
+                            models_to_keep: List[str] = []) -> Tuple[List[int], List[datetime.datetime], List[int], Dict[str, Dict[str, np.ndarray]]]:
     """Given a path to a directory containing labels and features as well as a LabeledPatients object, returns
         the labels and features for each patient. Note that this function is more complex b/c we need to align
         the labels with their corresponding features based on their prediction times."""
@@ -261,22 +280,39 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
 
     # Go through every featurization we've created (e.g. count, clmbr, motor)
     # and align the label times with the featurization times
-    featurizations: Dict[str, np.ndarray] = {}
-    for model in MODEL_2_INFO.keys():
+    featurizations: Dict[str, Dict[str, np.ndarray]] = {}
+    for model in models_to_keep:
+        print(f"Processing features for model: {model}")
         path_to_feats_file: str = os.path.join(path_to_features_dir, f'{model}_features.pkl')
         assert os.path.exists(path_to_feats_file), f'Path to file containing `{model}` features does not exist at this path: {path_to_feats_file}. Maybe you forgot to run `generate_features.py` first?'
-        
+
         with open(path_to_feats_file, 'rb') as f:
             # Load data and do type checking
-            feats: Tuple[Any, np.ndarray, np.ndarray, np.ndarray] = pickle.load(f)
+            feats = pickle.load(f)
             
+            feature_tokenized_timelines = None
             if isinstance(feats, dict):
-                feature_matrix, feature_patient_ids, feature_times = (
-                    feats['data_matrix'],
-                    feats['patient_ids'],
-                    feats['labeling_time'],
-                )
+                if path_to_tokenized_timelines_dir is not None:
+                    # HF_EHR format
+                    path_to_tokenized_timelines_file: str = os.path.join(path_to_tokenized_timelines_dir, f'{model}_tokenized_timelines.npz')
+                    assert os.path.exists(path_to_tokenized_timelines_file), f'Path to file containing `{model}` tokenized timelines does not exist at this path: {path_to_tokenized_timelines_file}. Maybe you forgot to run `generate_features.py` first?'
+                    tokenized_timelines: np.ndarray = np.load(path_to_tokenized_timelines_file)['tokenized_timelines']
+                    feature_matrix, feature_patient_ids, feature_times, feature_tokenized_timelines = (
+                        feats['data_matrix'],
+                        feats['patient_ids'],
+                        feats['labeling_time'],
+                        tokenized_timelines,
+                    )
+                    assert feature_tokenized_timelines.shape[0] == feature_matrix.shape[0], f'Error -- mismatched number of entries between feature_matrix={feature_matrix.shape[0]} and feature_tokenized_timelines={feature_tokenized_timelines.shape[0]}'
+                else:
+                    # CLMBR format
+                    feature_matrix, feature_patient_ids, feature_times = (
+                        feats['data_matrix'],
+                        feats['patient_ids'],
+                        feats['labeling_time'],
+                    )
             else:
+                # Count-based format
                 feature_matrix, feature_patient_ids, feature_times = (
                     feats[0],
                     feats[1],
@@ -298,12 +334,17 @@ def get_labels_and_features(labeled_patients: LabeledPatients, path_to_features_
                                                             feature_patient_ids, 
                                                             feature_times.astype(np.int64))
             feature_matrix = feature_matrix[sort_order[join_indices], :]
+            if feature_tokenized_timelines is not None:
+                feature_tokenized_timelines = feature_tokenized_timelines[sort_order[join_indices], :]
 
             # Validate that our alignment was successful
             assert np.all(feature_patient_ids[join_indices] == label_patient_ids)
             assert np.all(feature_times[join_indices] == label_times)
 
-            featurizations[model] = feature_matrix
+            featurizations[model] = {
+                'frozen' : feature_matrix,
+                'timelines' : feature_tokenized_timelines,
+            }
     
     return label_patient_ids, label_values, label_times, featurizations
 
@@ -373,9 +414,7 @@ def filter_df(df: pd.DataFrame,
     if sub_tasks:
         df = df[df['sub_task'].isin(sub_tasks)]
     if model_heads:
-        mask = [ False ] * df.shape[0]
-        for model_head in model_heads:
-            mask = mask | ((df['model'] == model_head[0]) & (df['head'] == model_head[1]))
+        mask = df.apply(lambda row: (row['model'], row['head']) in model_heads, axis=1)
         df = df[mask]
     return df
 

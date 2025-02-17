@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 logs/
 assets*
+ehrshot/eda
+ehrshot/stratify
 
 # C extensions
 *.so
