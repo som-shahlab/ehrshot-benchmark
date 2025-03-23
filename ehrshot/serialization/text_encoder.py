@@ -437,7 +437,7 @@ class TextEncoder:
             return self.encoder._encode(inputs)
         else:
             # Encode texts in batches and store intermediate results
-            num_batches = 4
+            num_batches = 4 # For experiments with 512 chunked had to set to 12 batches on DGX
             batch_size = len(inputs) // num_batches + 1
             current_index = 0
             
