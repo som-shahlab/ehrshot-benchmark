@@ -246,17 +246,36 @@ def datetime_date_to_markdown(dt):
     iso_date = dt.strftime("%Y-%m-%d")
     return f"[{display_date}]({iso_date})"  
 
-def datetimes_to_visit_time(label_dt, visit_dt, duration_days=None):
-    days_before_label = (label_dt - visit_dt).days
-    if duration_days is not None and duration_days > 0:
-        return f"{datetime_date_to_markdown(visit_dt)} ({days_before_label} days before prediction time, duration: {duration_days} days)"
+def datetimes_to_visit_time(label_dt: datetime, visit_start_dt: datetime, visit_end_dt: datetime | None = None) -> str:
+    # First: Markdown formatted date
+    visit_date_str = datetime_date_to_markdown(visit_start_dt)
+    
+    # Second: Days before prediction time
+    days_before_label = (label_dt - visit_start_dt).days
+    if days_before_label == 1:
+        days_before_str = "1 day before prediction time"
     else:
-        return f"{datetime_date_to_markdown(visit_dt)} ({days_before_label} days before prediction time)"
+        days_before_str = f"{days_before_label} days before prediction time"
+
+    # Third: Duration of stay
+    duration_str = ""
+    # Ensure that duration of current stay does not leak into the future
+    if visit_end_dt is not None:
+        if visit_end_dt > label_dt:
+            duration_str = "current visit"
+        else:
+            duration_days = (visit_end_dt - visit_start_dt).days
+            if duration_days == 1:
+                duration_str = "duration: 1 day"
+            elif duration_days > 1:
+                duration_str = f"duration: {duration_days} days"
+                
+    return f"{visit_date_str} ({days_before_str}, {duration_str})" if duration_str else f"{visit_date_str} ({days_before_str})"
 
 def visit_heading(label_dt: datetime, visit) -> str:
-    shifted_visit_dt = CONSTANT_LABEL_TIME - (label_dt - visit.start)
-    duration_days = (visit.end - visit.start).days if visit.end is not None else None
-    return f"### {visit.description} on {datetimes_to_visit_time(CONSTANT_LABEL_TIME, shifted_visit_dt, duration_days)}\n\n"
+    shifted_visit_start_dt = CONSTANT_LABEL_TIME - (label_dt - visit.start)
+    shifted_visit_end_dt = CONSTANT_LABEL_TIME - (label_dt - visit.end) if visit.end is not None else None
+    return f"### {visit.description} on {datetimes_to_visit_time(CONSTANT_LABEL_TIME, shifted_visit_start_dt, shifted_visit_end_dt)}\n\n"
 
 class SerializationStrategy(ABC):
     @abstractmethod
