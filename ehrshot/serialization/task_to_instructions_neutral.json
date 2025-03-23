@@ -1,0 +1,19 @@
+{
+    "instruction_prefix_long": "We will provide you with a patient's electronic healthcare record (EHR) in Markdown format, which contains routinely collected clinical events such as conditions, procedures, lab tests, and a medication history. The record includes a section called 'General Events', which lists events not tied to a specific visit, and a section called 'Medical History', which contains previous visits with the number of days before the prediction time and their associated events.",
+    "instruction_prefix": "Given a patient's electronic healthcare record (EHR) in Markdown format, retrieve relevant passages that answer the query:",
+    "guo_los": "what are the key clinical features of the patient to predict future medical events",
+    "guo_readmission": "what are the key clinical features of the patient to predict future medical events",
+    "guo_icu": "what are the key clinical features of the patient to predict future medical events",
+    "lab_thrombocytopenia": "what are the key clinical features of the patient to predict future medical events",
+    "lab_hyperkalemia": "what are the key clinical features of the patient to predict future medical events",
+    "lab_hypoglycemia": "what are the key clinical features of the patient to predict future medical events",
+    "lab_hyponatremia": "what are the key clinical features of the patient to predict future medical events",
+    "lab_anemia": "what are the key clinical features of the patient to predict future medical events",
+    "new_hypertension": "what are the key clinical features of the patient to predict future medical events",
+    "new_hyperlipidemia": "what are the key clinical features of the patient to predict future medical events",
+    "new_pancan": "what are the key clinical features of the patient to predict future medical events",
+    "new_celiac": "what are the key clinical features of the patient to predict future medical events",
+    "new_lupus": "what are the key clinical features of the patient to predict future medical events",
+    "new_acutemi": "what are the key clinical features of the patient to predict future medical events",
+    "chexpert": "what are the key clinical features of the patient to predict future medical events"
+}
