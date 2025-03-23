@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from typing import Dict, List, Optional, Set, Tuple, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import re
@@ -205,7 +205,8 @@ class LLMFeaturizer():
         task_to_instructions: Optional[Dict[str, str]] = {},
         excluded_ontologies: List[str] = [],
         filter_aggregated_events: bool = False,
-        add_condition_parent_concepts: Optional[bool] = False
+        add_condition_parent_concepts: Optional[bool] = False,
+        time_window: Optional[timedelta] = None,
     ):
         self.embedding_dim = embedding_size
         self.serialization_strategy = serialization_strategy
@@ -213,6 +214,7 @@ class LLMFeaturizer():
         self.excluded_ontologies = excluded_ontologies
         self.filter_aggregated_events = filter_aggregated_events
         self.add_condition_parent_concepts = add_condition_parent_concepts
+        self.time_window = time_window
 
         # Filled during preprocessing
         # A dictionary mapping patient ID and label index to the serialization of the patient's EHR
@@ -326,9 +328,15 @@ class LLMFeaturizer():
             # Manually checked two examples for anemia and hypoglycemia: label.time one minute before actual value
             events_until_label = [event for event in patient.events if event.start <= label.time]
             
+            if self.time_window is not None:
+                # Keep demographics even though coded at birth
+                keep_first_num_events = 3
+                if len(events_until_label) > 3 and events_until_label[3].code.split('/')[0] in ['Race', 'Gender', 'Ethnicity']:
+                    keep_first_num_events = 4
+                events_until_label = events_until_label[0:keep_first_num_events] + [event for event in events_until_label if label.time - event.start <= self.time_window]
+                
             if self.add_condition_parent_concepts:
                 # Add all direct parents of conditions (omop_table=condition_occurrence)
-                
                 events_until_label = [self._create_conditions_parent_events(event, ontology.get_parents(event.code)) for event in events_until_label]
                 events_until_label = list(itertools.chain(*events_until_label))
             

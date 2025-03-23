@@ -18,7 +18,7 @@
 # GPU resources: 
 # --partition=gpu
 # --gres=gpu:nvidia_a100_80gb_pcie:1
-# --mem=256GB
+# --mem=800GB
 
 # CPU
 # --partition=compute
@@ -27,11 +27,11 @@
 export PYTHONUNBUFFERED=1
 
 # Check if instruction file at last position, then set instructions_file_arg
-if [ -z "${11}" ]
+if [ -z "${12}" ]
 then
     instructions_file_arg=""
 else
-    instructions_file_arg="--task_to_instructions ${11}"
+    instructions_file_arg="--task_to_instructions ${12}"
 fi
 
 # TODO: For multi-gpu setup
@@ -47,4 +47,5 @@ python /home/sthe14/ehrshot-benchmark/ehrshot/run_experiments.py \
     --serialization_strategy $8 \
     --excluded_ontologies $9 \
     --num_aggregated ${10} \
+    --time_window_days ${11} \
     $instructions_file_arg

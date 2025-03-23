@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 from serialization.text_encoder import TextEncoder, LLM2VecLlama3_1_7B_InstructSupervisedEncoder, GTEQwen2_7B_InstructEncoder, GTEQwen2_1_5B_InstructEncoder, STGTELargeENv15Encoder, BertEncoder, LLM2VecLlama2_Sheared_1_3B_SupervisedEncoder, GTEQwen2_7B_InstructChunkedEncoder, LLM2VecLlama3_1_7B_InstructSupervisedChunkedEncoder
 from serialization.ehr_serializer import UniqueThenListVisitsStrategy, UniqueThenListVisitsWithValuesStrategy, UniqueThenListVisitsWOAllCondsStrategy, UniqueThenListVisitsWOAllCondsWithValuesStrategy
-from datetime import datetime
+from datetime import datetime, timedelta
 from llm_featurizer import LLMFeaturizer, preprocess_llm_featurizer, featurize_llm_featurizer, load_labeled_patients_with_tasks
 import json
 from utils import LABELING_FUNCTION_2_PAPER_NAME
@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--serialization_strategy", required=True, type=str, help="Serialization strategy to use")
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
+    parser.add_argument("--time_window_days", type=int, default=0, help="Number of days before label time to consider for each patient")
     return parser.parse_args()
     
 if __name__ == "__main__":
@@ -41,6 +42,8 @@ if __name__ == "__main__":
         ['LOINC', 'Domain', 'CARE_SITE', 'ICDO3', 'RxNorm', 'RxNorm Extension', 'Medicare Specialty', 'CMS Place of Service', 'OMOP Extension', 'Condition Type']  if args.excluded_ontologies == 'no_labs_meds_single' else []
     NUM_AGGREGATED_EVENTS: int = args.num_aggregated  # Default: 0
     FILTER_AGGREGATED_EVENTS: bool = NUM_AGGREGATED_EVENTS > 0
+    # Convert into None or timedelta in days
+    TIME_WINDOW: timedelta | None = None if args.time_window_days == 0 else timedelta(days=args.time_window_days)
 
     # Process serialization ablations for unique_then_list_visits_wo_allconds_w_values_4k
     ablation_prefix = 'unique_then_list_visits_wo_allconds_w_values_4k_no_'
@@ -89,6 +92,7 @@ if __name__ == "__main__":
     logger.info(f"    Max input length: {max_input_length}")
     logger.info(f"    Exclude ontologies: {EXCLUDED_ONTOLOGIES}")
     logger.info(f"    Ablation: {ablation}")
+    logger.info(f"    Time window: {TIME_WINDOW}")
     
     # Mapping of text encoder names to their corresponding classes
     encoder_mapping = {
@@ -158,7 +162,8 @@ if __name__ == "__main__":
         serialization_strategy=serialization_strategy,
         task_to_instructions=task_to_instructions,
         excluded_ontologies=EXCLUDED_ONTOLOGIES,
-        filter_aggregated_events=FILTER_AGGREGATED_EVENTS
+        filter_aggregated_events=FILTER_AGGREGATED_EVENTS,
+        time_window=TIME_WINDOW,
     ) 
     llm_featurizer = preprocess_llm_featurizer(PATH_TO_PATIENT_DATABASE, llm_featurizer, patients_to_labels, NUM_THREADS)
 

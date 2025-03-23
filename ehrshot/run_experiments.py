@@ -62,6 +62,7 @@ def main(args):
         --serialization_strategy {args.serialization_strategy} \
         --excluded_ontologies {args.excluded_ontologies} \
         --num_aggregated {args.num_aggregated} \
+        --time_window_days {args.time_window_days} \
         {tasks_to_instructions}
         """
         run_command(feature_command)
@@ -181,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--serialization_strategy", required=True, help="Serialization strategy to be used")
     parser.add_argument("--excluded_ontologies", type=str, default="", help="Ontologies to exclude")
     parser.add_argument("--num_aggregated", type=int, default=0, help="Number of aggregated values to use")
+    parser.add_argument("--time_window_days", type=int, default=0, help="Time window in days")
     parser.add_argument("--task_to_instructions", type=str, default="", help="Path to task to instructions file")
     
     args = parser.parse_args()
