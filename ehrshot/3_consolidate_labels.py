@@ -24,8 +24,8 @@ if __name__ == "__main__":
     PATH_TO_OUTPUT_TASKS_FILE: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels_tasks_out.csv')
     
     # Force refresh
-    check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
-    check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_TASKS_FILE, IS_FORCE_REFRESH)
+    # check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_FILE, IS_FORCE_REFRESH)
+    # check_file_existence_and_handle_force_refresh(PATH_TO_OUTPUT_TASKS_FILE, IS_FORCE_REFRESH)
 
     # Get all labels currently in `PATH_TO_LABELS_DIR`
     labeling_functions: List[str] = os.listdir(PATH_TO_LABELS_DIR)
@@ -43,12 +43,16 @@ if __name__ == "__main__":
     # Keep them separate for each task for task specific processing
     patient_2_label_times_tasks: Dict[int, Set[Tuple[datetime.datetime, str]]] = collections.defaultdict(set)
 
+    num_duplicates = 0
     for lf in labeling_functions:
         labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(PATH_TO_LABELS_DIR, lf, 'labeled_patients.csv'))
         for patient_id, labels in labeled_patients.items():
             for label in labels:
                 patient_2_label_times[patient_id].add(label.time)
+                if (label.time, lf) in patient_2_label_times_tasks[patient_id]:
+                    num_duplicates += 1
                 patient_2_label_times_tasks[patient_id].add((label.time, lf))
+    logger.info(f"Found {num_duplicates} duplicate labels with same timestamp and task")
     logger.info("Finish | Consolidate patients")
 
     # Resort all labels to be in chronological order AND force minute-level time resolution
