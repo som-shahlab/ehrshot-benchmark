@@ -33,11 +33,11 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
     #     'heads' : ['lr_lbfgs', ],
     # },
     'llm' : {
-        'label' : 'GTE Qwen2 7B', # 'LLM',
+        'label' : 'GTE-Qwen2-7B', # 'LLM',
         'heads' : ['lr_lbfgs', ],
     },
     'llm_llama' : {
-        'label' : 'LLM2Vec Llama 3.1 7B',
+        'label' : 'LLM2Vec-Llama-3.1-8B',
         'heads' : ['lr_lbfgs', ],
     },
 }
