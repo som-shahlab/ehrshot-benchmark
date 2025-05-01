@@ -437,7 +437,8 @@ class TextEncoder:
             return self.encoder._encode(inputs)
         else:
             # Encode texts in batches and store intermediate results
-            num_batches = 4 # For experiments with 512 chunked had to set to 12 batches on DGX
+            # INFO: For experiments with 512 and 1024 chunked had to set to 12 batches on DGX
+            num_batches = 4
             batch_size = len(inputs) // num_batches + 1
             current_index = 0
             
@@ -476,7 +477,7 @@ class TextEncoder:
                 print(f"Saved {len(embeddings)} embeddings to {cache_file}")
                 
             # Delete all old cache files
-            # NOTE: Keep last cached files in case anything goes wrong after this point
-            self._delete_all_cache_files(cache_dir)
+            # NOTE: Keep last cached files in case anything goes wrong after this point; then must delete manually
+            # self._delete_all_cache_files(cache_dir)
             
             return np.array(embeddings)
