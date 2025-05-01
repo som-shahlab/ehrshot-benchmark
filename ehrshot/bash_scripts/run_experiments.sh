@@ -13,8 +13,6 @@ INSTRUCTIONS_FILE="${BASE_DIR}/ehrshot/serialization/task_to_instructions.json"
 EXPERIMENTS_DIR="$BASE_DIR/EHRSHOT_ASSETS/experiments/$EXPERIMENT_IDENTIFIER"
 mkdir -p $EXPERIMENTS_DIR
 
-# For neutral instruction ablation - use different instructions file and rename experiment folder to include "_neutr_instr"
-# INSTRUCTIONS_FILE="${BASE_DIR}/ehrshot/serialization/task_to_instructions_neutr.json"
 
 # Define the different options to iterate over
 text_encoders=(
@@ -55,7 +53,7 @@ text_encoders=(
 #     "unique_then_list_visits_wo_allconds"
 #     "unique_then_list_visits_wo_allconds_4k"
 #     "unique_then_list_visits_w_values"
-#     "unique_then_list_visits_w_values_4k" # <- llama
+#     "unique_then_list_visits_w_values_4k"
 #     "unique_then_list_visits"
 #     "unique_then_list_visits_4k"
 # )
@@ -68,7 +66,7 @@ instructions_options=("true")
 excluded_ontologies=("no_labs_single")
 num_aggregated=(3)
 time_window_days=(0)
-# time_window_days=(0 1 7 30 365)
+# time_window_days=(1 7 30 365 1095)
 
 # Labels = Dataset subset
 DATASET="full"

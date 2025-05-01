@@ -18,7 +18,7 @@
 # GPU resources: 
 # --partition=gpu
 # --gres=gpu:nvidia_a100_80gb_pcie:1
-# --mem=800GB
+# --mem=480GB
 
 # CPU
 # --partition=compute

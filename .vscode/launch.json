@@ -54,15 +54,16 @@
                 "--path_to_database", "~/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract",
                 "--path_to_labels_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_subsets/new_guo",  // Only two tasks
                 "--path_to_features_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/features",
-                "--num_threads", "1",
+                "--num_threads", "10",
                 "--is_force_refresh",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_mimic_/mntp-supervised-mednli/Meta-Llama-3.1-8B-Instruct_1000_mntp_steps/MedNLI_train_m-Meta-Llama-3.1-8B-Instruct_l-512/checkpoint-200",
-                "--text_encoder", "gteqwen2_7b_instruct",
+                // "--text_encoder", "gteqwen2_7b_instruct",
                 // "--text_encoder", "gteqwen2_1_5b_instruct",
-                // "--text_encoder", "deberta_v3_base",
+                "--text_encoder", "deberta_v3_base",
                 // "--text_encoder", "gteqwen2_7b_instruct_chunked_512",
                 // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised_chunked_2k",
+                // "--text_encoder", "llm2vec_llama3_1_7b_instruct_supervised_chunked_512",
                 "--task_to_instructions", "~/ehrshot-benchmark/ehrshot/serialization/task_to_instructions.json",
                 // "--task_to_instructions", "",
                 // "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k_no_demographics",
@@ -71,9 +72,11 @@
                 // "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k_no_conditions",
                 // "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k_no_medications",
                 // "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k_no_procedures",
+                // "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_512",
                 "--serialization_strategy", "unique_then_list_visits_wo_allconds_w_values_4k",  // "unique_then_list_visits_wo_allconds_w_values_4k"
                 "--excluded_ontologies", "no_labs_single",
                 "--num_aggregated", "3",
+                "--time_window_days", "1",
             ],
         },
 
@@ -131,14 +134,37 @@
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
-            "program": "${workspaceFolder}/ehrshot/join_results.py",
+            "program": "${workspaceFolder}/ehrshot/helper/join_results.py",
             "console": "integratedTerminal",
             "args": [
-                "--first_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_final/gteqwen2_7b_instruct_unqiue_then_list_visits_wo_allconds_w_values_4k_no_labs_single_true_false_true_3_full_with_baselines",
+                // First combine baselines with gteqwen2
+                // "--first_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS_BASELINES/results_complete_ll3_unique_codes",
+                // "--first_source_filter", "count,gbm;clmbr,lr_lbfgs",
+                // "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full",
+                // "--second_source_filter", "llm,lr_lbfgs",
+                // "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_with_baselines",
+                // Then combine with llm2vec
+                "--first_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_with_baselines",
                 "--first_source_filter", "count,gbm;clmbr,lr_lbfgs;llm,lr_lbfgs",
-                "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_final/llm2vec_llama3_1_7b_instruct_supervised_unqiue_then_list_visits_wo_allconds_w_values_4k_no_labs_single_true_false_true_3_full_renamed",
+                "--second_source_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/llm2vec_llama3_1_7b_instruct_supervised_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_renamed",
                 "--second_source_filter", "llm_llama,lr_lbfgs",
-                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/markdown_serialization_final/gteqwen2_7b_instruct_unqiue_then_list_visits_wo_allconds_w_values_4k_no_labs_single_true_false_true_3_full_with_baselines_and_llama",
+                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_with_baselines_and_llama"
+            ]
+        },
+
+        {
+            "name": "Python Debugger: join_embeddings.py",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/ehrshot/helper/join_embeddings.py",
+            "console": "integratedTerminal",
+            "args": [
+                // "--llm_source_embeddings", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full/llm_features.pkl",
+                "--llm_source_embeddings", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/llm2vec_llama3_1_7b_instruct_supervised_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full/llm_features.pkl",
+                "--clmbr_source_embeddings", "~/ehrshot-benchmark/EHRSHOT_ASSETS_BASELINES/features/clmbr_features.pkl",
+                // "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/gteqwen2_7b_instruct_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_combined_clmbr",
+                "--output_dir", "~/ehrshot-benchmark/EHRSHOT_ASSETS/experiments/full_run/llm2vec_llama3_1_7b_instruct_supervised_unique_then_list_visits_wo_allconds_w_values_4k_no_labs_single_3_0_full_combined_clmbr",
             ]
         }
     ]
