@@ -38,7 +38,8 @@ For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Me
 
 You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
 
-Note that this currently only works on Linux machines.
+> [!CAUTION]
+> This currently only works on Linux machines.
 
 ```bash
 pip install femr-cuda==0.0.20 dm-haiku==0.0.9 optax==0.1.4
