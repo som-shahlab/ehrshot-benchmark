@@ -2,7 +2,7 @@ lightgbm==3.3.5
 loguru==0.7.0
 matplotlib==3.7.1
 numpy==1.24.3
-pandas==2.0.2
+pandas==2.2
 scikit-learn==1.2.2
 scipy==1.10.1
 tqdm==4.65.0
