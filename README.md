@@ -42,7 +42,7 @@ You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0)
 > This currently only works on Linux machines.
 
 ```bash
-pip install femr-cuda==0.0.20 dm-haiku==0.0.9 optax==0.1.4
+pip install femr-cuda==0.1.16 dm-haiku==0.0.9 optax==0.1.4
 pip install --upgrade "jax[cuda]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
