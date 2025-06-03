@@ -6,6 +6,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 > [!NOTE]  
 > EHRSHOT can be downloaded as a [💊 MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard).
+> 
 > Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
 
 # 📖 Table of Contents
