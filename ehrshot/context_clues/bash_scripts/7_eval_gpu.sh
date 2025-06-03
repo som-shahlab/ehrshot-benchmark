@@ -11,6 +11,8 @@
 #   MIMIC-IV: bash 7_eval.sh model1,model2 --mimic4 --is_use_slurm
 #   EHRSHOT tasks on full STARR-OMOP: bash 7_eval.sh model1,model2 --starr --is_use_slurm
 
+BASE_EHRSHOT_DIR="../../../EHRSHOT_ASSETS"
+
 if [[ " $* " == *" --mimic4 "* ]]; then
     labeling_functions=(
         "mimic4_los" 
@@ -18,10 +20,10 @@ if [[ " $* " == *" --mimic4 "* ]]; then
         "mimic4_mortality"
     )
     path_to_database="/share/pi/nigam/datasets/femr_mimic_4_extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_mimic4"
-    path_to_features_dir="../../EHRSHOT_ASSETS/features_mimic4"
-    path_to_output_dir='../../EHRSHOT_ASSETS/results_mimic4'
-    path_to_split_csv="../../EHRSHOT_ASSETS/splits_mimic4/person_id_map.csv"
+    path_to_labels_dir="${BASE_EHRSHOT_DIR}/benchmark_mimic4"
+    path_to_features_dir="${BASE_EHRSHOT_DIR}/features_mimic4"
+    path_to_output_dir="${BASE_EHRSHOT_DIR}/results_mimic4"
+    path_to_split_csv="${BASE_EHRSHOT_DIR}/splits_mimic4/person_id_map.csv"
 elif [[ " $* " == *" --starr "* ]]; then
     labeling_functions=(
         #"chexpert" # CheXpert first b/c slowest
@@ -41,11 +43,11 @@ elif [[ " $* " == *" --starr "* ]]; then
         #"lab_hypoglycemia" # will OOM at 200G on `gpu` partition
     )
     path_to_database="/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_starr"
-    path_to_features_dir="../../EHRSHOT_ASSETS/features_starr"
-    path_to_output_dir='../../EHRSHOT_ASSETS/results_starr'
-    path_to_split_csv="../../EHRSHOT_ASSETS/splits_starr/person_id_map.csv"
-    path_to_tokenized_timelines='../../EHRSHOT_ASSETS/tokenized_timelines_starr'
+    path_to_labels_dir="${BASE_EHRSHOT_DIR}/benchmark_starr"
+    path_to_features_dir="${BASE_EHRSHOT_DIR}/features_starr"
+    path_to_output_dir="${BASE_EHRSHOT_DIR}/results_starr"
+    path_to_split_csv="${BASE_EHRSHOT_DIR}/splits_starr/person_id_map.csv"
+    path_to_tokenized_timelines="${BASE_EHRSHOT_DIR}/tokenized_timelines_starr"
 else
     labeling_functions=(
         "chexpert" # CheXpert first b/c slowest
@@ -64,12 +66,12 @@ else
         "lab_anemia"
         "lab_hypoglycemia" # will OOM at 200G on `gpu` partition
     )
-    path_to_database="../../EHRSHOT_ASSETS/femr/extract"
-    path_to_labels_dir="../../EHRSHOT_ASSETS/benchmark_ehrshot"
-    path_to_features_dir="../../EHRSHOT_ASSETS/features_ehrshot"
-    path_to_output_dir='../../EHRSHOT_ASSETS/results_ehrshot'
-    path_to_split_csv="../../EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv"
-    path_to_tokenized_timelines='../../EHRSHOT_ASSETS/tokenized_timelines_ehrshot'
+    path_to_database="${BASE_EHRSHOT_DIR}/femr/extract"
+    path_to_labels_dir="${BASE_EHRSHOT_DIR}/benchmark"
+    path_to_features_dir="${BASE_EHRSHOT_DIR}/features"
+    path_to_output_dir="${BASE_EHRSHOT_DIR}/results"
+    path_to_split_csv="${BASE_EHRSHOT_DIR}/splits/person_id_map.csv"
+    path_to_tokenized_timelines="${BASE_EHRSHOT_DIR}/tokenized_timelines"
 fi
 
 models=$1

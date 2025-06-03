@@ -18,7 +18,7 @@ from sklearn.ensemble import RandomForestClassifier
 from torch.optim.lr_scheduler import LambdaLR
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
-from utils import (
+from ehrshot.utils import (
     LABELING_FUNCTION_2_PAPER_NAME,
     SHOT_STRATS,
     MODEL_2_INFO,
@@ -41,12 +41,6 @@ import femr.datasets
 import torch
 from jaxtyping import Float
 from femr.labelers import load_labeled_patients, LabeledPatients
-from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
-from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
-
-import torch._dynamo
-torch.set_float32_matmul_precision('high')
-torch._dynamo.config.suppress_errors = True
 
 def fit_logreg_lbfgs(model: torch.nn.Module, 
                      X: Float[torch.Tensor, 'B H'], 
@@ -187,7 +181,7 @@ def calc_metrics(y_train: Float[np.ndarray, 'N'],
         scores[metric]['upper'] = upper
     return scores
 
-def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat: str):
+def setup_finetuning(model: 'CookbookModelWithClassificationHead', finetune_strat: str):
     # Start by freezing all `base_model` params
     for param in model.base_model.parameters():
         param.requires_grad = False
@@ -222,7 +216,7 @@ def setup_finetuning(model: CookbookModelWithClassificationHead, finetune_strat:
         raise ValueError(f"Fine-tuning strategy `{finetune_strat}` not supported.")
     return model, layers
 
-def sanity_check_finetuning_model(model: CookbookModelWithClassificationHead, layers, finetune_strat):
+def sanity_check_finetuning_model(model: 'CookbookModelWithClassificationHead', layers, finetune_strat):
     """For sanity checking that the output of `setup_finetuning` has correctly unfrozen the proper layers.
         NOTE: This takes ~10 seconds, so don't use if trying to be fast.
     """
@@ -378,6 +372,43 @@ def run_finetune_evaluation(X_train: np.ndarray,
                             replicate: int = 0,
                             n_jobs: int = 1,
                             test_patient_ids: List[int] = None) -> Tuple[Any, Dict[str, Dict[str, float]], Dict[str, np.ndarray]]:
+    """Run fine-tuning evaluation for a given model and hyperparameter configuration.
+    
+    ! NOTE: Requires the `hf_ehr` package (installable via `pip install hf-ehr`)
+
+    Args:
+        X_train (np.ndarray): Training features
+        X_val (np.ndarray): Validation features 
+        X_test (np.ndarray): Test features
+        y_train (np.ndarray): Training labels
+        y_val (np.ndarray): Validation labels
+        y_test (np.ndarray): Test labels
+        X_train_timelines (np.ndarray): Training timeline features
+        X_val_timelines (np.ndarray): Validation timeline features 
+        X_test_timelines (np.ndarray): Test timeline features
+        model_name (str): Name of the model architecture
+        model_head (str): Type of model head/fine-tuning strategy
+        path_to_ckpt (str): Path to model checkpoint
+        batch_size (int, optional): Batch size for training. Defaults to 4.
+        n_epochs (int, optional): Number of training epochs. Defaults to 2.
+        lr (float, optional): Learning rate. Defaults to 1e-5.
+        logreg_C (Union[float, List[float]], optional): Logistic regression regularization parameter(s). Defaults to [1.0].
+        logreg_penalty (Optional[str], optional): Type of regularization penalty. Defaults to 'l2'.
+        warmup_epochs (int, optional): Number of warmup epochs. Defaults to 0.
+        replicate (int, optional): Random seed for reproducibility. Defaults to 0.
+        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+        test_patient_ids (List[int], optional): List of patient IDs in test set. Defaults to None.
+
+    Returns:
+        Tuple[Any, Dict[str, Dict[str, float]], Dict[str, np.ndarray]]: Tuple containing:
+            - Best model state dictionary
+            - Dictionary of evaluation metrics
+            - Dictionary of model predictions
+    """
+    
+    from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
+    from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
+
     logger.debug(f"Start | Training {model_head} | replicate={replicate}")
     logger.info(f"Train shape: X = {X_train.shape}, Y = {y_train.shape}")
     logger.info(f"Val shape: X = {X_val.shape}, Y = {y_val.shape}")
@@ -521,7 +552,6 @@ def run_frozen_feature_evaluation(X_train: np.ndarray,
         # This is necessary for few-shot learning, since we may have very few samples in a leaf node.
         # Otherwise the GBM model will refuse to learn anything
         XGB_PARAMS['min_child_samples'] = [ 1 ]
-        breakpoint()
         model = tune_hyperparams(X_train, X_val, y_train, y_val, model, XGB_PARAMS, n_jobs=n_jobs)
         logger.info(f"Best hparams: {model.get_params()}")
     elif model_head == "rf":

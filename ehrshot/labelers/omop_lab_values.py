@@ -1,14 +1,11 @@
 """Labeling functions for OMOP data based on lab values."""
-from __future__ import annotations
-
 import datetime
 from abc import abstractmethod
 from typing import Any, List, Optional, Set
-
-from femr import Patient
+from femr import Patient, Event
 from femr.extension import datasets as extension_datasets
-from .core import Label, Labeler, LabelType
-from .omop import OMOPConceptCodeLabeler, get_femr_codes
+from ehrshot.labelers.core import Label, Labeler, LabelType
+from ehrshot.labelers.omop import get_femr_codes
 
 ##########################################################
 ##########################################################

@@ -3,6 +3,7 @@ import argparse
 from typing import List, Optional, Tuple, Set
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from utils import (
@@ -14,7 +15,7 @@ from utils import (
     SHOT_STRATS,
     filter_df,
 )
-from plot import (
+from ehrshot.plot import (
     plot_one_labeling_function,
     plot_one_task_group,
     plot_one_task_group_box_plot,
@@ -28,8 +29,8 @@ def plot_individual_tasks(df_results: pd.DataFrame,
                                 model_heads: Optional[List[Tuple[str, str]]] = None,
                                 is_x_scale_log: bool = True,
                                 is_std_bars: bool = True):
-    fig, axes = plt.subplots(5, 3, figsize=(20, 20))
     labeling_functions: List[str] = df_results[df_results['score'] == score]['labeling_function'].unique().tolist()
+    fig, axes = plt.subplots(int(np.ceil(len(labeling_functions) / 3)), 3, figsize=(20, 20))
     for idx, labeling_function in enumerate(labeling_functions):
         sub_tasks: List[str] = df_results[(df_results['score'] == score) & (df_results['labeling_function'] == labeling_function)]['sub_task'].unique().tolist()
         plot_one_labeling_function(df_results, 

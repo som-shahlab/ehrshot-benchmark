@@ -13,7 +13,7 @@ echo "11: ${11}"
 echo "12: ${12}"
 echo "13: ${13}"
 
-CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
+CUDA_VISIBLE_DEVICES=0 && python3 ../../7_eval_finetune.py \
     --path_to_database $1 \
     --path_to_labels_dir $2 \
     --path_to_features_dir $3 \
@@ -28,7 +28,7 @@ CUDA_VISIBLE_DEVICES=0 && python3 ../7_eval_finetune.py \
     --num_threads 5 &
 
 
-CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
+CUDA_VISIBLE_DEVICES=1 && python3 ../../7_eval_finetune.py \
     --path_to_database $1 \
     --path_to_labels_dir $2 \
     --path_to_features_dir $3 \
@@ -42,7 +42,7 @@ CUDA_VISIBLE_DEVICES=1 && python3 ../7_eval_finetune.py \
     --labeling_function ${12} \
     --num_threads 5 &
 
-CUDA_VISIBLE_DEVICES=2 && python3 ../7_eval_finetune.py \
+CUDA_VISIBLE_DEVICES=2 && python3 ../../7_eval_finetune.py \
     --path_to_database $1 \
     --path_to_labels_dir $2 \
     --path_to_features_dir $3 \
@@ -60,7 +60,7 @@ wait
 
 # For running one job per node:
 #
-# python3 ../7_eval_finetune.py \
+# python3 ../../7_eval_finetune.py \
 #     --path_to_database $1 \
 #     --path_to_labels_dir $2 \
 #     --path_to_features_dir $3 \
@@ -75,7 +75,7 @@ wait
 
 # For debugging:
 #
-# python3 ../7_eval_finetune.py \
+# python3 ../../7_eval_finetune.py \
 #     --path_to_database '../../EHRSHOT_ASSETS/femr/extract' \
 #     --path_to_labels_dir '../../EHRSHOT_ASSETS/benchmark' \
 #     --path_to_features_dir '../../EHRSHOT_ASSETS/features' \
@@ -90,7 +90,7 @@ wait
 
 # For debugging:
 #
-# python3 ../7_eval_finetune.py \
+# python3 ../../7_eval_finetune.py \
 #     --path_to_database '../../EHRSHOT_ASSETS/femr/extract' \
 #     --path_to_labels_dir '../../EHRSHOT_ASSETS/benchmark' \
 #     --path_to_features_dir '../../EHRSHOT_ASSETS/features' \

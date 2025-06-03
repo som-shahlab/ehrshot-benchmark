@@ -32,7 +32,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from loguru import logger
 from sklearn.preprocessing import MaxAbsScaler
 from femr.datasets import PatientDatabase
-from utils import (
+from ehrshot.utils import (
     LABELING_FUNCTION_2_PAPER_NAME,
     SHOT_STRATS,
     MODEL_2_INFO,
@@ -57,8 +57,8 @@ import femr.datasets
 from femr.labelers import load_labeled_patients, LabeledPatients
 from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
 from hf_ehr.eval.ehrshot import CookbookModelWithClassificationHead
-from labelers.omop import get_icu_visit_detail_codes, get_femr_codes
-from labelers.ehrshot import (
+from ehrshot.labelers.omop import get_icu_visit_detail_codes, get_femr_codes
+from ehrshot.labelers.ehrshot import (
     AnemiaInstantLabValueLabeler,
     HyperkalemiaInstantLabValueLabeler,
     HyponatremiaInstantLabValueLabeler,
@@ -324,15 +324,17 @@ def generate_rollouts(X_test_timelines: np.ndarray,
 
 
 def eval_rollouts(generations: List[Float[torch.Tensor, 'N max_tokens_to_generate']], is_positive_func: Callable, idx_2_token: Dict[int, str], ontology) -> np.ndarray:
-    """Evaluate if a rollout contains a positive event."""
-    # TRUE if ICU transfer within 24 hours of admission
+    """Evaluate if a rollout contains a positive event.
+    
+    `generations` is a list of 20 tensors, each of shape (N, max_tokens_to_generate)
+    """
     labels: List[List[bool]] = [ 
         [ is_positive_func([ idx_2_token[tok.item()] for tok in timeline ], ontology) for timeline in gens ] 
         for gens in generations
     ]
-    labels = np.array(labels).T # each row is a data point, each column a generation
+    labels: Float[np.ndarray, 'N generations'] = np.array(labels).T # each row is a data point, each column a generation
     assert labels.shape == (len(generations[0]), len(generations)), f"Labels have incorrect shape: {labels.shape} != {(len(generations), 20)}"
-    y_test_proba = np.mean(labels, axis=1) # Take mean across trials as "probability" of event occuring
+    y_test_proba: Float[np.ndarray, 'N'] = np.mean(labels, axis=1) # Take mean across trials as "probability" of event occuring
     return y_test_proba
 
 def run_zeroshot_rollout_evals(X_test: np.ndarray, 
@@ -349,6 +351,7 @@ def run_zeroshot_rollout_evals(X_test: np.ndarray,
                                 ontology = None,
                                 test_patient_ids: List[int] = None,
                                 device: str = 'cuda',
+                                path_to_generations_dir: str = None,
                                 is_force_refresh: bool = False) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]]]:
     """Run ETHOS-style zero-shot evaluation on timelines. Implementation depends on the sub_task."""
     logger.info(f"Test prevalence:  {np.mean(y_test)}")
@@ -373,13 +376,12 @@ def run_zeroshot_rollout_evals(X_test: np.ndarray,
     logger.info(f"Start | Generating zero-shot sequences=`{model_name}`")
     generations: List[Float[torch.Tensor, 'N max_tokens_to_generate']] = []
     for i in range(start_generation_idx, end_generation_idx):
-        path_to_cached_rollouts: str = f'../../EHRSHOT_ASSETS/zeroshot_ehrshot/rollouts_{model_name}_{sub_task}_{i}.pt'
+        path_to_cached_rollouts: str = os.path.join(path_to_generations_dir, f'rollouts_{model_name}_{sub_task}_{i}.pt')
         if os.path.exists(path_to_cached_rollouts) and not is_force_refresh:
-            gens = torch.load(path_to_cached_rollouts)
+            gens = torch.load(path_to_cached_rollouts, map_location='cpu')
             print(f"Loaded cached rollouts from {path_to_cached_rollouts}")
             assert gens.shape == (X_test_timelines.shape[0], max_tokens_to_generate), f"Cached rollouts have incorrect shape: {gens.shape}"
         else:
-            # break # TODO
             gens: Float[torch.Tensor, 'N max_tokens_to_generate'] = generate_rollouts(
                 X_test_timelines, 
                 y_test, 
@@ -392,7 +394,7 @@ def run_zeroshot_rollout_evals(X_test: np.ndarray,
                 max_tokens_to_generate,
                 seed=i,
                 device=device
-            )
+            ).to('cpu')
             torch.save(gens, path_to_cached_rollouts)
         generations.append(gens)
     logger.info(f"Finish | Generating zero-shot sequences=`{model_name}`")
@@ -401,7 +403,7 @@ def run_zeroshot_rollout_evals(X_test: np.ndarray,
     # Run ETHOS-style evaluation
     if sub_task == 'guo_icu':
         # TRUE if ICU transfer before "[VISIT END]" token
-        y_test_proba = eval_rollouts(generations, guo_icu_zeroshot_rollouts, tokenizer.idx_2_token, ontology)
+        y_test_proba: Float[np.ndarray, 'N'] = eval_rollouts(generations, guo_icu_zeroshot_rollouts, tokenizer.idx_2_token, ontology)
     elif sub_task == 'guo_los':
         # TRUE if >= 7 days before "[VISIT END]" token
         y_test_proba = eval_rollouts(generations, guo_los_zeroshot_rollouts, tokenizer.idx_2_token, ontology)
@@ -428,11 +430,9 @@ def run_zeroshot_rollout_evals(X_test: np.ndarray,
         y_test_proba = eval_rollouts(generations, new_hyperlipidemia_zeroshot_rollouts, tokenizer.idx_2_token, ontology)
     else:
         raise ValueError(f"Unknown sub_task: {sub_task} for zero-shot rollout evaluation")
-    # breakpoint() # TODO
-    
     
     # Calculate AUROC, AUPRC, and Brier scores
-    best_scores = calc_metrics(y_test, y_test_proba, test_patient_ids)
+    best_scores: Dict[str, float] = calc_metrics(y_test, y_test_proba, test_patient_ids)
     best_metrics: Dict[str, np.ndarray] = { 'test' : y_test_proba }
 
     # Return scores
@@ -484,6 +484,7 @@ if __name__ == "__main__":
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, LABELING_FUNCTION, 'labeled_patients.csv')
     PATH_TO_OUTPUT_DIR: str = args.path_to_output_dir
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_OUTPUT_DIR, LABELING_FUNCTION, f'{SHOT_STRAT}_results.csv')
+    PATH_TO_GENERATIONS_DIR: Optional[str] = os.path.abspath(os.path.join(PATH_TO_OUTPUT_DIR, '../zeroshot_ehrshot/'))
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
     
     # Load ontology
@@ -610,6 +611,7 @@ if __name__ == "__main__":
                     end_generation_idx=end_generation_idx,
                     ontology=ontology,
                     test_patient_ids=test_patient_ids,
+                    path_to_generations_dir=PATH_TO_GENERATIONS_DIR,
                     device=DEVICE,
                     is_force_refresh=IS_FORCE_REFRESH,
                 )
@@ -647,6 +649,7 @@ if __name__ == "__main__":
                     'lower' : score_value['lower'],
                     'mean' : score_value['mean'],
                     'upper' : score_value['upper'],
+                    'y_test_proba' : metrics['test'].tolist(),
                     'model_hparams' : { 'start_idx' : start_generation_idx, 'end_idx' : end_generation_idx },
                 })
 
@@ -664,129 +667,3 @@ if __name__ == "__main__":
             df.to_csv(PATH_TO_OUTPUT_FILE, index=False)
     logger.success(f"Done with {model} for task {LABELING_FUNCTION}!")
 
-
-
-# def generate_next_token_logits(X_test_timelines: np.ndarray,
-#                                 y_test: np.ndarray,
-#                                 model: torch.nn.Module, 
-#                                 pad_token_id: int,
-#                                 model_name: str, 
-#                                 batch_size: int,
-#                                 model_max_length: int,
-#                                 max_tokens_to_generate: int,
-#                                 device: str) -> Float[torch.Tensor, 'B max_tokens_to_generate']:
-#     """
-#     Return the logits for the next token for each patient in `X_test_timelines`.
-    
-#     Useful for lab value prediction tasks where we want to predict the next token.
-    
-#     Note that timelines are already left-padded with `pad_token_id` to the max length of the model,
-#     so we don't need to worry about that here.
-    
-#     Returns a tensor of shape (N, max_tokens_to_generate)
-#     """
-#     model.eval()
-#     generations: List[torch.Tensor] = []
-#     with torch.no_grad():
-#         with torch.amp.autocast('cuda'):
-#             for batch_start in tqdm(range(0, X_test_timelines.shape[0], batch_size), desc=f'Next Token Inference: model={model_name[:15]}', total=X_test_timelines.shape[0] // batch_size):
-#                 X_batch = X_test_timelines[batch_start:batch_start+batch_size]
-#                 input_ids: Float[torch.Tensor, 'B model_max_length'] = torch.tensor(X_batch, device=device)
-#                 # Limit to max length of model
-#                 input_ids = input_ids[:, -model_max_length:]
-#                 assert input_ids.shape == (batch_size, model_max_length), f"Input IDs have incorrect shape: {input_ids.shape}"
-                
-#                 # Run model
-#                 attention_mask = (input_ids != pad_token_id).int()
-#                 batch = {
-#                     'input_ids': input_ids,
-#                     'attention_mask': attention_mask,
-#                 }
-#                 if "hyena" in model_name:
-#                     batch.pop('attention_mask')
-#                 logits = model(**batch).logits
-#                 generations.append(logits)
-#     generations: Float[torch.Tensor, 'N V'] = torch.cat(generations, dim=0)
-#     # TODO -- check that the shapes are correct w/ torch.cat here
-#     assert generations.shape == (X_test_timelines.shape[0], max_tokens_to_generate), f"Generations have incorrect shape: {generations.shape}"
-#     return generations
-
-# def eval_next_token_logits(generations: List[Float[torch.Tensor, 'N V']], is_positive_func: Callable, idx_2_token: Dict[int, str], ontology) -> np.ndarray:
-#     """Evaluate if a next token logit contains a positive event."""
-#     labels: List[List[bool]] = [ 
-#         [ is_positive_func(logits, idx_2_token, ontology) for logits in gens ] 
-#         for gens in generations
-#     ]
-#     labels = np.array(labels)
-#     y_test_proba = np.mean(labels, axis=1) # Take mean across trials as "probability" of event occuring
-#     return y_test_proba
-# 
-# 
-# def run_zeroshot_next_token_evals(X_test: np.ndarray, 
-#                                   y_test: np.ndarray,
-#                                   X_test_timelines: np.ndarray,
-#                                   model_name: str, 
-#                                   sub_task: str,
-#                                   path_to_ckpt: str,
-#                                   batch_size: int = 4,
-#                                   ontology = None,
-#                                   test_patient_ids: List[int] = None) -> Tuple[Any, Dict[str, Dict[str, float]], Dict[str, np.ndarray]]:
-#     logger.info(f"Test prevalence:  {np.mean(y_test)}")
-#     logger.info(f"Test pids:  {len(test_patient_ids)} | {len(y_test)} | {len(set(test_patient_ids))}")
-
-#     # Load tokenizer
-#     device: str = 'cuda'
-#     tokenizer = load_tokenizer_from_path(path_to_ckpt)
-#     pad_token_id: int = tokenizer.pad_token_id
-#     embed_strat: str = [ x for x in model_name.split("_") if x.split(":")[0] == 'embed' ][0].split(":")[1] # "mean" or "last"
-
-#     # Load original model -- weights won't change
-#     model = load_model_from_path(path_to_ckpt)
-#     model.get_params = lambda : {}
-#     model.model.to(device)
- 
-#     # Eval best model on train/val/test sets
-#     logger.info(f"Start | Generating zero-shot next token logits=`{model_name}`")
-#     generations: List[Float[torch.Tensor, 'N V']] = []
-#     for i in range(n_generations_per_label):
-#         gens: Float[torch.Tensor, 'N V'] = generate_next_token_logits(
-#             X_test_timelines, 
-#             y_test, 
-#             model.model, 
-#             pad_token_id, 
-#             model_name, 
-#             batch_size,
-#             model.config.data.dataloader.max_length,
-#             temperature,
-#             max_tokens_to_generate,
-#             device
-#         )
-#         generations.append(gens)
-#     logger.info(f"Finish | Generating zero-shot next token logits=`{model_name}`")
-#     model.to('cpu')
-    
-#     # Run ETHOS-style evaluation
-#     if sub_task == 'lab_anemia':
-#         # TRUE if abnormal anemia
-#         y_test_proba = eval_next_token_logits(generations, anemia_zeroshot_logits, idx_2_token, ontology)
-#     elif sub_task == 'lab_thrombocytopenia':
-#         # TRUE if abnormal thrombocytopenia
-#         pass
-#     elif sub_task == 'lab_hyperkalemia':
-#         # TRUE if abnormal hyperkalemia
-#         pass
-#     elif sub_task == 'lab_hypoglycemia':
-#         # TRUE if abnormal hypoglycemia
-#         pass
-#     elif sub_task == 'lab_hyponatremia':
-#         # TRUE if abnormal hyponatremia
-#         pass
-#     else:
-#         raise ValueError(f"Unknown sub_task: {sub_task} for zero-shot next token evaluation")
-
-#     # Calculate AUROC, AUPRC, and Brier scores
-#     best_scores = calc_metrics(y_test, y_test_proba, test_patient_ids)
-#     best_metrics: Dict[str, np.ndarray] = { 'test' : y_test_proba }
-
-#     # Return scores
-#     return best_scores, best_metrics
