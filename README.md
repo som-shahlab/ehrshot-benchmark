@@ -109,10 +109,11 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** We provide two versions of EHRSHOT (each version contains identical data, just different formats). Access requires signing a research usage agreement.
+**Access:** We provide three versions of EHRSHOT. Access requires signing a research usage agreement.
 
-1. **Original:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The original EHRSHOT dataset from the paper (and version compatible with this repo) is stored in `EHRSHOT_ASSETS.zip` at this link.
-2. **MEDS:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The EHRSHOT dataset in a [MEDS](https://github.com/Medical-Event-Data-Standard) compatible version is stored in `EHRSHOT_MEDS.zip` at this link.
+1. **Original:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The original EHRSHOT dataset from the paper (and version compatible with this repo) is stored in `EHRSHOT_ASSETS.zip`. The rest of this documentation refers to the **Original** dataset.
+2. **MEDS:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The EHRSHOT dataset in a [MEDS](https://github.com/Medical-Event-Data-Standard) compatible version is stored in `EHRSHOT_MEDS.zip`. It contains the **same exact data** as **Original**.
+3. **OMOP:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). All of the EHRSHOT patients, but with their full OMOP table dumps. This contains the same patients as **Original**, but **different data** (i.e. full OMOP tables).
 
 EHRSHOT contains:
 * **6,739 patients**
@@ -121,6 +122,8 @@ EHRSHOT contains:
 * **15 prediction tasks**
 
 Each patient consists of an ordered timeline of clinical events taken from the structured data of their EHR (e.g. diagnoses, procedures, prescriptions, etc.). 
+
+### Tasks
 
 Each task is a predictive classification task, and includes a canonical train/val/test split. The tasks are defined as follows:
 
@@ -142,6 +145,165 @@ Each task is a predictive classification task, and includes a canonical train/va
 | Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
 | Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |  {0,1,...,8192} aka binary string where a 1 at location `idx` means that the label at `CHEXPERT_LABELS[idx]` is True, per [this array](https://github.com/som-shahlab/ehrshot-benchmark/blob/f23b83a2b487b6ae8da06cb08b23b3656c447307/ehrshot/utils.py#L107C1-L122C2) |
 
+### Label Counts
+
+Here is the number of labels per task. Note this is slightly different than reported in the original EHRSHOT paper due to dataset updates pre-release.
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Task Name</th>
+      <th colspan="2">Train</th>
+      <th colspan="2">Val</th>
+      <th colspan="2">Test</th>
+    </tr>
+    <tr>
+      <th># Patients (# Positive)</th>
+      <th># Labels (# Positive)</th>
+      <th># Patients (# Positive)</th>
+      <th># Labels (# Positive)</th>
+      <th># Patients (# Positive)</th>
+      <th># Labels (# Positive)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="7"><strong>Operational Outcomes</strong></td>
+    </tr>
+    <tr>
+      <td>Long Length of Stay</td>
+      <td>1377 (464)</td>
+      <td>2569 (681)</td>
+      <td>1240 (395)</td>
+      <td>2231 (534)</td>
+      <td>1238 (412)</td>
+      <td>2195 (552)</td>
+    </tr>
+    <tr>
+      <td>30-day Readmission</td>
+      <td>1337 (164)</td>
+      <td>2608 (370)</td>
+      <td>1191 (159)</td>
+      <td>2206 (281)</td>
+      <td>1190 (151)</td>
+      <td>2189 (260)</td>
+    </tr>
+    <tr>
+      <td>ICU Transfer</td>
+      <td>1306 (107)</td>
+      <td>2402 (113)</td>
+      <td>1157 (84)</td>
+      <td>2052 (92)</td>
+      <td>1154 (75)</td>
+      <td>2037 (85)</td>
+    </tr>
+    <tr>
+      <td colspan="7"><strong>Anticipating Lab Test Results</strong></td>
+    </tr>
+    <tr>
+      <td>Thrombocytopenia</td>
+      <td>2084 (906)</td>
+      <td>68776 (22714)</td>
+      <td>1981 (807)</td>
+      <td>54504 (17867)</td>
+      <td>1998 (853)</td>
+      <td>56338 (19137)</td>
+    </tr>
+    <tr>
+      <td>Hyperkalemia</td>
+      <td>2038 (456)</td>
+      <td>76349 (1829)</td>
+      <td>1935 (428)</td>
+      <td>60168 (1386)</td>
+      <td>1958 (405)</td>
+      <td>63653 (1554)</td>
+    </tr>
+    <tr>
+      <td>Hypoglycemia</td>
+      <td>2054 (511)</td>
+      <td>122108 (1904)</td>
+      <td>1950 (433)</td>
+      <td>95488 (1449)</td>
+      <td>1970 (435)</td>
+      <td>100568 (1368)</td>
+    </tr>
+    <tr>
+      <td>Hyponatremia</td>
+      <td>2035 (1294)</td>
+      <td>81336 (23877)</td>
+      <td>1930 (1174)</td>
+      <td>64473 (17557)</td>
+      <td>1956 (1224)</td>
+      <td>67028 (19274)</td>
+    </tr>
+    <tr>
+      <td>Anemia</td>
+      <td>2092 (1484)</td>
+      <td>70501 (49028)</td>
+      <td>1992 (1379)</td>
+      <td>56224 (38498)</td>
+      <td>2002 (1408)</td>
+      <td>58155 (39970)</td>
+    </tr>
+    <tr>
+      <td colspan="7"><strong>Assignment of New Diagnoses</strong></td>
+    </tr>
+    <tr>
+      <td>Hypertension</td>
+      <td>792 (129)</td>
+      <td>1259 (182)</td>
+      <td>781 (128)</td>
+      <td>1247 (175)</td>
+      <td>755 (129)</td>
+      <td>1258 (159)</td>
+    </tr>
+    <tr>
+      <td>Hyperlipidemia</td>
+      <td>923 (137)</td>
+      <td>1684 (205)</td>
+      <td>863 (140)</td>
+      <td>1441 (189)</td>
+      <td>864 (133)</td>
+      <td>1317 (172)</td>
+    </tr>
+    <tr>
+      <td>Pancreatic Cancer</td>
+      <td>1376 (128)</td>
+      <td>2576 (155)</td>
+      <td>1242 (46)</td>
+      <td>2215 (53)</td>
+      <td>1246 (40)</td>
+      <td>2220 (56)</td>
+    </tr>
+    <tr>
+      <td>Celiac</td>
+      <td>1392 (48)</td>
+      <td>2623 (62)</td>
+      <td>1252 (8)</td>
+      <td>2284 (11)</td>
+      <td>1255 (13)</td>
+      <td>2222 (21)</td>
+    </tr>
+    <tr>
+      <td>Lupus</td>
+      <td>1377 (79)</td>
+      <td>2570 (104)</td>
+      <td>1238 (24)</td>
+      <td>2225 (33)</td>
+      <td>1249 (19)</td>
+      <td>2243 (20)</td>
+    </tr>
+    <tr>
+      <td>Acute MI</td>
+      <td>1365 (130)</td>
+      <td>2534 (175)</td>
+      <td>1234 (112)</td>
+      <td>2176 (145)</td>
+      <td>1235 (115)</td>
+      <td>2127 (144)</td>
+    </tr>
+  </tbody>
+</table>
 
 
 <a name="prior_work"/>
