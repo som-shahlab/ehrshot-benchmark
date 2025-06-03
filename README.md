@@ -1,17 +1,26 @@
-# 👂 💉 EHRSHOT
+<div align="center">
+  <h1>👂 💉 EHRSHOT</h1>
+  <h4>
+    <a href="https://redivis.com/datasets/53gc-8rhx41kgt">🗃️ Dataset</a> • <a href="https://huggingface.co/StanfordShahLab/clmbr-t-base">🔮 CLMBR-T-Base Model</a> • <a href="https://arxiv.org/abs/2307.02028">📝 Paper</a> • <a href="https://ehrshot.stanford.edu">⚙️ Documentation</a>
+  </h4>
+  <h4>A benchmark for few-shot evaluation of foundation models on EHR data</h4>
+  <p>
+    6,739 patients • 41,661,637 clinical events • 921,499 visits • 15 tasks
+  </p>
+</div>
 
-A benchmark/dataset for few-shot evaluation of foundation models for electronic health records (EHRs). You can **[read the paper here](https://arxiv.org/abs/2307.02028)**. 
+# 
 
-Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
+Unlike prior EHR benchmarks limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
 > [!NOTE]  
-> EHRSHOT can be downloaded as a [💊 MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard).
+> EHRSHOT is now available as a [💊 MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard).
 > 
 > Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
 
 # 📖 Table of Contents
 1. [Quick Start](#quick_start)
-2. [Pre-trained Foundation Model (CLMBR-T-base)](#models)
+2. [Foundation Model (CLMBR-T-base)](#models)
 3. [Dataset + Tasks](#dataset)
 4. [Comparison to Prior Work](#prior_work)
 5. [Other](#other)
