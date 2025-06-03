@@ -9,7 +9,7 @@ Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** co
 
 # 📖 Table of Contents
 1. [Quick Start](#quick_start)
-2. [Pre-trained Foundation Model](#models)
+2. [Pre-trained Foundation Model (CLMBR-T-base)](#models)
 3. [Dataset + Tasks](#dataset)
 4. [Comparison to Prior Work](#prior_work)
 5. [Other](#other)
