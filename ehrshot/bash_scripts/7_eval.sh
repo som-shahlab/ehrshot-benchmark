@@ -36,7 +36,7 @@ path_to_split_csv="${BASE_EHRSHOT_DIR}/splits/person_id_map.csv"
 
 models="clmbr,count"
 heads="lr_lbfgs,rf,gbm"
-ks="-1"
+ks="1,2,4,8,16,32,64,128,-1"
 shot_strats=("all")
 num_threads=20
 
