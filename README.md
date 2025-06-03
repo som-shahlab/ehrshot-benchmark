@@ -197,6 +197,10 @@ We've included a number of helper scripts in `ehrshot/scripts`. None of these ar
 * [create_splits](ehrshot/scripts/create_splits.py) - creates splits for other FEMR extracts into the EHRSHOT format
 * [generate_benchmark_starr](ehrshot/scripts/generate_benchmark_starr.py) - runs EHRSHOT labelers on entire Stanford STARR-OMOP dataset
 
+## Context Clues
+
+The files in `ehrshot/context_clues` contain scripts used for evals in the [Context Clues paper](https://github.com/som-shahlab/hf_ehr/tree/main).
+
 <a name="citation"/>
 
 # Citation
