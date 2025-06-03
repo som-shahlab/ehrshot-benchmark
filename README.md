@@ -4,9 +4,14 @@ A benchmark/dataset for few-shot evaluation of foundation models for electronic 
 
 Whereas most prior EHR benchmarks are limited to the ICU setting, **EHRSHOT** contains the **full longitudinal health records of 6,739 patients from Stanford Medicine** and a diverse set of **15 classification tasks** tailored towards few-shot evaluation of pre-trained models. 
 
+> [!NOTE]  
+> EHRSHOT can be downloaded as a [💊 MEDS compatible dataset](https://github.com/Medical-Event-Data-Standard).
+> 
+> Please visit this [**Redivis link**](https://redivis.com/datasets/53gc-8rhx41kgt) and download the file called `EHRSHOT_MEDS.zip`
+
 # 📖 Table of Contents
 1. [Quick Start](#quick_start)
-2. [Pre-trained Foundation Model](#models)
+2. [Pre-trained Foundation Model (CLMBR-T-base)](#models)
 3. [Dataset + Tasks](#dataset)
 4. [Comparison to Prior Work](#prior_work)
 5. [Other](#other)
@@ -35,11 +40,12 @@ For our data preprocessing pipeline we use **[FEMR  (Framework for Electronic Me
 
 You must also have CUDA/cuDNN installed (we recommend CUDA 11.8 and cuDNN 8.7.0). 
 
-Note that this currently only works on Linux machines.
+> [!CAUTION]
+> This currently only works on Linux machines.
 
 ```bash
-pip install femr-cuda==0.0.20 dm-haiku==0.0.9 optax==0.1.4
-pip install --upgrade "jax[cuda11_pip]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install femr-cuda==0.1.16 dm-haiku==0.0.9 optax==0.1.4
+pip install --upgrade "jax[cuda]==0.4.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 **3)**: **Download dataset + model** from [Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and place the results in a directory called `EHRSHOT_ASSETS/`.
@@ -94,7 +100,10 @@ We use [Clinical Language-Model-Based Representations (CLMBR)](https://www.scien
 
 # 🗃️ Dataset + Tasks
 
-**Access:** [The EHRSHOT dataset is on Redivis here](https://redivis.com/datasets/53gc-8rhx41kgt) and requires signing a research usage agreement.
+**Access:** We provide two versions of EHRSHOT (each version contains identical data, just different formats). Access requires signing a research usage agreement.
+
+1. **Original:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The original EHRSHOT dataset from the paper (and version compatible with this repo) is stored in `EHRSHOT_ASSETS.zip` at this link.
+2. **MEDS:** [Link](https://redivis.com/datasets/53gc-8rhx41kgt). The EHRSHOT dataset in a [MEDS](https://github.com/Medical-Event-Data-Standard) compatible version is stored in `EHRSHOT_MEDS.zip` at this link.
 
 EHRSHOT contains:
 * **6,739 patients**
@@ -106,23 +115,23 @@ Each patient consists of an ordered timeline of clinical events taken from the s
 
 Each task is a predictive classification task, and includes a canonical train/val/test split. The tasks are defined as follows:
 
-|         Task         | Type              | Prediction Time                       | Time Horizon           |
-|:--------------------:|-------------------|---------------------------------------|------------------------|
-| Long Length of Stay  | Binary            | 11:59pm on day of admission           | Admission duration     |
-| 30-day Readmission   | Binary            | 11:59pm on day of discharge           | 30-days post discharge |
-| ICU Transfer         | Binary            | 11:59pm on day of admission           | Admission duration     |
-| Thrombocytopenia     | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hyperkalemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hypoglycemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hyponatremia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Anemia               | 4-way Multiclass  | Immediately before result is recorded | Next result            |
-| Hypertension         | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Hyperlipidemia       | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Pancreatic Cancer    | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Celiac               | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Lupus                | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |
-| Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |
+|         Task         | Type              | Prediction Time                       | Time Horizon           | Possible Label Values in Dataset |
+|:--------------------:|-------------------|---------------------------------------|------------------------|--------|
+| Long Length of Stay  | Binary            | 11:59pm on day of admission           | Admission duration     |  {0,1} aka {<7 days, >=7 days} |
+| 30-day Readmission   | Binary            | 11:59pm on day of discharge           | 30-days post discharge |  {0,1} aka {no readmission, readmission} |
+| ICU Transfer         | Binary            | 11:59pm on day of admission           | Admission duration     |  {0,1} aka {no transfer, transfer} |
+| Thrombocytopenia     | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hyperkalemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hypoglycemia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hyponatremia         | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Anemia               | 4-way Multiclass  | Immediately before result is recorded | Next result            |  {0,1,2,3} aka {low, medium, high, abnormal}  |
+| Hypertension         | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Hyperlipidemia       | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Pancreatic Cancer    | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Celiac               | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Lupus                | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Acute MI             | Binary            | 11:59pm on day of discharge           | 1 year post-discharge  |  {0,1} aka {no diagnosis, diagnosis} |
+| Chest X-Ray Findings | 14-way Multilabel | 24hrs before report is recorded       | Next report            |  {0,1,...,8192} aka binary string where a 1 at location `idx` means that the label at `CHEXPERT_LABELS[idx]` is True, per [this array](https://github.com/som-shahlab/ehrshot-benchmark/blob/f23b83a2b487b6ae8da06cb08b23b3656c447307/ehrshot/utils.py#L107C1-L122C2) |
 
 
 
@@ -187,6 +196,10 @@ We've included a number of helper scripts in `ehrshot/scripts`. None of these ar
 * [convert_to_meds](ehrshot/scripts/convert_to_meds.py) - converts EHRSHOT into the [MEDS dataset format](https://github.com/Medical-Event-Data-Standard/meds/tree/main)
 * [create_splits](ehrshot/scripts/create_splits.py) - creates splits for other FEMR extracts into the EHRSHOT format
 * [generate_benchmark_starr](ehrshot/scripts/generate_benchmark_starr.py) - runs EHRSHOT labelers on entire Stanford STARR-OMOP dataset
+
+## Context Clues
+
+The files in `ehrshot/context_clues` contain scripts used for evals in the [Context Clues paper](https://github.com/som-shahlab/hf_ehr/tree/main).
 
 <a name="citation"/>
 

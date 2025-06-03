@@ -69,6 +69,20 @@ def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split
         os.remove(filename)
     logger.success(f"Done creating df_demo!")
 
+def get_splits(splits_dir):
+    splits_df = pd.read_csv(os.path.join(splits_dir, 'person_id_map.csv'))
+    splits_json = {'train':[],'test':[],'val':[]}
+
+    for index,row in splits_df.iterrows():
+        if row['split'] == 'val':
+            splits_json['val'].append(row['omop_person_id'])
+        elif row['split'] == 'test':
+            splits_json['test'].append(row['omop_person_id'])
+        else:
+            splits_json['train'].append(row['omop_person_id'])
+
+    return splits_json
+
 def compute_demographics(args):
     path_to_csv, path_to_database, path_to_splits_dir, patient_ids = args
     patient_database = femr.datasets.PatientDatabase(path_to_database)
