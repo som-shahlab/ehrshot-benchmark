@@ -7,12 +7,14 @@
 #SBATCH --mem=300G
 #SBATCH --cpus-per-task=32
 
-mkdir -p ../../EHRSHOT_ASSETS/cohort_stats
+BASE_EHRSHOT_DIR="../../EHRSHOT_ASSETS"
+
+mkdir -p ${BASE_EHRSHOT_DIR}/cohort_stats
 
 python3 ../9_make_cohort_plots.py \
-    --path_to_database ../../EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_and_feats_dir ../../EHRSHOT_ASSETS/benchmark \
-    --path_to_input_dir ../../EHRSHOT_ASSETS/data \
-    --path_to_splits_dir ../../EHRSHOT_ASSETS/splits \
-    --path_to_output_dir ../../EHRSHOT_ASSETS/cohort_stats \
+    --path_to_database ${BASE_EHRSHOT_DIR}/femr/extract \
+    --path_to_labels_and_feats_dir ${BASE_EHRSHOT_DIR}/benchmark \
+    --path_to_input_dir ${BASE_EHRSHOT_DIR}/data \
+    --path_to_splits_dir ${BASE_EHRSHOT_DIR}/splits \
+    --path_to_output_dir ${BASE_EHRSHOT_DIR}/cohort_stats \
     --num_threads 32

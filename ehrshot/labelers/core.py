@@ -1,6 +1,4 @@
 """Core labeling functionality/schemas, shared across all labeling functions."""
-from __future__ import annotations
-
 import collections
 import csv
 import datetime
@@ -13,11 +11,9 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Any, DefaultDict, Dict, List, Literal, Optional, Sequence, Tuple, Union, cast
-
 import numpy as np
 from nptyping import NDArray
-
-from femr import Patient
+from femr import Patient, Event
 from femr.datasets import PatientDatabase
 from femr.extension import datasets as extension_datasets
 
@@ -58,11 +54,11 @@ class Label:
 
 
 def _apply_labeling_function(
-    args: Tuple[Labeler, Optional[Sequence[Patient]], Optional[str], List[int]]
+    args: Tuple['Labeler', Optional[Sequence[Patient]], Optional[str], List[int]]
 ) -> Dict[int, List[Label]]:
     """Apply a labeling function to the set of patients included in `patient_ids`.
     Gets called as a parallelized subprocess of the .apply() method of `Labeler`."""
-    labeling_function: Labeler = args[0]
+    labeling_function: 'Labeler' = args[0]
     patients: Optional[Sequence[Patient]] = args[1]
     path_to_patient_database: Optional[str] = args[2]
     patient_ids: List[int] = args[3]
@@ -94,7 +90,7 @@ def _apply_labeling_function(
     return patients_to_labels
 
 
-def load_labeled_patients(filename: str) -> LabeledPatients:
+def load_labeled_patients(filename: str) -> 'LabeledPatients':
     with open(filename, "r") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -191,9 +187,9 @@ class LabeledPatients(MutableMapping[int, List[Label]]):
     def as_numpy_arrays(
         self,
     ) -> Tuple[
-        NDArray[Literal["n_patients, 1"], np.int64],
-        NDArray[Literal["n_patients, 1 or 2"], Any],
-        NDArray[Literal["n_patients, 1"], np.datetime64],
+        NDArray,  # Shape (n_patients, 1) for int64
+        NDArray,       # Shape (n_patients, 1 or 2) for general type
+        NDArray,  # Shape (n_patients, 1) for datetime64
     ]:
         """Convert `patients_to_labels` to a tuple of NDArray's.
 
@@ -277,11 +273,11 @@ class LabeledPatients(MutableMapping[int, List[Label]]):
     @classmethod
     def load_from_numpy(
         cls,
-        patient_ids: NDArray[Literal["n_patients, 1"], np.int64],
-        label_values: NDArray[Literal["n_patients, 1 or 2"], Any],
-        label_times: NDArray[Literal["n_patients, 1"], datetime.datetime],
+        patient_ids: NDArray, # Shape (n_patients, 1) for int64
+        label_values: NDArray, # Shape (n_patients, 1 or 2) for general type
+        label_times: NDArray, # Shape (n_patients, 1) for datetime64
         labeler_type: LabelType,
-    ) -> LabeledPatients:
+    ) -> 'LabeledPatients':
         """Create a :class:`LabeledPatients` from NDArray labels.
 
             Inverse of `as_numpy_arrays()`

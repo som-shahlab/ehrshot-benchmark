@@ -1,14 +1,12 @@
 """Labeling functions for OMOP data."""
-from __future__ import annotations
-
 import datetime
 import warnings
-from typing import List, Optional, Tuple
-
+from typing import List, Optional, Tuple, Any, Dict
+import pandas as pd
 from femr import Event, Patient
 from femr.extension import datasets as extension_datasets
-from .core import Label, Labeler, LabelType, TimeHorizon, TimeHorizonEventLabeler
-from .omop import (
+from ehrshot.labelers.core import Label, Labeler, LabelType, TimeHorizon, TimeHorizonEventLabeler, LabeledPatients
+from ehrshot.labelers.omop import (
     CodeLabeler,
     WithinVisitLabeler,
     does_exist_event_within_time_range,
@@ -18,8 +16,8 @@ from .omop import (
     get_inpatient_admission_events,
     move_datetime_to_end_of_day,
 )
-from .omop_inpatient_admissions import get_inpatient_admission_discharge_times
-from .omop_lab_values import InstantLabValueLabeler
+from ehrshot.labelers.omop_inpatient_admissions import get_inpatient_admission_discharge_times
+from ehrshot.labelers.omop_lab_values import InstantLabValueLabeler
 
 ##########################################################
 ##########################################################

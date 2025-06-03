@@ -1,28 +1,12 @@
-import os
-from tqdm import tqdm
-import pandas as pd
-import numpy as np
 import datetime
-from collections import deque, defaultdict
-import time
-import random
-from datetime import timedelta
-import csv
-import femr.datasets
-from typing import Dict, List, Tuple, Set, Union, Optional, Callable
-from torch.utils.data import Dataset
-from hf_ehr.config import Event
-from femr import Patient
+from typing import List, Tuple
+from femr import Patient, Event
 from femr.extension import datasets as extension_datasets
-from hf_ehr.data.datasets import FEMRDataset
-from .core import Label, Labeler, LabelType, TimeHorizon, TimeHorizonEventLabeler
-from .omop import (
-    CodeLabeler,
+from ehrshot.labelers.core import Label, Labeler, LabelType
+from ehrshot.labelers.omop import (
     WithinVisitLabeler,
-    get_death_concepts,
     get_inpatient_admission_events,
     move_datetime_to_end_of_day,
-    does_exist_event_within_time_range,
     get_inpatient_admission_discharge_times,
     get_femr_codes,
     identity,
@@ -114,52 +98,3 @@ class Mimic_MortalityLabeler(WithinVisitLabeler):
 
 if __name__ == '__main__':
     pass
-
-
-
-# class Mimic_MortalityLabeler(Labeler):
-#     """In-hospital mortality prediction task.
-
-#     Binary prediction task @ 11:59PM on the day of admission whether the patient dies during their hospital stay.
-
-#     Excludes:
-#         - Admissions with no length-of-stay (i.e. `event.end is None` )
-#         - Admissions with no events before 48 hours
-#     """
-
-#     def __init__(
-#         self,
-#         ontology: extension_datasets.Ontology,
-#     ):
-#         self.ontology: extension_datasets.Ontology = ontology
-#         self.prediction_time_adjustment_func = move_datetime_to_end_of_day
-
-#     def label(self, patient: Patient) -> List[Label]:
-#         labels: List[Label] = []
-#         outcome_times: List[datetime.datetime] = self.get_outcome_times(patient)
-#         for admission_time, discharge_time in get_inpatient_admission_discharge_times(patient, self.ontology):
-#             prediction_time: datetime.datetime = self.prediction_time_adjustment_func(admission_time)
-#             is_outcome: bool = False
-#             for outcome_time in outcome_times:
-#                 if outcome_time <= prediction_time:
-#                     # Ignore deaths that occur before prediction time
-#                     continue
-#                 if (prediction_time - admission_time2) <= self.time_horizon:
-#                     # If death occurs within visit, mark as True
-#                     is_30_day_readmission: bool = True
-#                     break
-                    
-#             labels.append(Label(prediction_time, is_30_day_readmission))
-#         return labels
-
-#     def get_outcome_times(self, patient: Patient) -> List[datetime.datetime]:
-#         """Return a list of all times when the patient experiences an outcome (i.e., death)."""
-#         outcome_codes = list(get_femr_codes(self.ontology, get_death_concepts(), is_ontology_expansion=True))
-#         times: List[datetime.datetime] = []
-#         for e in patient.events:
-#             if e.code in outcome_codes:
-#                 times.append(e.start)
-#         return times
-
-#     def get_labeler_type(self) -> LabelType:
-#         return "boolean"

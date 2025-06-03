@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ehrshot-benchmark"
+version = "0.1.0"
+authors = [
+    { name = "Michael Wornow" }
+]
+description = "EHRSHOT Benchmark"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "lightgbm==3.3.5",
+    "loguru==0.7.0",
+    "matplotlib==3.7.1",
+    "numpy==1.24.3",
+    "pandas==2.2",
+    "scikit-learn==1.2.2",
+    "scipy==1.10.1",
+    "tqdm==4.65.0",
+    "tabulate==0.9.0",
+    "torch",
+    "meds==0.3.3",
+    "meds_reader==0.1.9",
+    "jsonschema",
+    "omegaconf==2.3.0",
+    "jaxtyping==0.2.33",
+    "transformers==4.42.4",
+    "lightning==2.2.1",
+    "wandb==0.17.4",
+    "polars==0.19.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/som-shahlab/ehrshot-benchmark/"
+
+[tool.setuptools.packages.find]
+include = ["ehrshot*"]

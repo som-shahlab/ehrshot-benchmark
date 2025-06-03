@@ -29,27 +29,27 @@ MODEL_2_INFO: Dict[str, Dict[str, Any]] = {
     },
     'gpt' : {
         'label' : 'gpt',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
     'gpt2' : {
         'label' : 'gpt2',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
     'bert' : {
         'label' : 'bert',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
     'hyena' : {
         'label' : 'hyena',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
     'mamba' : {
         'label' : 'mamba',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
     'llama' : {
         'label' : 'llama',
-        'heads' : ['lr_lbfgs', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
+        'heads' : ['lr_lbfgs', 'zero_shot', 'finetune_frozen', 'finetune_full', 'finetune_layers=1', 'finetune_layers=2', 'finetune_frozen-logregfirst', 'finetune_full-logregfirst' ],
     },
 }
 
@@ -59,6 +59,9 @@ HEAD_2_INFO: Dict[str, Dict[str, str]] = {
     },
     'lr_lbfgs' : {
         'label' : 'LR',
+    },
+    'zero_shot' : {
+        'label' : 'Zero-shot',
     },
     'protonet' : {
         'label' : 'ProtoNet',

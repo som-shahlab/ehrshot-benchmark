@@ -1,24 +1,12 @@
 """Labeling functions for OMOP data."""
-from __future__ import annotations
-
-import collections
 import datetime
-import multiprocessing
-import warnings
 from abc import abstractmethod
 from collections import deque
 from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-
-import numpy as np
-import pandas as pd
-
-from femr import Event, Patient
-from femr.datasets import PatientDatabase
+from femr import Patient, Event
 from femr.extension import datasets as extension_datasets
-from .core import Label, LabeledPatients, Labeler, LabelType, TimeHorizon, TimeHorizonEventLabeler
-
-
+from ehrshot.labelers.core import Label, Labeler, LabelType, TimeHorizon, TimeHorizonEventLabeler
 
 def identity(x: Any) -> Any:
     return x

@@ -1,8 +1,7 @@
 import argparse
 import datetime
-import json
 import multiprocessing
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import os
@@ -22,7 +21,7 @@ def parse_args():
     parser.add_argument("--path_to_labels_and_feats_dir", required=True, type=str, help="Path to directory containing saved labels and featurizers")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_input_dir", required=True, type=str, help="Path to folder containing all EHRSHOT cohort CSVs")
-    parser.add_argument("--path_to_splits_dir", required=True, type=str, help="Path to directory containing splits.json")
+    parser.add_argument("--path_to_splits_dir", required=True, type=str, help="Path to directory containing splits")
     parser.add_argument("--path_to_output_dir", required=True, type=str, help="Path to directory to save figures")
     parser.add_argument("--num_threads", default=1, type=int, help="Number of processes to launch")
     return parser.parse_args()
@@ -73,7 +72,13 @@ def create_df_demo(path_to_database: str, path_to_output_dir: str, path_to_split
 def compute_demographics(args):
     path_to_csv, path_to_database, path_to_splits_dir, patient_ids = args
     patient_database = femr.datasets.PatientDatabase(path_to_database)
-    splits = json.load(open(os.path.join(path_to_splits_dir, 'person_id_map.csv'), 'r'))
+    
+    # Load splits
+    df_split = pd.read_csv(os.path.join(path_to_splits_dir, 'person_id_map.csv'))
+    splits: Dict[str, List[int]] = { # [key] = split, [value] = list of patient IDs
+        split: df_split[df_split['split'] == split]['omop_person_id'].tolist() for split in df_split['split'].unique()
+    }
+
     rows = []
     for idx, pid in enumerate(patient_ids):
         is_male: bool = False
@@ -161,9 +166,9 @@ if __name__ == "__main__":
 
     # Load splits
     df_split = pd.read_csv(os.path.join(PATH_TO_SPLITS_DIR, 'person_id_map.csv'))
-    split_2_idxs = { 'train' : [], 'val' : [], 'test' : [], }
-    
-    splits: Dict[str, List[int]] = json.load(open(os.path.join(PATH_TO_SPLITS_DIR, 'splits.json'), 'r'))
+    splits: Dict[str, List[int]] = { # [key] = split, [value] = list of patient IDs
+        split: df_split[df_split['split'] == split]['omop_person_id'].tolist() for split in df_split['split'].unique()
+    }
 
     # Load all labels from CSVs
     logger.info("Start | Creating df_labels.csv")

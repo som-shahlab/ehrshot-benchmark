@@ -7,10 +7,11 @@ from loguru import logger
 from utils import LABELING_FUNCTION_2_PAPER_NAME
 import pandas as pd
 import random
+from multiprocessing import Pool, Manager
 
 from femr.datasets import PatientDatabase
-from labelers.core import LabeledPatients, Label
-from labelers.ehrshot import (
+from ehrshot.labelers.core import LabeledPatients, Label
+from ehrshot.labelers.ehrshot import (
     Guo_LongLOSLabeler,
     Guo_30DayReadmissionLabeler,
     Guo_ICUAdmissionLabeler,
@@ -27,15 +28,10 @@ from labelers.ehrshot import (
     AnemiaInstantLabValueLabeler,
     ChexpertLabeler,
 )
-from labelers.mimic import (
-    Mimic_MortalityLabeler,
-    Mimic_ReadmissionLabeler
-)
-
-import random
-from multiprocessing import Pool, Manager
-from tqdm import tqdm
-from typing import List
+# from ehrshot.labelers.mimic import (
+#     Mimic_MortalityLabeler,
+#     Mimic_ReadmissionLabeler
+# )
 
 # Function to handle label generation for a subset of patient IDs
 def process_patient_ids(pid_subset, labeled_patients, path_to_database, results_dict):
@@ -173,12 +169,12 @@ if __name__ == "__main__":
         assert args.path_to_chexpert_csv is not None, f"The argument --path_to_chexpert_csv must be specified"
         labeler = ChexpertLabeler(args.path_to_chexpert_csv)
     #   MIMIC-IV specific labelers
-    elif LABELING_FUNCTION == "mimic4_los":
-        labeler = Guo_LongLOSLabeler(ontology)
-    elif LABELING_FUNCTION == "mimic4_readmission":
-        labeler = Mimic_ReadmissionLabeler(ontology)
-    elif LABELING_FUNCTION == "mimic4_mortality":
-        labeler = Mimic_MortalityLabeler(ontology)
+    # elif LABELING_FUNCTION == "mimic4_los":
+    #     labeler = Guo_LongLOSLabeler(ontology)
+    # elif LABELING_FUNCTION == "mimic4_readmission":
+    #     labeler = Mimic_ReadmissionLabeler(ontology)
+    # elif LABELING_FUNCTION == "mimic4_mortality":
+    #     labeler = Mimic_MortalityLabeler(ontology)
     else:
         raise ValueError(
             f"Labeling function `{LABELING_FUNCTION}` not supported. Must be one of: {LABELING_FUNCTION_2_PAPER_NAME.keys()}."
